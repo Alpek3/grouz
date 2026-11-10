@@ -418,7 +418,7 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, t}) {
 // ════════════════════════════════════════════════════════════════════════════════
 function SettingsPage({currentUser, darkMode, onToggleDark, onLogout, onBack, onChangePassword, onOpenBlocked, onDeleteAccount, blockedCount, t}) {
   const [copied, setCopied] = useState(false);
-  const inviteLink = "https://grouz.vercel.app";
+  const inviteLink = window.location.origin;   // s'adapte tout seul au futur nom de domaine
   const msgEnc = encodeURIComponent(`Rejoins-moi sur GrouZ pour organiser des sorties : ${inviteLink}`);
   const copyLink = () => { navigator.clipboard?.writeText(inviteLink).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
@@ -1197,7 +1197,7 @@ function CreateModal({onClose,onSave,currentUser,t}) {
 // ════════════════════════════════════════════════════════════════════════════════
 // ACTIVITY CARD
 // ════════════════════════════════════════════════════════════════════════════════
-function ActivityCard({activity,currentUser,onClick,t}) {
+function ActivityCard({activity,currentUser,onClick,km,t}) {
   const isMember=activity.accepted?.some(u=>u.id===currentUser.id);
   const isPending=activity.pending?.some(u=>u.id===currentUser.id);
   const spotsLeft=activity.maxPeople-(activity.accepted?.length||0);
@@ -1217,7 +1217,7 @@ function ActivityCard({activity,currentUser,onClick,t}) {
       <h3 style={{margin:"0 0 8px",fontFamily:"'Fraunces',serif",fontSize:17,color:t.text,lineHeight:1.3}}>{activity.title}</h3>
       <div style={{fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace",marginBottom:14,display:"flex",flexDirection:"column",gap:3}}>
         <span>📅 {formatDate(activity.date)} · {activity.time}</span>
-        <span>📍 {activity.location}</span>
+        <span>📍 {activity.location}{km!=null && <span style={{color:"#E8008A",fontWeight:700}}> · à {fmtKm(km)}</span>}</span>
       </div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -1529,6 +1529,8 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
 // ════════════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ════════════════════════════════════════════════════════════════════════════════
+const fmtKm = km => km < 1 ? "< 1 km" : km < 10 ? `${km.toFixed(1).replace(".", ",")} km` : `${Math.round(km)} km`;
+
 const distKm = (a, b) => {
   const R = 6371, r = x => x * Math.PI / 180;
   const dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
@@ -1899,6 +1901,13 @@ export default function App() {
     window.location.reload();
   };
 
+  // ── Fil d'accueil : les sorties les plus proches de toi en premier (toutes catégories) ──
+  const feed = (() => {
+    const items = filtered.map(a => ({ a, km: userPos && a.lat != null ? distKm(userPos, { lat: a.lat, lng: a.lng }) : null }));
+    if (!userPos) return items;
+    return items.sort((x, y) => (x.km == null) - (y.km == null) || (x.km ?? 0) - (y.km ?? 0));
+  })();
+
   // ── Liste des conversations (dernier message par ami) ──────────────────────
   const [lastDMs, setLastDMs] = useState({});
   useEffect(()=>{
@@ -2088,10 +2097,10 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              {filtered.length===0
+              {feed.length===0
                 ? <div style={{textAlign:"center",padding:"56px 0",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:14}}>Aucune sortie. Soyez le premier !</div>
                 : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-                    {filtered.map(a=><ActivityCard key={a.id} activity={a} currentUser={currentUser} onClick={()=>{setSelected(a);setDetailBack("home");setPage("detail");}} t={t} />)}
+                    {feed.map(({a,km})=><ActivityCard key={a.id} km={km} activity={a} currentUser={currentUser} onClick={()=>{setSelected(a);setDetailBack("home");setPage("detail");}} t={t} />)}
                   </div>
               }
             </div>
