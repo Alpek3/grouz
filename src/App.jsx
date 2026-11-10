@@ -140,7 +140,7 @@ function AuthScreen({onAuth,t}) {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:t.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20,position:"relative",overflow:"hidden"}}>
+    <div style={{minHeight:"100dvh",background:t.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20,position:"relative",overflow:"hidden"}}>
       {/* Background glow orbs */}
       <div style={{position:"absolute",top:"-10%",left:"-10%",width:300,height:300,borderRadius:"50%",background:"#E8008A",opacity:0.12,filter:"blur(80px)",pointerEvents:"none"}}/>
       <div style={{position:"absolute",bottom:"-10%",right:"-10%",width:350,height:350,borderRadius:"50%",background:"#AAEE00",opacity:0.10,filter:"blur(80px)",pointerEvents:"none"}}/>
@@ -516,7 +516,7 @@ function ChatInputBar({ onSend, onVoiceSend, t, placeholder="Écrire…", padH=1
 
   if (voice.previewing) {
     return (
-      <div style={{ padding:`${padV}px ${padH}px`, borderTop:`1px solid ${t.border}`, background:t.bg2, display:"flex", alignItems:"center", gap:10 }}>
+      <div style={{ padding:`${padV}px ${padH}px calc(${padV}px + env(safe-area-inset-bottom, 0px))`, borderTop:`1px solid ${t.border}`, background:t.bg2, display:"flex", alignItems:"center", gap:10 }}>
         <button onClick={voice.cancel} style={{ padding:"8px 12px", borderRadius:10, background:t.bg3, border:`1px solid ${t.border}`, color:t.text3, cursor:"pointer", fontFamily:"'DM Mono',monospace", fontSize:12 }}>✕ Annuler</button>
         <div style={{ flex:1, background:t.accentBg, border:`1px solid ${t.accent}44`, borderRadius:12, padding:"8px 14px", display:"flex", alignItems:"center", gap:10 }}>
           <button onClick={voice.togglePlay} style={{ width:32, height:32, borderRadius:"50%", background:t.accent, border:"none", cursor:"pointer", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
@@ -533,7 +533,7 @@ function ChatInputBar({ onSend, onVoiceSend, t, placeholder="Écrire…", padH=1
 
   if (voice.recording) {
     return (
-      <div style={{ padding:`${padV}px ${padH}px`, borderTop:`1px solid ${t.border}`, background:t.bg2, display:"flex", alignItems:"center", gap:10 }}>
+      <div style={{ padding:`${padV}px ${padH}px calc(${padV}px + env(safe-area-inset-bottom, 0px))`, borderTop:`1px solid ${t.border}`, background:t.bg2, display:"flex", alignItems:"center", gap:10 }}>
         <button onClick={voice.cancel} style={{ padding:"8px 12px", borderRadius:10, background:t.bg3, border:`1px solid ${t.border}`, color:t.text3, cursor:"pointer", fontFamily:"'DM Mono',monospace", fontSize:12 }}>✕</button>
         <div style={{ flex:1, display:"flex", alignItems:"center", gap:10, background:t.accentBg, border:`1px solid ${t.accent}44`, borderRadius:12, padding:"10px 14px" }}>
           <div style={{ width:10, height:10, borderRadius:"50%", background:"#E8008A", animation:"pulse 1s ease-in-out infinite", flexShrink:0 }} />
@@ -548,7 +548,7 @@ function ChatInputBar({ onSend, onVoiceSend, t, placeholder="Écrire…", padH=1
   }
 
   return (
-    <div style={{ padding:`${padV}px ${padH}px`, borderTop:`1px solid ${t.border}`, background:t.bg2, display:"flex", gap:10, alignItems:"center" }}>
+    <div style={{ padding:`${padV}px ${padH}px calc(${padV}px + env(safe-area-inset-bottom, 0px))`, borderTop:`1px solid ${t.border}`, background:t.bg2, display:"flex", gap:10, alignItems:"center" }}>
       <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} placeholder={placeholder} style={{ flex:1, padding:"11px 16px", borderRadius:12, background:t.input, border:`1px solid ${t.border}`, color:t.text, fontSize:14, fontFamily:"'DM Mono',monospace", outline:"none" }} />
       {msg.trim() ? (
         <button onClick={send} style={{ padding:"11px 16px", borderRadius:12, background:t.accent, border:"none", color:"#fff", cursor:"pointer", fontSize:18, transition:"all 0.2s" }}>→</button>
@@ -573,7 +573,7 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onBack, 
   const bottomRef = useRef();
   useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[messages]);
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"100vh"}}>
+    <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
       <div style={{padding:"16px 20px",borderBottom:`1px solid ${t.border}`,display:"flex",alignItems:"center",gap:12,background:t.bg2,flexShrink:0}}>
         <button onClick={onBack} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center"}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1332,13 +1332,13 @@ export default function App() {
 
   // ── Écrans d'attente / connexion ───────────────────────────────────────────
   if (loadErr) return (
-    <div style={{minHeight:"100vh",background:t.bg,color:t.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:24,textAlign:"center",fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{minHeight:"100dvh",background:t.bg,color:t.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:24,textAlign:"center",fontFamily:"'DM Sans',sans-serif"}}>
       <p>Impossible de charger ton profil.<br/><span style={{color:t.text3,fontSize:12}}>{loadErr}</span></p>
       <Btn accent onClick={handleLogout} t={t}>Se déconnecter</Btn>
     </div>
   );
   if (session===undefined || (session && !me0)) return (
-    <div style={{minHeight:"100vh",background:t.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div style={{minHeight:"100dvh",background:t.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <img src={LOGO_B64} alt="GrouZ" style={{width:90,height:90,borderRadius:"50%",border:"3px solid #D4AF37"}} />
     </div>
   );
@@ -1420,6 +1420,8 @@ export default function App() {
         @keyframes pulse{0%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.3)}100%{opacity:1;transform:scale(1)}}
         @keyframes wave{0%{transform:scaleY(0.4)}100%{transform:scaleY(1.1)}}
         @keyframes grouz-glow{0%,100%{box-shadow:0 0 20px rgba(232,0,138,0.3)}50%{box-shadow:0 0 40px rgba(170,238,0,0.3)}}
+        @media (max-width:768px){input,textarea,select{font-size:16px!important}}
+        html,body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}
         @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
         .grouz-map-dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.7);}
         .grouz-map-dark.leaflet-container{background:#1b1b1f;}
@@ -1428,16 +1430,16 @@ export default function App() {
         .leaflet-bar{border:1px solid ${t.border}!important;border-radius:10px!important;overflow:hidden;}
       `}</style>
 
-      <div style={{background:t.bg,height:"100vh",display:"flex",flexDirection:"column",color:t.text,fontFamily:"'DM Sans',sans-serif",transition:"background 0.2s,color 0.2s",overflow:"hidden",position:"relative"}}>
+      <div style={{background:t.bg,position:"fixed",inset:0,display:"flex",flexDirection:"column",color:t.text,fontFamily:"'DM Sans',sans-serif",transition:"background 0.2s,color 0.2s",overflow:"hidden"}}>
         {/* Ambient background orbs */}
         <div style={{position:"fixed",top:"-15%",left:"-10%",width:280,height:280,borderRadius:"50%",background:"#E8008A",opacity:0.06,filter:"blur(70px)",pointerEvents:"none",zIndex:0}}/>
         <div style={{position:"fixed",bottom:"-10%",right:"-10%",width:320,height:320,borderRadius:"50%",background:"#AAEE00",opacity:0.05,filter:"blur(70px)",pointerEvents:"none",zIndex:0}}/>
         <div style={{position:"fixed",top:"45%",left:"60%",width:180,height:180,borderRadius:"50%",background:"#7B00C8",opacity:0.04,filter:"blur(50px)",pointerEvents:"none",zIndex:0}}/>
-        <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",height:"100vh",overflow:"hidden"}}>
+        <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
 
         {/* ── TOP BAR (logo + DM icon) ── */}
         {showNav && page!=="detail" && (
-          <div style={{height:TOP_BAR_H,padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",background:t.navBg,flexShrink:0,zIndex:40,borderBottom:`1px solid ${t.border}`}}>
+          <div style={{height:`calc(${TOP_BAR_H}px + env(safe-area-inset-top, 0px))`,padding:"env(safe-area-inset-top, 0px) 20px 0",display:"flex",alignItems:"center",justifyContent:"space-between",background:t.navBg,flexShrink:0,zIndex:40,borderBottom:`1px solid ${t.border}`}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <div style={{position:"relative"}}>
                 <div style={{position:"absolute",inset:-2,borderRadius:"50%",background:t.gradient,opacity:0.6,filter:"blur(6px)"}}/>
@@ -1558,7 +1560,7 @@ export default function App() {
 
         {/* ── BOTTOM NAV BAR (Instagram style) ── */}
         {showNav&&(
-          <div style={{height:BOTTOM_NAV_H,borderTop:`1px solid ${t.border}`,background:t.navBg,display:"flex",alignItems:"center",justifyContent:"space-around",padding:"0 8px",flexShrink:0,zIndex:60,position:"relative"}}>
+          <div style={{height:`calc(${BOTTOM_NAV_H}px + env(safe-area-inset-bottom, 0px))`,borderTop:`1px solid ${t.border}`,background:t.navBg,display:"flex",alignItems:"center",justifyContent:"space-around",padding:"0 8px env(safe-area-inset-bottom, 0px)",flexShrink:0,zIndex:60,position:"relative"}}>
             {/* gradient top border */}
             <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:t.gradient,opacity:0.6}}/>
             {NAV.map(({id,icon})=>{
