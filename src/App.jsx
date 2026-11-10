@@ -988,7 +988,7 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
       </div>
 
       {/* Map container */}
-      <div style={{ flex:1, position:"relative", margin:"0 12px", borderRadius:20, overflow:"hidden", border:`1px solid ${t.border}`, minHeight:260 }}>
+      <div style={{ flex:1, position:"relative", margin:"0 12px", borderRadius:20, overflow:"hidden", border:`1px solid ${t.border}`, minHeight:260, isolation:"isolate", zIndex:0 }}>
         {!mapReady && (
           <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", background:t.bg2, zIndex:10 }}>
             <div style={{ textAlign:"center" }}>
