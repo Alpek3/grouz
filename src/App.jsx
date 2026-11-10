@@ -122,6 +122,16 @@ function AuthScreen({onAuth,t}) {
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
   const [busy, setBusy] = useState(false);
+  const [forgot, setForgot] = useState(false);
+  const [info, setInfo] = useState("");
+  const [accepted, setAccepted] = useState(false);
+  const handleForgot = async () => {
+    if (!form.email.trim()) return setErr("Entre ton adresse email.");
+    setBusy(true); setErr(""); setInfo("");
+    try { await api.requestPasswordReset(form.email.trim()); setInfo("Si un compte existe avec cette adresse, un email vient d'être envoyé. Pense à vérifier tes spams."); }
+    catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
   const handleLogin = async () => {
     setBusy(true); setErr("");
     try { await api.signIn({ email: form.email.trim(), password: form.password }); }
@@ -130,7 +140,8 @@ function AuthScreen({onAuth,t}) {
   };
   const handleRegister = async () => {
     if (!form.name||!form.pseudo||!form.email||!form.password||!form.age) return setErr("Tous les champs sont obligatoires.");
-    if (isNaN(+form.age)||+form.age<13) return setErr("Âge invalide (min. 13 ans).");
+    if (isNaN(+form.age)||+form.age<15) return setErr("Tu dois avoir 15 ans ou plus pour utiliser GrouZ.");
+    if (!accepted) return setErr("Tu dois accepter les conditions d'utilisation et la politique de confidentialité.");
     if (form.password.length<6) return setErr("Mot de passe : 6 caractères minimum.");
     setBusy(true); setErr("");
     try {
@@ -142,6 +153,19 @@ function AuthScreen({onAuth,t}) {
 
   return (
     <div style={{minHeight:"100dvh",background:t.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20,position:"relative",overflow:"hidden"}}>
+      {forgot && (
+        <div onClick={()=>setForgot(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:380,padding:26}}>
+            <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"0 0 8px"}}>Mot de passe oublié</h2>
+            <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.5,margin:"0 0 16px"}}>Entre ton adresse email, on t'envoie un lien pour choisir un nouveau mot de passe.</p>
+            <Field label="Email" value={form.email} onChange={v=>set("email",v)} type="email" placeholder="toi@mail.com" t={t} />
+            {err&&<p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,margin:"12px 0 0"}}>{err}</p>}
+            {info&&<p style={{color:t.green,fontFamily:"'DM Mono',monospace",fontSize:12,margin:"12px 0 0",lineHeight:1.5}}>{info}</p>}
+            <Btn accent onClick={handleForgot} disabled={busy} t={t} style={{width:"100%",marginTop:16,padding:14}}>ENVOYER LE LIEN</Btn>
+            <button onClick={()=>setForgot(false)} style={{display:"block",margin:"12px auto 0",background:"none",border:"none",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>← Retour</button>
+          </div>
+        </div>
+      )}
       {/* Background glow orbs */}
       <div style={{position:"absolute",top:"-10%",left:"-10%",width:300,height:300,borderRadius:"50%",background:"#E8008A",opacity:0.12,filter:"blur(80px)",pointerEvents:"none"}}/>
       <div style={{position:"absolute",bottom:"-10%",right:"-10%",width:350,height:350,borderRadius:"50%",background:"#AAEE00",opacity:0.10,filter:"blur(80px)",pointerEvents:"none"}}/>
@@ -171,6 +195,13 @@ function AuthScreen({onAuth,t}) {
             </>}
             <Field label="Email" value={form.email} onChange={v=>set("email",v)} type="email" placeholder="toi@mail.com" t={t} />
             <Field label="Mot de passe" value={form.password} onChange={v=>set("password",v)} type="password" placeholder="••••••••" t={t} />
+            {tab==="login" && <button onClick={()=>{ setForgot(true); setErr(""); setInfo(""); }} style={{width:"100%",background:"none",border:"none",color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:11,cursor:"pointer",padding:0,textAlign:"left"}}>Mot de passe oublié ?</button>}
+            {tab==="register" && (
+              <label style={{display:"flex",gap:10,alignItems:"flex-start",width:"100%",cursor:"pointer"}}>
+                <input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)} style={{width:18,height:18,marginTop:1,accentColor:"#E8008A",flexShrink:0}} />
+                <span style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:12,lineHeight:1.5}}>J'ai 15 ans ou plus et j'accepte les <a href="/conditions.html" target="_blank" rel="noreferrer" style={{color:t.accent}}>conditions d'utilisation</a> et la <a href="/confidentialite.html" target="_blank" rel="noreferrer" style={{color:t.accent}}>politique de confidentialité</a>.</span>
+              </label>
+            )}
           </div>
           {err&&<p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,marginTop:12,padding:"8px 12px",background:t.accentBg,borderRadius:8,border:`1px solid ${t.accent}44`}}>{err}</p>}
           <button onClick={tab==="login"?handleLogin:handleRegister} disabled={busy} style={{marginTop:20,width:"100%",padding:"14px",borderRadius:14,background:t.gradient,color:"#fff",border:"none",fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",boxShadow:`0 4px 20px rgba(232,0,138,0.4)`,transition:"all 0.2s"}}>
@@ -185,14 +216,115 @@ function AuthScreen({onAuth,t}) {
 // ════════════════════════════════════════════════════════════════════════════════
 // USER PROFILE MODAL
 // ════════════════════════════════════════════════════════════════════════════════
-function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, isFriend, hasPendingReq, t}) {
+function PasswordForm({ onDone, onCancel, t }) {
+  const [pw, setPw] = useState(""); const [pw2, setPw2] = useState("");
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (pw.length < 6) return setErr("6 caractères minimum.");
+    if (pw !== pw2) return setErr("Les deux mots de passe ne correspondent pas.");
+    setBusy(true); setErr("");
+    try { await api.updatePassword(pw); onDone(); } catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:t.bg,zIndex:330,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:380,padding:26}}>
+        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"0 0 14px"}}>Nouveau mot de passe</h2>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <Field label="Nouveau mot de passe" value={pw} onChange={setPw} type="password" placeholder="••••••••" t={t} />
+          <Field label="Confirmer" value={pw2} onChange={setPw2} type="password" placeholder="••••••••" t={t} />
+        </div>
+        {err && <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,margin:"12px 0 0"}}>{err}</p>}
+        <Btn accent onClick={submit} disabled={busy} t={t} style={{width:"100%",marginTop:16,padding:14}}>ENREGISTRER</Btn>
+        {onCancel && <button onClick={onCancel} style={{display:"block",margin:"12px auto 0",background:"none",border:"none",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>Annuler</button>}
+      </div>
+    </div>
+  );
+}
+
+const REPORT_REASONS = ["Harcèlement ou menaces", "Contenu inapproprié ou sexuel", "Faux profil ou usurpation d'identité", "Spam ou arnaque", "Personne mineure en danger ou propos inquiétants", "Autre"];
+
+function ReportModal({ user, onSend, onClose, t }) {
+  const [reason, setReason] = useState(null);
+  const [details, setDetails] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:400,maxHeight:"90%",overflowY:"auto",padding:24}}>
+        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:21,color:t.text,margin:"0 0 4px"}}>Signaler {user.name}</h2>
+        <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:12,margin:"0 0 14px",lineHeight:1.5}}>Ton signalement est confidentiel : la personne ne saura pas que c'est toi.</p>
+        {REPORT_REASONS.map(r=>(
+          <button key={r} onClick={()=>setReason(r)} style={{display:"block",width:"100%",textAlign:"left",padding:"11px 14px",marginBottom:6,borderRadius:12,background:reason===r?t.accentBg:t.bg3,border:`1px solid ${reason===r?t.accent:t.border}`,color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:13,cursor:"pointer"}}>{r}</button>
+        ))}
+        <textarea value={details} onChange={e=>setDetails(e.target.value)} rows={3} placeholder="Précisions (optionnel)…" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
+        <div style={{display:"flex",gap:10,marginTop:14}}>
+          <Btn onClick={onClose} t={t} style={{flex:1}}>Annuler</Btn>
+          <Btn accent disabled={!reason||busy} onClick={async()=>{ setBusy(true); await onSend(reason, details); setBusy(false); }} t={t} style={{flex:2}}>Envoyer le signalement</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BlockedListModal({ users, onUnblock, onClose, t }) {
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:400,maxHeight:"80%",overflowY:"auto",padding:24}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <h2 style={{fontFamily:"'Fraunces',serif",fontSize:21,color:t.text,margin:0}}>Utilisateurs bloqués</h2>
+          <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:18,cursor:"pointer"}}>✕</button>
+        </div>
+        {users.length===0 && <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:13,textAlign:"center",padding:"20px 0"}}>Tu n'as bloqué personne.</p>}
+        {users.map(u=>(
+          <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderTop:`1px solid ${t.border}`}}>
+            <Avatar user={u} size={40} t={t} />
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{margin:0,color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:14}}>{u.name}</p>
+              <p style={{margin:0,color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10}}>@{u.pseudo}</p>
+            </div>
+            <Btn small t={t} onClick={()=>onUnblock(u)}>Débloquer</Btn>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DeleteAccountModal({ onConfirm, onClose, t }) {
+  const [txt, setTxt] = useState(""); const [busy, setBusy] = useState(false);
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.accent}`,borderRadius:20,width:"100%",maxWidth:380,padding:24}}>
+        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:21,color:t.text,margin:"0 0 8px"}}>Supprimer mon compte</h2>
+        <p style={{color:t.text2,fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.55,margin:"0 0 14px"}}>Cette action est <b>définitive</b> : ton profil, tes sorties, tes messages, tes photos et tes vocaux seront supprimés, et tes amis ne te verront plus.</p>
+        <Field label="Tape SUPPRIMER pour confirmer" value={txt} onChange={setTxt} placeholder="SUPPRIMER" t={t} />
+        <div style={{display:"flex",gap:10,marginTop:16}}>
+          <Btn onClick={onClose} t={t} style={{flex:1}}>Annuler</Btn>
+          <Btn accent disabled={txt.trim().toUpperCase()!=="SUPPRIMER"||busy} onClick={async()=>{ setBusy(true); await onConfirm(); setBusy(false); }} t={t} style={{flex:2}}>Supprimer définitivement</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onReport, onBlock, isFriend, hasPendingReq, t}) {
   const isMe = user.id===currentUser.id;
+  const [menu, setMenu] = useState(false);
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:380,padding:28}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:380,padding:28,position:"relative"}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:20}}>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em"}}>PROFIL</span>
-          <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:18,cursor:"pointer"}}>✕</button>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            {!isMe && <button onClick={()=>setMenu(m=>!m)} aria-label="Plus d'options" style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer",lineHeight:1,padding:"0 6px"}}>⋯</button>}
+            <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:18,cursor:"pointer"}}>✕</button>
+          </div>
+          {menu && !isMe && (
+            <div style={{position:"absolute",top:52,right:22,zIndex:5,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:12,overflow:"hidden",boxShadow:"0 10px 30px rgba(0,0,0,0.45)"}}>
+              <button onClick={()=>{ setMenu(false); onReport(); }} style={{display:"block",width:"100%",textAlign:"left",padding:"12px 18px",background:"none",border:"none",color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,cursor:"pointer"}}>🚩 Signaler</button>
+              <button onClick={()=>{ setMenu(false); onBlock(); }} style={{display:"block",width:"100%",textAlign:"left",padding:"12px 18px",background:"none",border:"none",borderTop:`1px solid ${t.border}`,color:t.accent,fontFamily:"'DM Sans',sans-serif",fontSize:14,cursor:"pointer"}}>🚫 Bloquer</button>
+            </div>
+          )}
         </div>
         <div style={{textAlign:"center",marginBottom:20}}>
           <Avatar user={user} size={72} t={t} />
@@ -284,9 +416,10 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, t}) {
 // ════════════════════════════════════════════════════════════════════════════════
 // SETTINGS PAGE
 // ════════════════════════════════════════════════════════════════════════════════
-function SettingsPage({currentUser, darkMode, onToggleDark, onLogout, onBack, t}) {
+function SettingsPage({currentUser, darkMode, onToggleDark, onLogout, onBack, onChangePassword, onOpenBlocked, onDeleteAccount, blockedCount, t}) {
   const [copied, setCopied] = useState(false);
-  const inviteLink = `https://grouz.app/invite/${currentUser.pseudo}`;
+  const inviteLink = "https://grouz.vercel.app";
+  const msgEnc = encodeURIComponent(`Rejoins-moi sur GrouZ pour organiser des sorties : ${inviteLink}`);
   const copyLink = () => { navigator.clipboard?.writeText(inviteLink).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
   const Row = ({icon,label,right,onClick}) => (
@@ -325,19 +458,19 @@ function SettingsPage({currentUser, darkMode, onToggleDark, onLogout, onBack, t}
           <Btn onClick={copyLink} accent={copied} t={t} small>{copied?"✓ Copié !":"Copier"}</Btn>
         </div>
         <div style={{display:"flex",gap:8,marginTop:12}}>
-          {["WhatsApp 📲","Email 📧","SMS 💬"].map(s=>(
-            <Btn key={s} t={t} small style={{flex:1}}>{s}</Btn>
+          {[["WhatsApp 📲",`https://wa.me/?text=${msgEnc}`],["Email 📧",`mailto:?subject=${encodeURIComponent("Rejoins-moi sur GrouZ")}&body=${msgEnc}`],["SMS 💬",`sms:?&body=${msgEnc}`]].map(([s,href])=>(
+            <a key={s} href={href} target="_blank" rel="noreferrer" style={{flex:1,textDecoration:"none"}}><Btn t={t} small style={{width:"100%"}}>{s}</Btn></a>
           ))}
         </div>
       </div>
 
       <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"20px 0 10px"}}>COMPTE</p>
-      <Row icon="🔒" label="Changer le mot de passe" />
-      <Row icon="🔔" label="Préférences de notifications" />
-      <Row icon="🌍" label="Langue — Français" />
-      <Row icon="❓" label="Aide & Support" />
-      <Row icon="📄" label="Conditions d'utilisation" />
+      <Row icon="🔒" label="Changer le mot de passe" onClick={onChangePassword} right={<span style={{color:t.text3}}>›</span>} />
+      <Row icon="🚫" label={`Utilisateurs bloqués${blockedCount?` (${blockedCount})`:""}`} onClick={onOpenBlocked} right={<span style={{color:t.text3}}>›</span>} />
+      <Row icon="🛡" label="Politique de confidentialité" onClick={()=>window.open("/confidentialite.html","_blank")} right={<span style={{color:t.text3}}>›</span>} />
+      <Row icon="📄" label="Conditions d'utilisation" onClick={()=>window.open("/conditions.html","_blank")} right={<span style={{color:t.text3}}>›</span>} />
       <div style={{marginTop:8}}>
+        <Row icon="🗑" label="Supprimer mon compte" onClick={onDeleteAccount} right={<span style={{color:t.accent}}>›</span>} />
         <Row icon="🚪" label="Se déconnecter" onClick={onLogout} right={<span style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12}}>→</span>} />
       </div>
       <p style={{textAlign:"center",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,marginTop:24}}>GrouZ v2.0.0 — Fait avec ♥</p>
@@ -752,7 +885,7 @@ function GifPicker({ userId, onPick, onClose, t }) {
   );
 }
 
-function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onBack, t}) {
+function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onOpenProfile, onBack, t}) {
   const bottomRef = useRef();
   const [pending, setPending] = useState(null);   // fichier choisi, en attente de confirmation
   const [sending, setSending] = useState(false);
@@ -785,8 +918,8 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
         <button onClick={onBack} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center"}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <Avatar user={otherUser} size={36} t={t} />
-        <div style={{minWidth:0}}>
+        <div onClick={onOpenProfile} style={{cursor:"pointer",display:"flex"}}><Avatar user={otherUser} size={36} t={t} /></div>
+        <div onClick={onOpenProfile} style={{minWidth:0,cursor:"pointer"}}>
           <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0,fontSize:15}}>{otherUser.name}</p>
           {statusText
             ? <p style={{color:t.accent,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic",fontSize:11,margin:0}}>{statusText}</p>
@@ -1519,9 +1652,10 @@ export default function App() {
   const [session, setSession] = useState(undefined); // undefined = chargement
   const [me0, setMe0] = useState(null);
   const [loadErr, setLoadErr] = useState(null);
+  const [recovery, setRecovery] = useState(false);
   useEffect(()=>{
     api.getSession().then(setSession).catch(()=>setSession(null));
-    const sub = api.onAuthChange(setSession);
+    const sub = api.onAuthChange((s, ev) => { setSession(s); if (ev === "PASSWORD_RECOVERY") setRecovery(true); });
     return ()=>sub.unsubscribe();
   },[]);
   const uid = session?.user?.id;
@@ -1544,14 +1678,17 @@ export default function App() {
   const dmPartnerRef = useRef(null);
   useEffect(()=>{ dmPartnerRef.current = dmPartner; },[dmPartner]);
 
-  const refreshActivities = useCallback(()=>api.listActivities().then(r=>setActivities(r.map(shapeAct).filter(isUpcoming))).catch(console.error),[]);
+  const blockedRef = useRef([]);
+  const [blockedIds, setBlockedIds] = useState([]);
+  const refreshBlocks = useCallback(()=>api.listBlocks().then(r=>{ const ids=r.map(x=>x.blocked_id); blockedRef.current=ids; setBlockedIds(ids); }).catch(console.error),[]);
+  const refreshActivities = useCallback(()=>api.listActivities().then(r=>setActivities(r.map(shapeAct).filter(isUpcoming).filter(a=>!blockedRef.current.includes(a.creator?.id)))).catch(console.error),[]);
   const refreshFriends = useCallback(()=>api.listFriendships().then(setFriendships).catch(console.error),[]);
   const refreshUsers = useCallback(()=>api.listProfiles().then(r=>setAllUsers(r.map(shapeUser))).catch(console.error),[]);
   const refreshNotifs = useCallback(()=>api.listNotifications().then(r=>setNotifs(r.map(n=>({...n,time:fmtTime(n.created_at)})))).catch(console.error),[]);
 
   useEffect(()=>{
     if (!me0) return;
-    refreshActivities(); refreshFriends(); refreshUsers(); refreshNotifs();
+    refreshBlocks().finally(refreshActivities); refreshFriends(); refreshUsers(); refreshNotifs();
     const n = api.subscribeNotifications(me0.id, row=>{
       if (row.kind==="message" && pageRef.current==="dm" && dmPartnerRef.current?.id===row.ref_id) api.markNotifRead(row.id).finally(refreshNotifs);
       else refreshNotifs();
@@ -1734,6 +1871,34 @@ export default function App() {
   const sendMediaDM = (kind, file) => api.sendDMMedia(me0.id, dmPartner.id, kind, file).then(()=>loadDMs(dmPartner.id)).catch(fail);
   const sendGifDM = url => api.sendDMGif(me0.id, dmPartner.id, url).then(()=>loadDMs(dmPartner.id)).catch(fail);
 
+  // ── Sécurité : signaler, bloquer, mot de passe, suppression du compte ──────
+  const [reportTarget, setReportTarget] = useState(null);
+  const [showBlocked, setShowBlocked] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+
+  const blockUser = async (u) => {
+    if (!window.confirm(`Bloquer ${u.name} ?\n\nCette personne ne pourra plus t'écrire ni t'envoyer de demande d'ami, et ne sera plus dans tes amis.`)) return;
+    try { await api.blockUser(me0.id, u.id); } catch(e) { return fail(e); }
+    blockedRef.current = [...blockedRef.current, u.id]; setBlockedIds(b=>[...b, u.id]);
+    setProfileUser(null); if (page==="dm") setPage("messages");
+    refreshFriends(); refreshActivities();
+  };
+  const unblockUser = async (u) => {
+    try { await api.unblockUser(me0.id, u.id); } catch(e) { return fail(e); }
+    blockedRef.current = blockedRef.current.filter(id=>id!==u.id); setBlockedIds(b=>b.filter(id=>id!==u.id));
+    refreshActivities();
+  };
+  const sendReport = async (reason, details) => {
+    try { await api.reportUser(me0.id, reportTarget.id, reason, details); alert("Merci, ton signalement a bien été envoyé."); setReportTarget(null); }
+    catch(e) { fail(e); }
+  };
+  const deleteAccount = async () => {
+    try { await api.deleteMyAccount(me0.id); } catch(e) { return fail(e); }
+    ["grouz_geo","grouz_geo_asked","grouz_share"].forEach(k=>LS.set(k,null));
+    window.location.reload();
+  };
+
   // ── Liste des conversations (dernier message par ami) ──────────────────────
   const [lastDMs, setLastDMs] = useState({});
   useEffect(()=>{
@@ -1748,7 +1913,7 @@ export default function App() {
   useEffect(()=>{ const i=setInterval(()=>setActivities(p=>p.filter(isUpcoming)),60000); return ()=>clearInterval(i); },[]);
 
   // ── Chat de groupe (chargement + temps réel) ───────────────────────────────
-  const loadActMessages = useCallback(id => api.listActivityMessages(id).then(r=>setActMessages(p=>({...p,[id]:r.map(shapeMsg)}))).catch(console.error),[]);
+  const loadActMessages = useCallback(id => api.listActivityMessages(id).then(r=>setActMessages(p=>({...p,[id]:r.map(shapeMsg).filter(m=>!blockedRef.current.includes(m.sender_id))}))).catch(console.error),[]);
   useEffect(()=>{
     if (!selectedId || page!=="detail") return;
     loadActMessages(selectedId);
@@ -1771,6 +1936,7 @@ export default function App() {
   };
 
   // ── Écrans d'attente / connexion ───────────────────────────────────────────
+  if (recovery && session) return <PasswordForm t={t} onDone={()=>{ setRecovery(false); window.history.replaceState({}, "", window.location.pathname); }} onCancel={()=>setRecovery(false)} />;
   if (loadErr) return (
     <div style={{minHeight:"100dvh",background:t.bg,color:t.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:24,textAlign:"center",fontFamily:"'DM Sans',sans-serif"}}>
       <p>Impossible de charger ton profil.<br/><span style={{color:t.text3,fontSize:12}}>{loadErr}</span></p>
@@ -1990,7 +2156,7 @@ export default function App() {
           {/* SETTINGS */}
           {page==="settings"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <SettingsPage currentUser={me} darkMode={darkMode} onToggleDark={toggleDark} onLogout={handleLogout} onBack={()=>setPage("profile")} t={t} />
+              <SettingsPage currentUser={me} darkMode={darkMode} onToggleDark={toggleDark} onLogout={handleLogout} onBack={()=>setPage("profile")} onChangePassword={()=>setShowPassword(true)} onOpenBlocked={()=>setShowBlocked(true)} onDeleteAccount={()=>setShowDelete(true)} blockedCount={blockedIds.length} t={t} />
             </div>
           )}
         </div>
@@ -1998,7 +2164,7 @@ export default function App() {
         {/* DM — replaces everything */}
         {page==="dm"&&dmPartner&&(
           <div style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
-            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onBack={()=>setPage("messages")} t={t} />
+            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onOpenProfile={()=>setProfileUser(dmPartner)} onBack={()=>setPage("messages")} t={t} />
           </div>
         )}
 
@@ -2051,11 +2217,18 @@ export default function App() {
             onClose={()=>setProfileUser(null)}
             onAddFriend={()=>{ sendFriendReq(profileUser.id); setProfileUser(null); }}
             onOpenDM={()=>{ setProfileUser(null); openDM(profileUser); }}
+            onReport={()=>setReportTarget(profileUser)}
+            onBlock={()=>blockUser(profileUser)}
             isFriend={isFriend(profileUser.id)}
             hasPendingReq={hasPendingReq(profileUser.id)}
             t={t}
           />
         )}
+
+        {reportTarget && <ReportModal user={reportTarget} t={t} onClose={()=>setReportTarget(null)} onSend={sendReport} />}
+        {showBlocked && <BlockedListModal users={allUsers.filter(u=>blockedIds.includes(u.id))} onUnblock={unblockUser} onClose={()=>setShowBlocked(false)} t={t} />}
+        {showPassword && <PasswordForm t={t} onCancel={()=>setShowPassword(false)} onDone={()=>{ setShowPassword(false); alert("Mot de passe modifié ✅"); }} />}
+        {showDelete && <DeleteAccountModal t={t} onClose={()=>setShowDelete(false)} onConfirm={deleteAccount} />}
 
         {/* CREATE MODAL */}
         {showCreate&&<CreateModal onClose={()=>setShowCreate(false)} onSave={handleCreate} currentUser={currentUser} t={t} />}

@@ -23,7 +23,7 @@ export const signOut = () => supabase.auth.signOut();
 export const getSession = () => supabase.auth.getSession().then(r => r.data.session);
 
 export const onAuthChange = (cb) =>
-  supabase.auth.onAuthStateChange((_e, session) => cb(session)).data.subscription;
+  supabase.auth.onAuthStateChange((event, session) => cb(session, event)).data.subscription;
 
 // ── PROFILS ─────────────────────────────────────────────────────
 export const getProfile = (id) =>
@@ -188,3 +188,35 @@ export const sendDMGif = (me, other, url) =>
 
 export const mediaUrl = async (path) =>
   ok(await supabase.storage.from("media").createSignedUrl(path, 3600)).signedUrl;
+
+// ── MOT DE PASSE ────────────────────────────────────────────────
+export const requestPasswordReset = (email) =>
+  supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin }).then(ok);
+
+export const updatePassword = (password) =>
+  supabase.auth.updateUser({ password }).then(ok);
+
+// ── BLOCAGE / SIGNALEMENT ───────────────────────────────────────
+export const listBlocks = () =>
+  supabase.from("user_blocks").select("blocked_id, created_at").then(ok);
+
+export const blockUser = (me, other) =>
+  supabase.from("user_blocks").insert({ blocker_id: me, blocked_id: other }).then(ok);
+
+export const unblockUser = (me, other) =>
+  supabase.from("user_blocks").delete().eq("blocker_id", me).eq("blocked_id", other).then(ok);
+
+export const reportUser = (me, other, reason, details = "", context = "profile", contextId = null) =>
+  supabase.from("reports").insert({ reporter_id: me, target_user_id: other, reason, details, context, context_id: contextId }).then(ok);
+
+// ── SUPPRESSION DU COMPTE ───────────────────────────────────────
+export async function deleteMyAccount(userId) {
+  for (const bucket of ["avatars", "voices", "media"]) {   // d'abord les fichiers
+    try {
+      const { data } = await supabase.storage.from(bucket).list(userId, { limit: 1000 });
+      if (data?.length) await supabase.storage.from(bucket).remove(data.map(f => `${userId}/${f.name}`));
+    } catch {}
+  }
+  ok(await supabase.rpc("delete_my_account"));            // puis le compte et toutes les données
+  try { await supabase.auth.signOut(); } catch {}
+}
