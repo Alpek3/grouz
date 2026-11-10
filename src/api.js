@@ -148,6 +148,13 @@ export const subscribeDMs = (me, cb) =>
 export const listNotifications = () =>
   supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(50).then(ok);
 
+export const markNotifRead = (id) =>
+  supabase.from("notifications").update({ read: true }).eq("id", id).then(ok);
+
+export const markMessageNotifsRead = (userId, fromId) =>
+  supabase.from("notifications").update({ read: true })
+    .eq("user_id", userId).eq("kind", "message").eq("ref_id", fromId).eq("read", false).then(ok);
+
 export const markAllRead = (userId) =>
   supabase.from("notifications").update({ read: true }).eq("user_id", userId).eq("read", false).then(ok);
 
