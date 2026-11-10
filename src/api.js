@@ -174,3 +174,17 @@ export const removeMyLocation = (userId) =>
 
 export const nearbyUsers = (radiusKm) =>
   supabase.rpc("nearby_users", { radius_km: radiusKm }).then(ok);
+
+// ── PHOTOS / VIDÉOS / GIFS (messages privés) ────────────────────
+export async function sendDMMedia(me, other, kind, file) {
+  const ext = (file.name?.split(".").pop() || (kind === "video" ? "mp4" : "jpg")).toLowerCase();
+  const media_path = `${me}/${Date.now()}.${ext}`;
+  ok(await supabase.storage.from("media").upload(media_path, file, { contentType: file.type || undefined }));
+  return supabase.from("direct_messages").insert({ sender_id: me, receiver_id: other, type: kind, media_path }).then(ok);
+}
+
+export const sendDMGif = (me, other, url) =>
+  supabase.from("direct_messages").insert({ sender_id: me, receiver_id: other, type: "gif", media_url: url }).then(ok);
+
+export const mediaUrl = async (path) =>
+  ok(await supabase.storage.from("media").createSignedUrl(path, 3600)).signedUrl;
