@@ -123,6 +123,9 @@ export const listDMs = (me, other) =>
     .or(`and(sender_id.eq.${me},receiver_id.eq.${other}),and(sender_id.eq.${other},receiver_id.eq.${me})`)
     .order("created_at").then(ok);
 
+export const listRecentDMs = () =>
+  supabase.from("direct_messages").select("*").order("created_at", { ascending: false }).limit(300).then(ok);
+
 export const sendDM = (me, other, text) =>
   supabase.from("direct_messages").insert({ sender_id: me, receiver_id: other, text }).then(ok);
 
