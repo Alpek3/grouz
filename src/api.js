@@ -65,6 +65,9 @@ export const createActivity = (userId, f) =>
     max_people: f.maxPeople, description: f.description,
   }).select().single().then(ok); // le trigger ajoute le créateur + notifie ses amis
 
+export const deleteActivity = (id) =>
+  supabase.from("activities").delete().eq("id", id).then(ok);
+
 export const requestJoin = (activityId, userId) =>
   supabase.from("activity_members").insert({ activity_id: activityId, user_id: userId }).then(ok);
 
