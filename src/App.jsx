@@ -1103,6 +1103,35 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
 // ════════════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ════════════════════════════════════════════════════════════════════════════════
+function MessagesPage({ friends, last, myId, onOpenDM, onGoFriends, t }) {
+  const sorted = [...friends].sort((a,b)=>(last[b.id]?.created_at||"").localeCompare(last[a.id]?.created_at||""));
+  return (
+    <div style={{padding:"20px 24px",maxWidth:600,margin:"0 auto"}}>
+      <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:"0 0 20px"}}>Messages</h2>
+      {sorted.length===0 && (
+        <div style={{textAlign:"center",padding:"40px 12px",background:t.bg2,border:`1px dashed ${t.border}`,borderRadius:16}}>
+          <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:14,margin:"0 0 14px",lineHeight:1.5}}>Tu pourras discuter ici avec tes amis.<br/>Ajoute-en depuis leur profil pour commencer.</p>
+          <Btn accent onClick={onGoFriends} t={t}>Voir mes amis</Btn>
+        </div>
+      )}
+      {sorted.map(u=>{
+        const m = last[u.id];
+        const preview = !m ? "Commence la conversation" : (m.sender_id===myId?"Toi : ":"") + (m.type==="voice"?"🎙 Message vocal":m.text);
+        return (
+          <div key={u.id} onClick={()=>onOpenDM(u)} style={{display:"flex",alignItems:"center",gap:12,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 16px",marginBottom:8,cursor:"pointer"}}>
+            <Avatar user={u} size={46} t={t} />
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0}}>{u.name}</p>
+              <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:"2px 0 0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{preview}</p>
+            </div>
+            {m && <span style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10}}>{fmtTime(m.created_at)}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const colorFor = id => AVATAR_COLORS[(id?.charCodeAt(1)||0) % AVATAR_COLORS.length];
 const shapeUser = p => p && ({ ...p, avatar: p.avatar_url || null, avatarColor: colorFor(p.id), friends: [], friendReqs: [] });
 const fmtTime = iso => { const d = new Date(iso); return d.getHours().toString().padStart(2,"0")+":"+d.getMinutes().toString().padStart(2,"0"); };
@@ -1158,6 +1187,7 @@ export default function App() {
     const n = api.subscribeNotifications(me0.id, ()=>{ refreshNotifs(); refreshActivities(); refreshFriends(); });
     const d = api.subscribeDMs(me0.id, m=>{
       if (dmPartnerRef.current?.id === m.sender_id) setDmMessages(prev=>[...prev, shapeMsg(m)]);
+      setLastDMs(p=>({...p,[m.sender_id]:m}));
     });
     const feed = api.supabase.channel("feed")
       .on("postgres_changes",{event:"*",schema:"public",table:"activities"},refreshActivities)
@@ -1214,6 +1244,16 @@ export default function App() {
     (a.title.toLowerCase().includes(search.toLowerCase())||a.location.toLowerCase().includes(search.toLowerCase()))
   );
 
+  // ── Liste des conversations (dernier message par ami) ──────────────────────
+  const [lastDMs, setLastDMs] = useState({});
+  useEffect(()=>{
+    if (page!=="messages" || !me0) return;
+    api.listRecentDMs().then(rows=>{
+      const m={}; rows.forEach(r=>{ const other=r.sender_id===me0.id?r.receiver_id:r.sender_id; if(!m[other]) m[other]=r; });
+      setLastDMs(m);
+    }).catch(console.error);
+  },[page,me0?.id]);
+
   // Retire automatiquement les sorties qui viennent de passer (vérifié chaque minute)
   useEffect(()=>{ const i=setInterval(()=>setActivities(p=>p.filter(isUpcoming)),60000); return ()=>clearInterval(i); },[]);
 
@@ -1265,14 +1305,10 @@ export default function App() {
         <path d="M9 21V12h6v9" fill="none" stroke="currentColor" strokeWidth="2"/>
       </svg>
     )},
-    { id:"notifs",  icon: (active) => (
-      <div style={{position:"relative",display:"inline-flex"}}>
-        <svg width="26" height="26" viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth={active?0:2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 01-3.46 0" fill="none" stroke="currentColor" strokeWidth="2"/>
-        </svg>
-        {unreadNotifs>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:16,height:16,borderRadius:8,background:t.accent,color:"#fff",fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{unreadNotifs}</span>}
-      </div>
+    { id:"messages", icon: (active) => (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth={active?0:2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+      </svg>
     )},
     { id:"create",  icon: () => (
       <div style={{width:48,height:48,borderRadius:16,background:t.gradient,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 20px rgba(232,0,138,0.5)`,marginBottom:4}}>
@@ -1359,11 +1395,13 @@ export default function App() {
               </div>
               <span style={{fontFamily:"'Fraunces',serif",fontSize:22,fontStyle:"italic",background:t.gradient,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontWeight:700}}>GrouZ</span>
             </div>
-            {/* right: DM shortcut */}
-            <button onClick={()=>{}} style={{background:"none",border:"none",cursor:"pointer",color:t.text2,padding:4}}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            {/* right: notifications */}
+            <button onClick={()=>setShowNotifs(v=>!v)} style={{position:"relative",background:"none",border:"none",cursor:"pointer",color:showNotifs?"#E8008A":t.text2,padding:4}}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill={showNotifs?"currentColor":"none"} stroke="currentColor" strokeWidth={showNotifs?0:2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 01-3.46 0" fill="none" stroke="currentColor" strokeWidth="2"/>
               </svg>
+              {unreadNotifs>0&&<span style={{position:"absolute",top:-2,right:-2,minWidth:16,height:16,borderRadius:8,background:"#E8008A",color:"#fff",fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{unreadNotifs}</span>}
             </button>
           </div>
         )}
@@ -1432,6 +1470,13 @@ export default function App() {
             </div>
           )}
 
+          {/* MESSAGES */}
+          {page==="messages"&&(
+            <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
+              <MessagesPage friends={allUsers.filter(u=>friendIds.includes(u.id))} last={lastDMs} myId={me0.id} onOpenDM={openDM} onGoFriends={()=>setPage("friends")} t={t} />
+            </div>
+          )}
+
           {/* FRIENDS */}
           {page==="friends"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
@@ -1457,7 +1502,7 @@ export default function App() {
         {/* DM — replaces everything */}
         {page==="dm"&&dmPartner&&(
           <div style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
-            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onBack={()=>setPage("friends")} t={t} />
+            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onBack={()=>setPage("messages")} t={t} />
           </div>
         )}
 
@@ -1478,7 +1523,7 @@ export default function App() {
                   {icon(active)}
                   {!isCreate&&(
                     <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",letterSpacing:"0.04em",color:active?"#E8008A":t.text3,fontWeight:active?700:400,marginTop:1}}>
-                      {id==="home"?"Accueil":id==="notifs"?"Notifs":id==="map"?"Carte":id==="friends"?"Amis":"Profil"}
+                      {id==="home"?"Accueil":id==="messages"?"Messages":id==="map"?"Carte":id==="friends"?"Amis":"Profil"}
                     </span>
                   )}
                   {active&&!isCreate&&(
