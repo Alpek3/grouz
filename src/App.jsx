@@ -992,7 +992,7 @@ function NotifPanel({notifs, onMarkRead, onOpen, onClose, t}) {
 // ════════════════════════════════════════════════════════════════════════════════
 // ACTIVITY DETAIL
 // ════════════════════════════════════════════════════════════════════════════════
-function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMessage,onSendVoice,onJoin,onOpenProfile,t}) {
+function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMessage,onSendVoice,onJoin,onOpenProfile,onDelete,t}) {
   const bottomRef=useRef();
   const isCreator=activity.creator?.id===currentUser.id;
   const isMember=activity.accepted?.some(u=>u.id===currentUser.id);
@@ -1023,6 +1023,12 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
             <Avatar user={activity.creator} size={28} t={t} />
             <span style={{fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace"}}>Par <span style={{color:t.text}}>{activity.creator?.name}</span></span>
           </div>
+          {isCreator && onDelete && (
+            <button onClick={()=>{ if (window.confirm(`Supprimer la sortie "${activity.title}" ?\n\nLes participants seront prévenus et le groupe de discussion sera supprimé. Cette action est définitive.`)) onDelete(activity.id); }}
+              style={{marginTop:14,width:"100%",padding:"10px",borderRadius:10,background:"transparent",border:`1px solid ${t.accent}66`,color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>
+              🗑 Supprimer cette sortie
+            </button>
+          )}
         </div>
         {isCreator&&activity.pending?.length>0&&(
           <div style={{background:t.bg2,borderRadius:14,border:`1px solid ${t.accent}44`,padding:16,marginBottom:16}}>
@@ -1834,6 +1840,7 @@ export default function App() {
       if (u) openDM(u); else setPage("messages");
       return;
     }
+    if (kind==="activity_cancelled") return;
     if (kind==="friend_request" || kind==="friend_accepted") { refreshFriends(); setPage("friends"); return; }
     let actId = n.ref_id;
     if (!actId) {
@@ -1931,6 +1938,13 @@ export default function App() {
   },[selectedId,page]);
 
   // ── Actions sorties ────────────────────────────────────────────────────────
+  const handleDeleteActivity = async (id) => {
+    try { await api.deleteActivity(id); } catch(e) { return fail(e); }
+    if (mapViewRef.current) mapViewRef.current = { ...mapViewRef.current, selectedId: null };
+    setSelected(null); setActMessages(m=>{ const c={...m}; delete c[id]; return c; });
+    setPage(detailBack==="detail" ? "home" : detailBack);
+    refreshActivities();
+  };
   const handleJoin = id => api.requestJoin(id, me0.id).then(refreshActivities).catch(fail);
   const handleAccept = (id,userId) => api.acceptMember(id,userId).then(refreshActivities).catch(e=>fail(/complète/i.test(e.message)?new Error("La sortie est complète."):e));
   const handleReject = (id,userId) => api.rejectMember(id,userId).then(refreshActivities).catch(fail);
@@ -2109,7 +2123,7 @@ export default function App() {
           {/* DETAIL */}
           {page==="detail"&&selected&&(
             <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onJoin={handleJoin} onOpenProfile={setProfileUser} t={t} />
+              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} t={t} />
             </div>
           )}
 
