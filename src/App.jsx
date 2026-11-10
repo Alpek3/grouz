@@ -890,15 +890,14 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
     });
 
     // Tuile selon le thème — style sombre ou clair
-    const tileUrl = isDark
-      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+    const tileUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
-    L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(map);
+    L.tileLayer(tileUrl, { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
     L.control.zoom({ position: "bottomright" }).addTo(map);
     L.control.attribution({ prefix: false }).addTo(map);
 
     leafletRef.current = map;
+    mapRef.current.classList.toggle("grouz-map-dark", isDark);
     setTimeout(()=>map.invalidateSize(),150);
     const ro = new ResizeObserver(()=>map.invalidateSize());
     ro.observe(mapRef.current);
@@ -967,10 +966,9 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
     
     const map = leafletRef.current;
     map.eachLayer(l => { if (l._url) map.removeLayer(l); });
-    const tileUrl = isDark
-      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
-    L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(map);
+    const tileUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+    L.tileLayer(tileUrl, { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+    mapRef.current?.classList.toggle("grouz-map-dark", isDark);
   }, [isDark, mapReady]);
 
   return (
@@ -1279,6 +1277,8 @@ export default function App() {
         @keyframes wave{0%{transform:scaleY(0.4)}100%{transform:scaleY(1.1)}}
         @keyframes grouz-glow{0%,100%{box-shadow:0 0 20px rgba(232,0,138,0.3)}50%{box-shadow:0 0 40px rgba(170,238,0,0.3)}}
         @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        .grouz-map-dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.7);}
+        .grouz-map-dark.leaflet-container{background:#1b1b1f;}
         .leaflet-container{font-family:'DM Sans',sans-serif!important;}
         .leaflet-control-zoom a{background:${t.navBg}!important;color:${t.text}!important;border-color:${t.border}!important;}
         .leaflet-bar{border:1px solid ${t.border}!important;border-radius:10px!important;overflow:hidden;}
