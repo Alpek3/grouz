@@ -927,8 +927,11 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
   const leafletRef = useRef(null);
   const markersRef = useRef([]);
   const [selected, setSelected] = useState(null);
+  const [clusterList, setClusterList] = useState(null);
+  const renderRef = useRef(null);
   const [filterCat, setFilterCat] = useState("Tous");
   const [mapReady] = useState(true);
+  useEffect(()=>{ setSelected(null); setClusterList(null); },[filterCat]);
   const isDark = t.bg === "#0D0A12";
 
   const filtered = activities.filter(a => filterCat === "Tous" || a.category === filterCat);
@@ -955,6 +958,8 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
     L.control.attribution({ prefix: false }).addTo(map);
 
     leafletRef.current = map;
+    map.on("zoomend", () => renderRef.current && renderRef.current());
+    map.on("click", () => { setSelected(null); setClusterList(null); });
     mapRef.current.classList.toggle("grouz-map-dark", isDark);
     setTimeout(()=>map.invalidateSize(),150);
     const ro = new ResizeObserver(()=>map.invalidateSize());
@@ -967,56 +972,87 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
     };
   }, [mapReady]);
 
-  // Met à jour les markers quand filtered change
+  // Pins + regroupement par zone (recalculé à chaque zoom)
+  const sig = filtered.map(a => `${a.id}:${a.accepted?.length}:${a.maxPeople}:${a.lat}`).join("|") + currentUser.id;
   useEffect(() => {
     if (!leafletRef.current || !mapReady) return;
-    
     const map = leafletRef.current;
 
-    // Clear old markers
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
+    const render = () => {
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+      const zoom = map.getZoom();
 
-    filtered.forEach(act => {
-      const latlng = act.lat != null ? [act.lat, act.lng] : guessLatLng(act);
-      const isMember = act.accepted?.some(u => u.id === currentUser.id);
-      const pinColor = isMember ? "#AAEE00" : "#E8008A";
-      const icon = CAT_ICONS[act.category] || "📍";
-      const spotsLeft = act.maxPeople - (act.accepted?.length || 0);
-
-      const markerIcon = L.divIcon({
-        className: "",
-        html: `
-          <div style="
-            position:relative;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            cursor:pointer;
-          ">
-            <div style="
-              width:38px;height:38px;border-radius:50% 50% 50% 0;
-              background:${pinColor};
-              border:2.5px solid #fff;
-              display:flex;align-items:center;justify-content:center;
-              font-size:16px;
-              transform:rotate(-45deg);
-              box-shadow:0 3px 14px ${pinColor}88;
-            ">
-              <span style="transform:rotate(45deg);line-height:1">${icon}</span>
-            </div>
-            ${spotsLeft===0?`<div style="position:absolute;top:-6px;right:-6px;background:#E8008A;color:#fff;font-size:8px;font-family:DM Mono,monospace;padding:1px 4px;border-radius:6px;font-weight:700;white-space:nowrap">COMPLET</div>`:""}
-          </div>`,
-        iconSize: [38, 48],
-        iconAnchor: [19, 48],
-        popupAnchor: [0, -50],
+      // 1. regroupe les sorties qui sont proches (moins de 50 px à l'écran)
+      const clusters = [];
+      filtered.forEach(act => {
+        const ll = act.lat != null ? [act.lat, act.lng] : guessLatLng(act);
+        const pt = map.project(L.latLng(ll), zoom);
+        const c = clusters.find(c => c.pt.distanceTo(pt) < 50);
+        if (c) {
+          c.items.push({ act, ll });
+          c.latSum += ll[0]; c.lngSum += ll[1];
+          c.pt = map.project(L.latLng(c.latSum / c.items.length, c.lngSum / c.items.length), zoom);
+        } else {
+          clusters.push({ items: [{ act, ll }], latSum: ll[0], lngSum: ll[1], pt });
+        }
       });
 
-      const marker = L.marker(latlng, { icon: markerIcon }).addTo(map);
-      marker.on("click", () => setSelected(act));
-      markersRef.current.push(marker);
-    });
-  }, [filtered, mapReady, currentUser]);
+      // 2. dessine un pin seul ou une bulle avec le nombre de sorties
+      clusters.forEach(c => {
+        if (c.items.length === 1) {
+          const { act, ll } = c.items[0];
+          const isMember = act.accepted?.some(u => u.id === currentUser.id);
+          const pinColor = isMember ? "#AAEE00" : "#E8008A";
+          const icon = CAT_ICONS[act.category] || "📍";
+          const spotsLeft = act.maxPeople - (act.accepted?.length || 0);
+          const markerIcon = L.divIcon({
+            className: "",
+            html: `
+              <div style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;">
+                <div style="width:38px;height:38px;border-radius:50% 50% 50% 0;background:${pinColor};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:16px;transform:rotate(-45deg);box-shadow:0 3px 14px ${pinColor}88;">
+                  <span style="transform:rotate(45deg);line-height:1">${icon}</span>
+                </div>
+                ${spotsLeft===0?`<div style="position:absolute;top:-6px;right:-6px;background:#E8008A;color:#fff;font-size:8px;font-family:DM Mono,monospace;padding:1px 4px;border-radius:6px;font-weight:700;white-space:nowrap">COMPLET</div>`:""}
+              </div>`,
+            iconSize: [38, 48], iconAnchor: [19, 48],
+          });
+          const marker = L.marker(ll, { icon: markerIcon }).addTo(map);
+          marker.on("click", () => {
+            setClusterList(null); setSelected(act);
+            map.flyTo(ll, Math.max(map.getZoom(), 14), { duration: 0.8 });
+          });
+          markersRef.current.push(marker);
+        } else {
+          const n = c.items.length;
+          const center = [c.latSum / n, c.lngSum / n];
+          const bubble = L.divIcon({
+            className: "",
+            html: `<div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#E8008A,#7B00C8);border:3px solid #fff;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:DM Mono,monospace;box-shadow:0 4px 18px rgba(232,0,138,0.6);cursor:pointer;line-height:1;">
+                     <span style="font-size:17px;font-weight:700">${n}</span><span style="font-size:7px;letter-spacing:0.05em;margin-top:2px">SORTIES</span></div>`,
+            iconSize: [50, 50], iconAnchor: [25, 25],
+          });
+          const marker = L.marker(center, { icon: bubble }).addTo(map);
+          marker.on("click", () => {
+            const bounds = L.latLngBounds(c.items.map(i => i.ll));
+            const tiny = bounds.getNorthEast().distanceTo(bounds.getSouthWest()) < 30; // même endroit
+            if (tiny || map.getZoom() >= 15) {
+              // trop proches pour se séparer : on liste les sorties de la zone
+              setSelected(null); setClusterList(c.items.map(i => i.act));
+              map.flyTo(bounds.getCenter(), Math.max(map.getZoom(), 14), { duration: 0.6 });
+            } else {
+              setClusterList(null); setSelected(null);
+              map.flyToBounds(bounds, { padding: [70, 70], maxZoom: 16, duration: 0.8 });
+            }
+          });
+          markersRef.current.push(marker);
+        }
+      });
+    };
+
+    renderRef.current = render;
+    render();
+  }, [sig, mapReady]);
 
   // Recharge les tiles si le thème change
   useEffect(() => {
@@ -1057,6 +1093,18 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
         )}
         <div ref={mapRef} style={{ position:"absolute", inset:0 }} />
 
+        {/* Mini-fiche de la sortie sélectionnée (haut gauche) : un clic ouvre la fiche complète */}
+        {selected && (
+          <div onClick={()=>onOpenActivity(selected)} style={{ position:"absolute", top:12, left:12, zIndex:1000, maxWidth:"min(250px, calc(100% - 150px))", display:"flex", alignItems:"center", gap:10, background:t.bg+"F2", backdropFilter:"blur(8px)", border:"1px solid #E8008A66", borderRadius:14, padding:"8px 10px", cursor:"pointer", boxShadow:"0 6px 20px rgba(0,0,0,0.35)", animation:"slideUp 0.2s ease" }}>
+            <div style={{ width:34, height:34, borderRadius:"50%", background:t.gradient, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>{CAT_ICONS[selected.category]}</div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <p style={{ margin:0, fontFamily:"'Fraunces',serif", fontSize:13, color:t.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{selected.title}</p>
+              <p style={{ margin:"2px 0 0", fontSize:9, color:t.text3, fontFamily:"'DM Mono',monospace", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{new Date(selected.date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · {selected.time} · {selected.location}</p>
+            </div>
+            <button onClick={e=>{ e.stopPropagation(); setSelected(null); }} style={{ width:22, height:22, borderRadius:"50%", background:t.bg3, border:`1px solid ${t.border}`, color:t.text3, cursor:"pointer", fontSize:10, flexShrink:0, padding:0 }}>✕</button>
+          </div>
+        )}
+
         {/* Counter overlay */}
         <div style={{ position:"absolute", bottom:12, left:12, zIndex:1000, background:t.bg+"EE", backdropFilter:"blur(8px)", borderRadius:10, padding:"6px 12px", border:`1px solid ${t.border}`, pointerEvents:"none" }}>
           <span style={{ fontSize:10, color:t.text2, fontFamily:"'DM Mono',monospace", fontWeight:700 }}>
@@ -1077,21 +1125,23 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
         </div>
       </div>
 
-      {/* Selected activity popup */}
-      {selected && (
-        <div style={{ margin:"10px 12px 0", background:t.bg2, border:`2px solid #E8008A55`, borderRadius:18, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexShrink:0, boxShadow:"0 8px 28px rgba(232,0,138,0.18)", animation:"slideUp 0.2s ease" }}>
-          <div style={{ width:44, height:44, borderRadius:"50%", background:t.gradient, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
-            {CAT_ICONS[selected.category]}
+      {/* Liste des sorties d'une zone regroupée */}
+      {clusterList && (
+        <div style={{ margin:"10px 12px 0", background:t.bg2, border:`2px solid #E8008A55`, borderRadius:18, padding:"12px 14px", flexShrink:0, maxHeight:"38%", overflowY:"auto", boxShadow:"0 8px 28px rgba(232,0,138,0.18)", animation:"slideUp 0.2s ease" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+            <span style={{ fontSize:11, color:"#E8008A", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>📍 {clusterList.length} SORTIES DANS CETTE ZONE</span>
+            <button onClick={()=>setClusterList(null)} style={{ width:28, height:28, borderRadius:"50%", background:t.bg3, border:`1px solid ${t.border}`, color:t.text3, cursor:"pointer", fontSize:12 }}>✕</button>
           </div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <span style={{ fontSize:10, color:"#E8008A", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>{selected.category?.toUpperCase()}</span>
-            <p style={{ fontFamily:"'Fraunces',serif", fontSize:15, color:t.text, margin:"2px 0 3px", lineHeight:1.2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{selected.title}</p>
-            <p style={{ fontSize:10, color:t.text3, fontFamily:"'DM Mono',monospace", margin:0 }}>📍 {selected.location} · 👥 {selected.accepted?.length}/{selected.maxPeople}</p>
-          </div>
-          <div style={{ display:"flex", gap:8, flexShrink:0 }}>
-            <button onClick={()=>setSelected(null)} style={{ width:34, height:34, borderRadius:"50%", background:t.bg3, border:`1px solid ${t.border}`, color:t.text3, cursor:"pointer", fontSize:14, display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
-            <button onClick={()=>{ onOpenActivity(selected); setSelected(null); }} style={{ padding:"0 16px", height:34, borderRadius:12, background:t.gradient, border:"none", color:"#fff", cursor:"pointer", fontFamily:"'DM Mono',monospace", fontSize:11, fontWeight:700, boxShadow:"0 2px 10px rgba(232,0,138,0.35)" }}>Voir →</button>
-          </div>
+          {clusterList.map(a=>(
+            <div key={a.id} onClick={()=>{ onOpenActivity(a); setClusterList(null); }} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderTop:`1px solid ${t.border}`, cursor:"pointer" }}>
+              <span style={{ fontSize:20 }}>{CAT_ICONS[a.category]}</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <p style={{ margin:0, fontFamily:"'Fraunces',serif", fontSize:14, color:t.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{a.title}</p>
+                <p style={{ margin:"2px 0 0", fontSize:10, color:t.text3, fontFamily:"'DM Mono',monospace" }}>{new Date(a.date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · {a.time} · {a.accepted?.length}/{a.maxPeople}</p>
+              </div>
+              <span style={{ fontSize:11, color:"#E8008A", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>Voir →</span>
+            </div>
+          ))}
         </div>
       )}
 
