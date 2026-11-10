@@ -1403,7 +1403,7 @@ export default function App() {
     if (!me0) return;
     refreshActivities(); refreshFriends(); refreshUsers(); refreshNotifs();
     const n = api.subscribeNotifications(me0.id, row=>{
-      if (row.kind==="message" && dmPartnerRef.current?.id===row.ref_id) api.markNotifRead(row.id).finally(refreshNotifs);
+      if (row.kind==="message" && pageRef.current==="dm" && dmPartnerRef.current?.id===row.ref_id) api.markNotifRead(row.id).finally(refreshNotifs);
       else refreshNotifs();
       refreshActivities(); refreshFriends();
     });
@@ -1416,7 +1416,10 @@ export default function App() {
       .on("postgres_changes",{event:"*",schema:"public",table:"activity_members"},refreshActivities)
       .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},refreshUsers)
       .subscribe();
-    return ()=>{ [n,d,feed].forEach(c=>api.supabase.removeChannel(c)); };
+    const onVis = () => { if (document.visibilityState==="visible") { refreshNotifs(); refreshActivities(); refreshFriends(); } };
+    document.addEventListener("visibilitychange", onVis);
+    const poll = setInterval(()=>{ if (document.visibilityState==="visible") refreshNotifs(); }, 30000);
+    return ()=>{ [n,d,feed].forEach(c=>api.supabase.removeChannel(c)); document.removeEventListener("visibilitychange", onVis); clearInterval(poll); };
   },[me0?.id]);
 
   const markNotifsRead = () => api.markAllRead(me0.id).then(refreshNotifs).catch(fail);
@@ -1454,6 +1457,7 @@ export default function App() {
   const sendVoiceDM = (url, dur, blob) => api.sendDMVoice(me0.id, dmPartner.id, blob, dur).then(()=>loadDMs(dmPartner.id)).catch(fail);
 
   // ── Vues ───────────────────────────────────────────────────────────────────
+  const pageRef = useRef("home");
   const [page, setPage] = useState("home"); // home | detail | profile | friends | settings | dm | map | notifs
   const [selectedId, setSelectedId] = useState(null);
   const [detailBack, setDetailBack] = useState("home");
@@ -1553,6 +1557,8 @@ export default function App() {
     refreshActivities();
     setSelected(act); setDetailBack(page); setPage("detail");
   };
+
+  useEffect(()=>{ pageRef.current = page; },[page]);
 
   // ── Liste des conversations (dernier message par ami) ──────────────────────
   const [lastDMs, setLastDMs] = useState({});
