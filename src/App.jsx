@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as api from "./api";
+import { gifsEnabled, gifProvider, searchGifs } from "./gifs";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -510,7 +511,7 @@ function VoiceMessageBubble({ msg, isMe, t }) {
 //  • maintenir le micro = enregistrer, relâcher = envoyer
 //  • glisser vers la gauche = annuler
 //  • glisser vers le haut = verrouiller (mains libres), puis ➤ pour envoyer ou 🗑 pour annuler
-function ChatInputBar({ onSend, onVoiceSend, t, placeholder="Écrire…", padH=16, padV=12 }) {
+function ChatInputBar({ onSend, onVoiceSend, onStatus, onPickFile, onGif, t, placeholder="Écrire…", padH=16, padV=12 }) {
   const [msg, setMsg] = useState("");
   const voice = useVoiceRecorder();
   const [mode, setMode] = useState("idle"); // idle | holding | locked
@@ -518,10 +519,15 @@ function ChatInputBar({ onSend, onVoiceSend, t, placeholder="Écrire…", padH=1
   const [hint, setHint] = useState(false);
   const gRef = useRef(null);
   const MIN_MS = 700;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const fileRef = useRef(null);
+  const lastTypingRef = useRef(0);
+  // pendant un enregistrement, on rappelle régulièrement l'état à l'autre personne
+  useEffect(() => { if (!onStatus || mode === "idle") return; const i = setInterval(() => onStatus("recording"), 30000); return () => clearInterval(i); }, [mode]);
   const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 
-  const send = () => { if (msg.trim()) { onSend(msg.trim()); setMsg(""); } };
-  const reset = () => { setMode("idle"); setDrag({ x: 0, y: 0 }); };
+  const send = () => { if (msg.trim()) { onSend(msg.trim()); setMsg(""); lastTypingRef.current = 0; onStatus && onStatus("idle"); } };
+  const reset = () => { setMode("idle"); setDrag({ x: 0, y: 0 }); onStatus && onStatus("idle"); };
   const flashHint = () => { setHint(true); setTimeout(() => setHint(false), 1800); };
 
   const finish = async () => {
@@ -538,6 +544,7 @@ function ChatInputBar({ onSend, onVoiceSend, t, placeholder="Écrire…", padH=1
     const g = { active: true, x0: e.clientX, y0: e.clientY, locked: false, released: false, ready: false, cancelled: false, abort: false };
     gRef.current = g;
     setMode("holding"); setDrag({ x: 0, y: 0 });
+    onStatus && onStatus("recording");
     navigator.vibrate?.(12);
     voice.start().then(ok => {
       if (!ok) { g.active = false; reset(); return; }
@@ -594,8 +601,20 @@ function ChatInputBar({ onSend, onVoiceSend, t, placeholder="Écrire…", padH=1
         </div>
       )}
 
+      {menuOpen && (
+        <div style={{ position: "absolute", left: padH, bottom: "calc(100% + 8px)", zIndex: 8, background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 14, overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.4)" }}>
+          <button onClick={() => fileRef.current?.click()} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14, cursor: "pointer" }}>📷 Photo ou vidéo</button>
+          {onGif && <button onClick={() => { setMenuOpen(false); onGif(); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14, cursor: "pointer" }}>🎞 GIF</button>}
+        </div>
+      )}
+      {onPickFile && <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: "none" }}
+        onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; setMenuOpen(false); if (f) onPickFile(f); }} />}
+      {mode === "idle" && onPickFile && (
+        <button onClick={() => setMenuOpen(o => !o)} aria-label="Joindre un fichier" style={{ width: 44, height: 44, borderRadius: "50%", background: menuOpen ? t.accent : t.bg3, border: `1px solid ${menuOpen ? t.accent : t.border}`, color: menuOpen ? "#fff" : t.text2, cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0, transform: menuOpen ? "rotate(45deg)" : "none", transition: "transform 0.15s" }}>+</button>
+      )}
+
       {mode === "idle" && (
-        <input value={msg} onChange={e => setMsg(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={placeholder}
+        <input value={msg} onChange={e => { const v = e.target.value; setMsg(v); if (onStatus) { if (v.trim()) { const now = Date.now(); if (now - lastTypingRef.current > 2500) { lastTypingRef.current = now; onStatus("typing"); } } else { lastTypingRef.current = 0; onStatus("idle"); } } }} onKeyDown={e => e.key === "Enter" && send()} placeholder={placeholder}
           style={{ flex: 1, minWidth: 0, padding: "11px 16px", borderRadius: 12, background: t.input, border: `1px solid ${t.border}`, color: t.text, fontSize: 14, fontFamily: "'DM Mono',monospace", outline: "none" }} />
       )}
 
@@ -636,9 +655,130 @@ function ChatInputBar({ onSend, onVoiceSend, t, placeholder="Écrire…", padH=1
 // ════════════════════════════════════════════════════════════════════════════════
 // DM CHAT
 // ════════════════════════════════════════════════════════════════════════════════
-function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onBack, t}) {
+const dmPreview = m => m.type==="voice" ? "🎙 Message vocal" : m.type==="image" ? "📷 Photo" : m.type==="video" ? "🎥 Vidéo" : m.type==="gif" ? "GIF" : m.text;
+
+// Réduit les grosses photos (1600 px max) avant l'envoi
+async function compressImage(file) {
+  if (file.type === "image/gif" || file.size < 300 * 1024) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.82));
+    return blob ? new File([blob], "photo.jpg", { type: "image/jpeg" }) : file;
+  } catch { return file; }
+}
+
+function MediaBubble({ msg, isMe, t, onOpen }) {
+  const [url, setUrl] = useState(msg.media_url || null);
+  const [err, setErr] = useState(false);
+  useEffect(() => { if (!url && msg.media_path) api.mediaUrl(msg.media_path).then(setUrl).catch(() => setErr(true)); }, [msg.media_path]);
+  const box = { maxWidth: 240, minWidth: 120, borderRadius: 16, overflow: "hidden", border: `1px solid ${isMe ? t.accent : t.border}`, background: t.bg3 };
+  if (err) return <div style={{ ...box, padding: 12, fontSize: 12, color: t.text3, fontFamily: "'DM Mono',monospace" }}>⚠ Média indisponible</div>;
+  if (!url) return <div style={{ ...box, height: 140, display: "flex", alignItems: "center", justifyContent: "center", color: t.text3, fontSize: 12, fontFamily: "'DM Mono',monospace" }}>Chargement…</div>;
+  if (msg.type === "video") return <div style={box}><video src={url} controls playsInline preload="metadata" onError={() => setErr(true)} style={{ display: "block", width: "100%", maxHeight: 320 }} /></div>;
+  return (
+    <div style={{ ...box, cursor: "pointer" }} onClick={() => onOpen({ kind: msg.type, url })}>
+      <img src={url} alt="" loading="lazy" onError={() => setErr(true)} style={{ display: "block", width: "100%", maxHeight: 320, objectFit: "cover" }} />
+    </div>
+  );
+}
+
+function MediaViewer({ item, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.94)", zIndex: 320, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <img src={item.url} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+      <button onClick={onClose} style={{ position: "absolute", top: "calc(14px + env(safe-area-inset-top, 0px))", right: 14, width: 38, height: 38, borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", fontSize: 18, cursor: "pointer" }}>✕</button>
+    </div>
+  );
+}
+
+function MediaPreviewModal({ pending, sending, onSend, onCancel, t }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 300, display: "flex", flexDirection: "column", padding: "calc(14px + env(safe-area-inset-top, 0px)) 14px calc(14px + env(safe-area-inset-bottom, 0px))" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {pending.kind === "video"
+          ? <video src={pending.url} controls playsInline style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 12 }} />
+          : <img src={pending.url} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 12 }} />}
+      </div>
+      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+        <Btn onClick={onCancel} t={t} disabled={sending} style={{ flex: 1 }}>Annuler</Btn>
+        <Btn accent onClick={onSend} t={t} disabled={sending} style={{ flex: 2 }}>{sending ? "Envoi en cours…" : pending.kind === "video" ? "Envoyer la vidéo →" : "Envoyer la photo →"}</Btn>
+      </div>
+    </div>
+  );
+}
+
+function GifPicker({ userId, onPick, onClose, t }) {
+  const [q, setQ] = useState("");
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  useEffect(() => {
+    let alive = true; setLoading(true); setErr(null);
+    const id = setTimeout(() => {
+      searchGifs(q.trim(), userId)
+        .then(r => { if (alive) { setItems(r); if (!r.length && !q.trim()) setErr("Aucun GIF reçu du fournisseur."); } })
+        .catch(e => { console.error(e); if (alive) { setItems([]); setErr("Impossible de charger les GIFs."); } })
+        .finally(() => alive && setLoading(false));
+    }, q.trim() ? 350 : 0);
+    return () => { alive = false; clearTimeout(id); };
+  }, [q]);
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 310, display: "flex", alignItems: "flex-end" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, margin: "0 auto", height: "68%", background: t.bg2, borderTop: `1px solid ${t.border}`, borderRadius: "20px 20px 0 0", display: "flex", flexDirection: "column", padding: "14px 14px calc(10px + env(safe-area-inset-bottom, 0px))" }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un GIF…" autoFocus
+            style={{ flex: 1, padding: "11px 14px", borderRadius: 12, background: t.input, border: `1px solid ${t.border}`, color: t.text, fontSize: 14, fontFamily: "'DM Mono',monospace", outline: "none" }} />
+          <button onClick={onClose} style={{ width: 42, height: 42, borderRadius: "50%", background: t.bg3, border: `1px solid ${t.border}`, color: t.text3, cursor: "pointer", fontSize: 16 }}>✕</button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {loading && <p style={{ textAlign: "center", color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 12, padding: 20 }}>Chargement…</p>}
+          {!loading && err && <p style={{ textAlign: "center", color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 12, padding: 20 }}>{err}</p>}
+          {!loading && !err && items.length === 0 && <p style={{ textAlign: "center", color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 12, padding: 20 }}>Aucun résultat.</p>}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {items.map(g => (
+              <button key={g.id} onClick={() => onPick(g.url)} style={{ padding: 0, border: "none", background: t.bg3, borderRadius: 10, overflow: "hidden", cursor: "pointer", minHeight: 70 }}>
+                <img src={g.thumb} alt={g.title} loading="lazy" style={{ display: "block", width: "100%", height: "auto" }} />
+              </button>
+            ))}
+          </div>
+        </div>
+        <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 9, color: t.text3, fontFamily: "'DM Mono',monospace" }}>Propulsé par {gifProvider}</p>
+      </div>
+    </div>
+  );
+}
+
+function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onBack, t}) {
   const bottomRef = useRef();
-  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[messages]);
+  const [pending, setPending] = useState(null);   // fichier choisi, en attente de confirmation
+  const [sending, setSending] = useState(false);
+  const [gifOpen, setGifOpen] = useState(false);
+  const [viewer, setViewer] = useState(null);
+  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[messages, partnerStatus]);
+
+  const statusText = partnerStatus==="recording" ? "est en train d'enregistrer un vocal…" : partnerStatus==="typing" ? "est en train d'écrire…" : null;
+
+  const pickFile = (file) => {
+    const kind = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : null;
+    if (!kind) { alert("Choisis une photo ou une vidéo."); return; }
+    if (file.size > 30*1024*1024) { alert("Fichier trop lourd (30 Mo maximum)."); return; }
+    setPending({ file, kind, url: URL.createObjectURL(file) });
+  };
+  const closePending = () => { if (pending) URL.revokeObjectURL(pending.url); setPending(null); };
+  const confirmSend = async () => {
+    if (!pending) return;
+    setSending(true);
+    try {
+      const file = pending.kind==="image" ? await compressImage(pending.file) : pending.file;
+      await onSendMedia(pending.kind, file);
+      closePending();
+    } finally { setSending(false); }
+  };
+
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
       <div style={{padding:"16px 20px",borderBottom:`1px solid ${t.border}`,display:"flex",alignItems:"center",gap:12,background:t.bg2,flexShrink:0}}>
@@ -646,34 +786,44 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onBack, 
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <Avatar user={otherUser} size={36} t={t} />
-        <div>
+        <div style={{minWidth:0}}>
           <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0,fontSize:15}}>{otherUser.name}</p>
-          <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>@{otherUser.pseudo}</p>
+          {statusText
+            ? <p style={{color:t.accent,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic",fontSize:11,margin:0}}>{statusText}</p>
+            : <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>@{otherUser.pseudo}</p>}
         </div>
       </div>
       <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
         {messages.length===0&&<p style={{color:t.text3,textAlign:"center",fontFamily:"'DM Mono',monospace",fontSize:12,padding:"40px 0"}}>Commencez la conversation !</p>}
         {messages.map((m,i)=>{
           const isMe = m.senderId===currentUser.id;
+          const isMedia = m.type==="image" || m.type==="video" || m.type==="gif";
           return (
-            <div key={i} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:8,marginBottom:14,alignItems:"flex-end"}}>
+            <div key={m.id||i} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:8,marginBottom:14,alignItems:"flex-end"}}>
               {!isMe&&<Avatar user={otherUser} size={28} t={t} />}
-              <div style={{maxWidth:"72%"}}>
+              <div style={{maxWidth:"72%",display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start"}}>
                 {m.type==="voice" ? (
                   <VoiceMessageBubble msg={m} isMe={isMe} t={t} />
+                ) : isMedia ? (
+                  <MediaBubble msg={m} isMe={isMe} t={t} onOpen={setViewer} />
                 ) : (
                   <div style={{background:isMe?t.accent:t.bg3,borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",color:isMe?"#fff":t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,border:isMe?"none":`1px solid ${t.border}`}}>
                     {m.text}
                   </div>
                 )}
-                <p style={{fontSize:10,color:t.text3,fontFamily:"'DM Mono',monospace",textAlign:isMe?"right":"left",margin:"3px 0 0"}}>{m.time}</p>
+                <p style={{fontSize:10,color:t.text3,fontFamily:"'DM Mono',monospace",margin:"3px 0 0"}}>{m.time}</p>
               </div>
             </div>
           );
         })}
+        {statusText && <p style={{fontStyle:"italic",fontSize:11,color:t.text3,fontFamily:"'DM Sans',sans-serif",margin:"0 0 6px 36px"}}>{otherUser.name.split(" ")[0]} {statusText}</p>}
         <div ref={bottomRef}/>
       </div>
-      <ChatInputBar onSend={onSend} onVoiceSend={onVoiceSend} t={t} placeholder="Écrire un message…" padH={16} />
+      <ChatInputBar onSend={onSend} onVoiceSend={onVoiceSend} onStatus={onStatus} onPickFile={pickFile}
+        onGif={gifsEnabled ? ()=>setGifOpen(true) : null} t={t} placeholder="Écrire un message…" padH={16} />
+      {pending && <MediaPreviewModal pending={pending} sending={sending} onSend={confirmSend} onCancel={closePending} t={t} />}
+      {gifOpen && <GifPicker userId={currentUser.id} t={t} onClose={()=>setGifOpen(false)} onPick={url=>{ setGifOpen(false); onSendGif(url); }} />}
+      {viewer && <MediaViewer item={viewer} onClose={()=>setViewer(null)} />}
     </div>
   );
 }
@@ -1334,7 +1484,7 @@ function MessagesPage({ friends, last, myId, onOpenDM, onGoFriends, t }) {
       )}
       {sorted.map(u=>{
         const m = last[u.id];
-        const preview = !m ? "Commence la conversation" : (m.sender_id===myId?"Toi : ":"") + (m.type==="voice"?"🎙 Message vocal":m.text);
+        const preview = !m ? "Commence la conversation" : (m.sender_id===myId?"Toi : ":"") + dmPreview(m);
         return (
           <div key={u.id} onClick={()=>onOpenDM(u)} style={{display:"flex",alignItems:"center",gap:12,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 16px",marginBottom:8,cursor:"pointer"}}>
             <Avatar user={u} size={46} t={t} />
@@ -1408,7 +1558,7 @@ export default function App() {
       refreshActivities(); refreshFriends();
     });
     const d = api.subscribeDMs(me0.id, m=>{
-      if (dmPartnerRef.current?.id === m.sender_id) setDmMessages(prev=>[...prev, shapeMsg(m)]);
+      if (dmPartnerRef.current?.id === m.sender_id) { setDmMessages(prev=>[...prev, shapeMsg(m)]); setPartnerStatus(null); }
       setLastDMs(p=>({...p,[m.sender_id]:m}));
     });
     const feed = api.supabase.channel("feed")
@@ -1559,6 +1709,30 @@ export default function App() {
   };
 
   useEffect(()=>{ pageRef.current = page; },[page]);
+
+  // ── « est en train d'écrire / d'enregistrer » (temps réel, sans base de données) ──
+  const [partnerStatus, setPartnerStatus] = useState(null);
+  const typingChRef = useRef(null);
+  const statusTimerRef = useRef(null);
+  useEffect(()=>{
+    if (!me0 || !dmPartner || page!=="dm") return;
+    const key = [me0.id, dmPartner.id].sort().join("_");
+    const ch = api.supabase.channel(`typing-${key}`, { config: { broadcast: { self: false } } });
+    ch.on("broadcast", { event: "status" }, ({ payload }) => {
+      if (payload.from !== dmPartner.id) return;
+      clearTimeout(statusTimerRef.current);
+      if (payload.status === "idle") { setPartnerStatus(null); return; }
+      setPartnerStatus(payload.status);
+      statusTimerRef.current = setTimeout(()=>setPartnerStatus(null), payload.status==="recording" ? 90000 : 5000);
+    }).subscribe();
+    typingChRef.current = ch;
+    return ()=>{ clearTimeout(statusTimerRef.current); setPartnerStatus(null); api.supabase.removeChannel(ch); typingChRef.current = null; };
+  },[me0?.id, dmPartner?.id, page==="dm"]);
+  const sendStatus = status => { typingChRef.current?.send({ type:"broadcast", event:"status", payload:{ status, from: me0.id } }); };
+
+  // ── Photos, vidéos et GIFs ─────────────────────────────────────────────────
+  const sendMediaDM = (kind, file) => api.sendDMMedia(me0.id, dmPartner.id, kind, file).then(()=>loadDMs(dmPartner.id)).catch(fail);
+  const sendGifDM = url => api.sendDMGif(me0.id, dmPartner.id, url).then(()=>loadDMs(dmPartner.id)).catch(fail);
 
   // ── Liste des conversations (dernier message par ami) ──────────────────────
   const [lastDMs, setLastDMs] = useState({});
@@ -1824,7 +1998,7 @@ export default function App() {
         {/* DM — replaces everything */}
         {page==="dm"&&dmPartner&&(
           <div style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
-            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onBack={()=>setPage("messages")} t={t} />
+            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onBack={()=>setPage("messages")} t={t} />
           </div>
         )}
 
