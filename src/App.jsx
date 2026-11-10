@@ -386,71 +386,68 @@ function FriendsPage({currentUser, allUsers, onOpenProfile, onAcceptFriend, onBa
 // ════════════════════════════════════════════════════════════════════════════════
 // VOICE MESSAGE HOOK + COMPONENTS
 // ════════════════════════════════════════════════════════════════════════════════
-function useVoiceRecorder(onVoiceSend) {
+function useVoiceRecorder() {
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
-  const [audioURL, setAudioURL] = useState(null);
-  const [previewing, setPreviewing] = useState(false);
   const mediaRef = useRef(null);
+  const streamRef = useRef(null);
   const chunksRef = useRef([]);
-  const blobRef = useRef(null);
   const timerRef = useRef(null);
-  const audioRef = useRef(null);
+  const startedAtRef = useRef(0);
+  const mimeRef = useRef(null);
 
+  const releaseMic = () => { streamRef.current?.getTracks().forEach(t => t.stop()); streamRef.current = null; };
+
+  // Démarre l'enregistrement. Renvoie true si le micro est prêt.
   const start = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
-      mediaRef.current = mr;
+      streamRef.current = stream;
+      // mp4/AAC se lit partout (iPhone compris) ; webm en secours
+      const mime = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find(m => window.MediaRecorder?.isTypeSupported?.(m));
+      mimeRef.current = mime;
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       chunksRef.current = [];
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        blobRef.current = blob;
-        const url = URL.createObjectURL(blob);
-        setAudioURL(url);
-        setPreviewing(true);
-        stream.getTracks().forEach(t => t.stop());
-      };
       mr.start();
-      setRecording(true);
-      setSeconds(0);
-      timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
+      mediaRef.current = mr;
+      startedAtRef.current = Date.now();
+      setSeconds(0); setRecording(true);
+      timerRef.current = setInterval(() => setSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000)), 250);
+      return true;
     } catch {
-      alert("Accès au microphone refusé. Veuillez autoriser le micro dans les paramètres du navigateur.");
+      releaseMic();
+      alert("Accès au microphone refusé. Autorise le micro pour GrouZ dans les réglages du navigateur, puis réessaie.");
+      return false;
     }
   };
 
-  const stop = () => {
-    if (mediaRef.current && recording) {
-      mediaRef.current.stop();
-      setRecording(false);
-      clearInterval(timerRef.current);
-    }
-  };
+  // Arrête et renvoie { blob, url, duration, ms } (ou null s'il n'y avait rien)
+  const stopAndGet = () => new Promise(resolve => {
+    clearInterval(timerRef.current);
+    setRecording(false);
+    const mr = mediaRef.current;
+    if (!mr || mr.state === "inactive") { releaseMic(); resolve(null); return; }
+    mr.onstop = () => {
+      releaseMic();
+      const ms = Date.now() - startedAtRef.current;
+      const blob = new Blob(chunksRef.current, { type: mr.mimeType || mimeRef.current || "audio/webm" });
+      mediaRef.current = null;
+      resolve({ blob, url: URL.createObjectURL(blob), duration: Math.max(1, Math.round(ms / 1000)), ms });
+    };
+    mr.stop();
+  });
 
   const cancel = () => {
-    stop();
-    setAudioURL(null);
-    setPreviewing(false);
-    setSeconds(0);
+    clearInterval(timerRef.current);
+    setRecording(false);
+    const mr = mediaRef.current;
+    mediaRef.current = null;
+    if (mr && mr.state !== "inactive") { mr.onstop = releaseMic; mr.stop(); } else releaseMic();
   };
 
-  const send = () => {
-    if (!audioURL) return;
-    onVoiceSend(audioURL, seconds || 1, blobRef.current);
-    setAudioURL(null);
-    setPreviewing(false);
-    setSeconds(0);
-  };
-
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (audioRef.current.paused) audioRef.current.play();
-    else audioRef.current.pause();
-  };
-
-  return { recording, seconds, previewing, audioURL, audioRef, start, stop, cancel, send, togglePlay };
+  useEffect(() => () => { clearInterval(timerRef.current); releaseMic(); }, []);
+  return { recording, seconds, start, stopAndGet, cancel };
 }
 
 // Waveform bars (static decorative)
@@ -476,19 +473,21 @@ function VoiceMessageBubble({ msg, isMe, t }) {
   useEffect(() => { if (!url && msg.audio_path) api.voiceUrl(msg.audio_path).then(setUrl).catch(()=>{}); }, [msg.audio_path]);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [err, setErr] = useState(false);
   const audioRef = useRef(null);
   const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 
   const toggle = () => {
-    if (!audioRef.current) return;
-    if (audioRef.current.paused) { audioRef.current.play(); setPlaying(true); }
-    else { audioRef.current.pause(); setPlaying(false); }
+    const a = audioRef.current;
+    if (!a) return;
+    if (a.paused) { setErr(false); a.volume = 1; a.play().then(() => setPlaying(true)).catch(() => setErr(true)); }
+    else { a.pause(); setPlaying(false); }
   };
 
   return (
     <div style={{ background: isMe ? t.accent : t.bg3, borderRadius: isMe?"16px 16px 4px 16px":"16px 16px 16px 4px", padding:"10px 14px", display:"flex", alignItems:"center", gap:10, minWidth:180, border: isMe?"none":`1px solid ${t.border}` }}>
-      {url && <audio ref={audioRef} src={url} onEnded={()=>setPlaying(false)} onTimeUpdate={()=>{ if(audioRef.current) setProgress(audioRef.current.currentTime/audioRef.current.duration||0); }} />}
-      <button onClick={toggle} style={{ width:34, height:34, borderRadius:"50%", background: isMe?"rgba(255,255,255,0.25)":"rgba(0,0,0,0.1)", border:"none", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, color: isMe?"#fff":t.text }}>
+      {url && <audio ref={audioRef} src={url} preload="auto" onError={()=>{ setErr(true); setPlaying(false); }} onEnded={()=>setPlaying(false)} onTimeUpdate={()=>{ if(audioRef.current) setProgress(audioRef.current.currentTime/audioRef.current.duration||0); }} />}
+      <button onClick={toggle} style={{ width:34, height:34, borderRadius:"50%", background: isMe?"rgba(255,255,255,0.25)":"rgba(0,0,0,0.1)", border:"none", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, color: isMe?"#fff":t.text, opacity: url ? 1 : 0.5 }}>
         {playing
           ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
           : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
@@ -498,7 +497,7 @@ function VoiceMessageBubble({ msg, isMe, t }) {
         <Waveform isMe={isMe} playing={playing} color={t.accent} />
         <div style={{ display:"flex", justifyContent:"space-between", marginTop:3 }}>
           <span style={{ fontSize:10, color: isMe?"rgba(255,255,255,0.7)":t.text3, fontFamily:"'DM Mono',monospace" }}>
-            {fmt(Math.round((msg.duration||0) * (playing ? progress : 1)))} / {fmt(msg.duration||0)}
+            {err ? "⚠ Lecture impossible" : `${fmt(Math.round((msg.duration||0) * (playing ? progress : 1)))} / ${fmt(msg.duration||0)}`}
           </span>
         </div>
       </div>
@@ -507,58 +506,126 @@ function VoiceMessageBubble({ msg, isMe, t }) {
   );
 }
 
-// Chat input bar with text + voice
+// Barre de saisie : texte + vocal par appui long
+//  • maintenir le micro = enregistrer, relâcher = envoyer
+//  • glisser vers la gauche = annuler
+//  • glisser vers le haut = verrouiller (mains libres), puis ➤ pour envoyer ou 🗑 pour annuler
 function ChatInputBar({ onSend, onVoiceSend, t, placeholder="Écrire…", padH=16, padV=12 }) {
   const [msg, setMsg] = useState("");
-  const voice = useVoiceRecorder(onVoiceSend);
-  const send = () => { if (msg.trim()) { onSend(msg.trim()); setMsg(""); } };
+  const voice = useVoiceRecorder();
+  const [mode, setMode] = useState("idle"); // idle | holding | locked
+  const [drag, setDrag] = useState({ x: 0, y: 0 });
+  const [hint, setHint] = useState(false);
+  const gRef = useRef(null);
+  const MIN_MS = 700;
   const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 
-  if (voice.previewing) {
-    return (
-      <div style={{ padding:`${padV}px ${padH}px calc(${padV}px + env(safe-area-inset-bottom, 0px))`, borderTop:`1px solid ${t.border}`, background:t.bg2, display:"flex", alignItems:"center", gap:10 }}>
-        <button onClick={voice.cancel} style={{ padding:"8px 12px", borderRadius:10, background:t.bg3, border:`1px solid ${t.border}`, color:t.text3, cursor:"pointer", fontFamily:"'DM Mono',monospace", fontSize:12 }}>✕ Annuler</button>
-        <div style={{ flex:1, background:t.accentBg, border:`1px solid ${t.accent}44`, borderRadius:12, padding:"8px 14px", display:"flex", alignItems:"center", gap:10 }}>
-          <button onClick={voice.togglePlay} style={{ width:32, height:32, borderRadius:"50%", background:t.accent, border:"none", cursor:"pointer", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-          </button>
-          {voice.audioURL && <audio ref={voice.audioRef} src={voice.audioURL} />}
-          <Waveform isMe={false} playing={false} color={t.accent} />
-          <span style={{ fontSize:11, color:t.accent, fontFamily:"'DM Mono',monospace", marginLeft:"auto" }}>{fmt(voice.seconds)}</span>
-        </div>
-        <button onClick={voice.send} style={{ padding:"8px 14px", borderRadius:10, background:t.accent, border:"none", color:"#fff", cursor:"pointer", fontFamily:"'DM Mono',monospace", fontSize:12, fontWeight:700 }}>Envoyer →</button>
-      </div>
-    );
-  }
+  const send = () => { if (msg.trim()) { onSend(msg.trim()); setMsg(""); } };
+  const reset = () => { setMode("idle"); setDrag({ x: 0, y: 0 }); };
+  const flashHint = () => { setHint(true); setTimeout(() => setHint(false), 1800); };
 
-  if (voice.recording) {
-    return (
-      <div style={{ padding:`${padV}px ${padH}px calc(${padV}px + env(safe-area-inset-bottom, 0px))`, borderTop:`1px solid ${t.border}`, background:t.bg2, display:"flex", alignItems:"center", gap:10 }}>
-        <button onClick={voice.cancel} style={{ padding:"8px 12px", borderRadius:10, background:t.bg3, border:`1px solid ${t.border}`, color:t.text3, cursor:"pointer", fontFamily:"'DM Mono',monospace", fontSize:12 }}>✕</button>
-        <div style={{ flex:1, display:"flex", alignItems:"center", gap:10, background:t.accentBg, border:`1px solid ${t.accent}44`, borderRadius:12, padding:"10px 14px" }}>
-          <div style={{ width:10, height:10, borderRadius:"50%", background:"#E8008A", animation:"pulse 1s ease-in-out infinite", flexShrink:0 }} />
-          <span style={{ color:t.accent, fontFamily:"'DM Mono',monospace", fontSize:13, fontWeight:700 }}>Enregistrement…</span>
-          <span style={{ color:t.accent, fontFamily:"'DM Mono',monospace", fontSize:13, marginLeft:"auto" }}>{fmt(voice.seconds)}</span>
-        </div>
-        <button onClick={voice.stop} style={{ width:44, height:44, borderRadius:"50%", background:t.accent, border:"none", cursor:"pointer", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-        </button>
-      </div>
-    );
-  }
+  const finish = async () => {
+    const r = await voice.stopAndGet();
+    reset();
+    if (!r) return;
+    if (r.ms < MIN_MS) return flashHint();       // appui trop court
+    onVoiceSend(r.url, r.duration, r.blob);
+  };
+
+  const onDown = (e) => {
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    const g = { active: true, x0: e.clientX, y0: e.clientY, locked: false, released: false, ready: false, cancelled: false, abort: false };
+    gRef.current = g;
+    setMode("holding"); setDrag({ x: 0, y: 0 });
+    navigator.vibrate?.(12);
+    voice.start().then(ok => {
+      if (!ok) { g.active = false; reset(); return; }
+      g.ready = true;
+      if (g.cancelled || g.abort) { voice.cancel(); return; }
+      if (g.released && !g.locked) finish();     // relâché pendant l'autorisation du micro
+    });
+  };
+
+  const onMove = (e) => {
+    const g = gRef.current;
+    if (!g || !g.active || g.locked) return;
+    const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+    setDrag({ x: Math.min(0, dx), y: Math.min(0, dy) });
+    if (dy < -70) { g.locked = true; g.active = false; setMode("locked"); setDrag({ x: 0, y: 0 }); navigator.vibrate?.(20); }
+    else if (dx < -90) { g.cancelled = true; g.active = false; if (g.ready) voice.cancel(); reset(); }
+  };
+
+  const onUp = () => {
+    const g = gRef.current;
+    if (!g || !g.active) return;
+    g.released = true; g.active = false;
+    if (g.ready) finish();
+  };
+
+  const onCancelGesture = () => {      // geste interrompu par le système : on n'envoie rien
+    const g = gRef.current;
+    if (!g || !g.active) return;
+    g.cancelled = true; g.active = false;
+    if (g.ready) voice.cancel();
+    reset();
+  };
+
+  const lockedCancel = () => { if (gRef.current) gRef.current.abort = true; voice.cancel(); reset(); };
+  const lockedSend = () => { if (gRef.current) gRef.current.abort = !gRef.current.ready; finish(); };
+
+  const holding = mode === "holding", locked = mode === "locked";
+  const showSend = mode === "idle" && !!msg.trim();
+  const cancelOpacity = 1 - Math.min(1, Math.abs(drag.x) / 90);
+  const lockProgress = Math.min(1, Math.abs(drag.y) / 70);
+  const strip = { flex: 1, display: "flex", alignItems: "center", gap: 10, background: t.accentBg, border: `1px solid ${t.accent}44`, borderRadius: 12, padding: "11px 14px" };
 
   return (
-    <div style={{ padding:`${padV}px ${padH}px calc(${padV}px + env(safe-area-inset-bottom, 0px))`, borderTop:`1px solid ${t.border}`, background:t.bg2, display:"flex", gap:10, alignItems:"center" }}>
-      <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} placeholder={placeholder} style={{ flex:1, padding:"11px 16px", borderRadius:12, background:t.input, border:`1px solid ${t.border}`, color:t.text, fontSize:14, fontFamily:"'DM Mono',monospace", outline:"none" }} />
-      {msg.trim() ? (
-        <button onClick={send} style={{ padding:"11px 16px", borderRadius:12, background:t.accent, border:"none", color:"#fff", cursor:"pointer", fontSize:18, transition:"all 0.2s" }}>→</button>
+    <div style={{ padding: `${padV}px ${padH}px calc(${padV}px + env(safe-area-inset-bottom, 0px))`, borderTop: `1px solid ${t.border}`, background: t.bg2, display: "flex", gap: 10, alignItems: "center", position: "relative", userSelect: "none", WebkitUserSelect: "none" }}>
+      {hint && (
+        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: "calc(100% + 8px)", background: t.bg3, border: `1px solid ${t.border}`, color: t.text2, fontFamily: "'DM Mono',monospace", fontSize: 11, padding: "7px 12px", borderRadius: 10, whiteSpace: "nowrap", zIndex: 5 }}>
+          Maintiens le micro pour enregistrer
+        </div>
+      )}
+      {holding && (
+        <div style={{ position: "absolute", right: padH + 4, bottom: "calc(100% + 10px)", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "8px 9px", borderRadius: 20, background: t.bg3, border: `1px solid ${lockProgress > 0.6 ? t.accent : t.border}`, transform: `scale(${1 + lockProgress * 0.25})`, transition: "transform 0.1s" }}>
+          <span style={{ fontSize: 16 }}>🔒</span>
+          <span style={{ fontSize: 12, color: t.text3 }}>↑</span>
+        </div>
+      )}
+
+      {mode === "idle" && (
+        <input value={msg} onChange={e => setMsg(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={placeholder}
+          style={{ flex: 1, minWidth: 0, padding: "11px 16px", borderRadius: 12, background: t.input, border: `1px solid ${t.border}`, color: t.text, fontSize: 14, fontFamily: "'DM Mono',monospace", outline: "none" }} />
+      )}
+
+      {holding && (
+        <div style={strip}>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#E8008A", animation: "pulse 1s ease-in-out infinite", flexShrink: 0 }} />
+          <span style={{ color: t.accent, fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 700 }}>{fmt(voice.seconds)}</span>
+          <span style={{ marginLeft: "auto", color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 11, opacity: cancelOpacity, whiteSpace: "nowrap" }}>◀ Glisse pour annuler</span>
+        </div>
+      )}
+
+      {locked && (
+        <>
+          <button onClick={lockedCancel} aria-label="Annuler" style={{ width: 44, height: 44, borderRadius: "50%", background: t.bg3, border: `1px solid ${t.border}`, cursor: "pointer", fontSize: 18, flexShrink: 0 }}>🗑</button>
+          <div style={strip}>
+            <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#E8008A", animation: "pulse 1s ease-in-out infinite", flexShrink: 0 }} />
+            <span style={{ color: t.accent, fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 700 }}>{fmt(voice.seconds)}</span>
+            <span style={{ marginLeft: "auto", color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 11 }}>Enregistrement…</span>
+          </div>
+        </>
+      )}
+
+      {(showSend || locked) ? (
+        <button key="send" onClick={locked ? lockedSend : send} aria-label="Envoyer" style={{ width: 44, height: 44, borderRadius: locked ? "50%" : 12, background: t.gradient, border: "none", color: "#fff", cursor: "pointer", fontSize: 18, flexShrink: 0, boxShadow: "0 4px 14px rgba(232,0,138,0.35)" }}>→</button>
       ) : (
-        <button onClick={voice.start} title="Message vocal" style={{ width:44, height:44, borderRadius:"50%", background:t.bg3, border:`1px solid ${t.border}`, cursor:"pointer", color:t.text2, display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.2s", flexShrink:0 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-            <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
+        <button key="mic" aria-label="Maintenir pour enregistrer un vocal"
+          onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancelGesture} onContextMenu={e => e.preventDefault()}
+          style={{ width: 44, height: 44, borderRadius: "50%", background: holding ? t.accent : t.bg3, border: `1px solid ${holding ? t.accent : t.border}`, color: holding ? "#fff" : t.text2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "none", WebkitTouchCallout: "none", transform: holding ? `translate(${drag.x}px, ${drag.y}px) scale(1.5)` : "none", transition: holding ? "none" : "transform 0.15s", zIndex: 6, boxShadow: holding ? "0 6px 22px rgba(232,0,138,0.55)" : "none" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: "none" }}>
+            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
           </svg>
         </button>
       )}
@@ -922,18 +989,20 @@ function guessLatLng(activity) {
   return [46.5 + (seed%20)/10 - 1, 2.3 + (seed%13)/10 - 0.6];
 }
 
-function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLocation, t }) {
+function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLocation, viewRef, t }) {
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
   const markersRef = useRef([]);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(() => viewRef?.current?.selectedId ? (activities.find(a => a.id === viewRef.current.selectedId) || null) : null);
   const [clusterList, setClusterList] = useState(null);
   const renderRef = useRef(null);
   const meMarkerRef = useRef(null);
-  const centeredRef = useRef(!!userPos);
+  const centeredRef = useRef(!!userPos || !!viewRef?.current?.center);
   const [filterCat, setFilterCat] = useState("Tous");
   const [mapReady] = useState(true);
-  useEffect(()=>{ setSelected(null); setClusterList(null); },[filterCat]);
+  const firstFilterRef = useRef(true);
+  useEffect(()=>{ if (firstFilterRef.current) { firstFilterRef.current = false; return; } setSelected(null); setClusterList(null); },[filterCat]);
+  useEffect(()=>{ if (viewRef) viewRef.current = { ...viewRef.current, selectedId: selected?.id || null }; },[selected]);
   const isDark = t.bg === "#0D0A12";
 
   const filtered = activities.filter(a => filterCat === "Tous" || a.category === filterCat);
@@ -947,8 +1016,8 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
     
 
     const map = L.map(mapRef.current, {
-      center: userPos ? [userPos.lat, userPos.lng] : [46.6, 2.3],
-      zoom: userPos ? 11 : 6,
+      center: viewRef?.current?.center || (userPos ? [userPos.lat, userPos.lng] : [46.6, 2.3]),
+      zoom: viewRef?.current?.zoom ?? (userPos ? 11 : 6),
       zoomControl: false,
       attributionControl: false,
     });
@@ -962,6 +1031,7 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
 
     leafletRef.current = map;
     map.on("zoomend", () => renderRef.current && renderRef.current());
+    map.on("moveend", () => { if (viewRef) { const c = map.getCenter(); viewRef.current = { ...viewRef.current, center: [c.lat, c.lng], zoom: map.getZoom() }; } });
     map.on("click", () => { setSelected(null); setClusterList(null); });
     mapRef.current.classList.toggle("grouz-map-dark", isDark);
     setTimeout(()=>map.invalidateSize(),150);
@@ -1376,6 +1446,8 @@ export default function App() {
   // ── Vues ───────────────────────────────────────────────────────────────────
   const [page, setPage] = useState("home"); // home | detail | profile | friends | settings | dm | map | notifs
   const [selectedId, setSelectedId] = useState(null);
+  const [detailBack, setDetailBack] = useState("home");
+  const mapViewRef = useRef(null);
   const setSelected = a => setSelectedId(a ? a.id : null);
   const selectedBase = activities.find(a=>a.id===selectedId);
   const selected = selectedBase ? { ...selectedBase, messages: actMessages[selectedId] || [] } : null;
@@ -1635,7 +1707,7 @@ export default function App() {
               {filtered.length===0
                 ? <div style={{textAlign:"center",padding:"56px 0",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:14}}>Aucune sortie. Soyez le premier !</div>
                 : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-                    {filtered.map(a=><ActivityCard key={a.id} activity={a} currentUser={currentUser} onClick={()=>{setSelected(a);setPage("detail");}} t={t} />)}
+                    {filtered.map(a=><ActivityCard key={a.id} activity={a} currentUser={currentUser} onClick={()=>{setSelected(a);setDetailBack("home");setPage("detail");}} t={t} />)}
                   </div>
               }
             </div>
@@ -1644,7 +1716,7 @@ export default function App() {
           {/* DETAIL */}
           {page==="detail"&&selected&&(
             <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage("home")} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onJoin={handleJoin} onOpenProfile={setProfileUser} t={t} />
+              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onJoin={handleJoin} onOpenProfile={setProfileUser} t={t} />
             </div>
           )}
 
@@ -1672,7 +1744,7 @@ export default function App() {
           {/* MAP */}
           {page==="map"&&(
             <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column"}}>
-              <MapPage activities={activities} currentUser={currentUser} userPos={userPos} onRequestLocation={requestLocation} onOpenActivity={(a)=>{ setSelected(a); setPage("detail"); }} t={t} />
+              <MapPage activities={activities} currentUser={currentUser} userPos={userPos} onRequestLocation={requestLocation} viewRef={mapViewRef} onOpenActivity={(a)=>{ setSelected(a); setDetailBack("map"); setPage("detail"); }} t={t} />
             </div>
           )}
 
