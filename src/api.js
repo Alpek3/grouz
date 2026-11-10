@@ -78,8 +78,10 @@ export const rejectMember = (activityId, userId) =>
 
 // ── VOCAUX (stockage privé + URLs signées) ──────────────────────
 async function uploadVoice(userId, blob) {
-  const path = `${userId}/${Date.now()}.webm`;
-  ok(await supabase.storage.from("voices").upload(path, blob, { contentType: "audio/webm" }));
+  const type = (blob.type || "audio/webm").split(";")[0];
+  const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
+  const path = `${userId}/${Date.now()}.${ext}`;
+  ok(await supabase.storage.from("voices").upload(path, blob, { contentType: type }));
   return path;
 }
 export const voiceUrl = async (path) =>
