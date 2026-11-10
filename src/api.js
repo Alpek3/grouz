@@ -155,3 +155,13 @@ export const subscribeNotifications = (userId, cb) =>
       { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
       p => cb(p.new))
     .subscribe();
+
+// ── LOCALISATION ────────────────────────────────────────────────
+export const saveMyLocation = (userId, lat, lng, city) =>
+  supabase.from("user_locations").upsert({ user_id: userId, lat, lng, city, updated_at: new Date().toISOString() }).then(ok);
+
+export const removeMyLocation = (userId) =>
+  supabase.from("user_locations").delete().eq("user_id", userId).then(ok);
+
+export const nearbyUsers = (radiusKm) =>
+  supabase.rpc("nearby_users", { radius_km: radiusKm }).then(ok);
