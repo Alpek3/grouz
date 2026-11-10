@@ -922,19 +922,22 @@ function guessLatLng(activity) {
   return [46.5 + (seed%20)/10 - 1, 2.3 + (seed%13)/10 - 0.6];
 }
 
-function MapPage({ activities, currentUser, onOpenActivity, t }) {
+function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLocation, t }) {
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
   const markersRef = useRef([]);
   const [selected, setSelected] = useState(null);
   const [clusterList, setClusterList] = useState(null);
   const renderRef = useRef(null);
+  const meMarkerRef = useRef(null);
+  const centeredRef = useRef(!!userPos);
   const [filterCat, setFilterCat] = useState("Tous");
   const [mapReady] = useState(true);
   useEffect(()=>{ setSelected(null); setClusterList(null); },[filterCat]);
   const isDark = t.bg === "#0D0A12";
 
   const filtered = activities.filter(a => filterCat === "Tous" || a.category === filterCat);
+  const nearCount = userPos ? filtered.filter(a => a.lat != null && distKm(userPos, { lat:a.lat, lng:a.lng }) <= 50).length : 0;
 
 
 
@@ -944,8 +947,8 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
     
 
     const map = L.map(mapRef.current, {
-      center: [46.6, 2.3],
-      zoom: 6,
+      center: userPos ? [userPos.lat, userPos.lng] : [46.6, 2.3],
+      zoom: userPos ? 11 : 6,
       zoomControl: false,
       attributionControl: false,
     });
@@ -971,6 +974,19 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
       leafletRef.current = null;
     };
   }, [mapReady]);
+
+  // Point bleu "tu es ici" + recentrage une seule fois quand la position arrive
+  useEffect(() => {
+    const map = leafletRef.current;
+    if (!map) return;
+    if (meMarkerRef.current) { meMarkerRef.current.remove(); meMarkerRef.current = null; }
+    if (!userPos) return;
+    meMarkerRef.current = L.marker([userPos.lat, userPos.lng], {
+      icon: L.divIcon({ className:"", html:'<div style="width:18px;height:18px;border-radius:50%;background:#3A8FE8;border:3px solid #fff;box-shadow:0 0 0 7px rgba(58,143,232,0.28)"></div>', iconSize:[18,18], iconAnchor:[9,9] }),
+      interactive:false, zIndexOffset:-100,
+    }).addTo(map);
+    if (!centeredRef.current) { centeredRef.current = true; map.setView([userPos.lat, userPos.lng], 11); }
+  }, [userPos?.lat, userPos?.lng, mapReady]);
 
   // Pins + regroupement par zone (recalculé à chaque zoom)
   const sig = filtered.map(a => `${a.id}:${a.accepted?.length}:${a.maxPeople}:${a.lat}`).join("|") + currentUser.id;
@@ -1105,10 +1121,14 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
           </div>
         )}
 
+        {/* Bouton "ma position" */}
+        <button onClick={()=>{ if (userPos && leafletRef.current) leafletRef.current.flyTo([userPos.lat, userPos.lng], 12, { duration:0.8 }); else onRequestLocation(); }}
+          aria-label="Ma position" style={{ position:"absolute", right:10, bottom:84, zIndex:1000, width:40, height:40, borderRadius:"50%", background:t.bg+"F2", border:`1px solid ${t.border}`, color:userPos?"#3A8FE8":t.text3, fontSize:18, cursor:"pointer", boxShadow:"0 4px 14px rgba(0,0,0,0.3)" }}>◎</button>
+
         {/* Counter overlay */}
         <div style={{ position:"absolute", bottom:12, left:12, zIndex:1000, background:t.bg+"EE", backdropFilter:"blur(8px)", borderRadius:10, padding:"6px 12px", border:`1px solid ${t.border}`, pointerEvents:"none" }}>
           <span style={{ fontSize:10, color:t.text2, fontFamily:"'DM Mono',monospace", fontWeight:700 }}>
-            📍 {filtered.length} sortie{filtered.length>1?"s":""}
+            📍 {userPos ? `${nearCount} près de toi` : `${filtered.length} sortie${filtered.length>1?"s":""}`}
           </span>
         </div>
 
@@ -1153,6 +1173,81 @@ function MapPage({ activities, currentUser, onOpenActivity, t }) {
 // ════════════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ════════════════════════════════════════════════════════════════════════════════
+const distKm = (a, b) => {
+  const R = 6371, r = x => x * Math.PI / 180;
+  const dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat/2)**2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+
+function GeoAskModal({ onAllow, onLater, t }) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,maxWidth:380,width:"100%",padding:28,textAlign:"center"}}>
+        <div style={{fontSize:44,marginBottom:10}}>📍</div>
+        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"0 0 10px"}}>Autoriser la localisation ?</h2>
+        <p style={{color:t.text2,fontFamily:"'DM Sans',sans-serif",fontSize:14,lineHeight:1.5,margin:"0 0 10px"}}>GrouZ utilise ta position pour centrer la carte sur toi et te proposer des sorties et des personnes près de chez toi.</p>
+        <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,lineHeight:1.5,margin:"0 0 20px"}}>Ta position exacte n'est jamais montrée : les autres voient seulement ta ville et une distance approximative. Tu peux arrêter à tout moment.</p>
+        <Btn accent onClick={onAllow} t={t} style={{width:"100%",padding:14,marginBottom:10}}>AUTORISER</Btn>
+        <button onClick={onLater} style={{background:"none",border:"none",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer",padding:8}}>Plus tard</button>
+      </div>
+    </div>
+  );
+}
+
+function NearbySheet({ users, loading, radius, onRadius, geoStatus, hasPos, sharing, onToggleShare, onAskLocation, onAdd, onOpenProfile, onClose, t }) {
+  const [sent, setSent] = useState({});
+  const msg = (txt) => <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.5,textAlign:"center",margin:"18px 6px"}}>{txt}</p>;
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:120,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)"}}>
+      <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(56px + env(safe-area-inset-top, 0px))",left:12,right:12,margin:"0 auto",maxWidth:460,maxHeight:"calc(100% - 140px)",overflowY:"auto",background:t.bg2,border:`1px solid ${t.border}`,borderRadius:18,padding:"16px 16px 12px",boxShadow:"0 16px 48px rgba(0,0,0,0.5)",animation:"slideUp 0.2s ease"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <h3 style={{fontFamily:"'Fraunces',serif",fontSize:20,color:t.text,margin:0}}>👋 Près de toi</h3>
+          <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+        <div style={{display:"flex",gap:6,marginBottom:6}}>
+          {[25,50,150].map(r=>(
+            <button key={r} onClick={()=>onRadius(r)} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${radius===r?"#E8008A":t.border}`,background:radius===r?"#E8008A":"transparent",color:radius===r?"#fff":t.text3,cursor:"pointer",fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:radius===r?700:400}}>{r===150?"Région":`${r} km`}</button>
+          ))}
+        </div>
+
+        {geoStatus==="denied" && msg("La localisation est bloquée pour GrouZ. Autorise-la dans les réglages de ton navigateur (cadenas près de l'adresse), puis recharge la page.")}
+        {geoStatus==="unsupported" && msg("Ton appareil ne permet pas la localisation.")}
+        {!hasPos && geoStatus!=="denied" && geoStatus!=="unsupported" && (
+          <div style={{textAlign:"center",margin:"18px 0"}}>
+            {msg("Active ta localisation pour voir les personnes autour de toi.")}
+            <Btn accent onClick={onAskLocation} t={t}>📍 Activer la localisation</Btn>
+          </div>
+        )}
+        {hasPos && !sharing && msg("Tu as désactivé le partage de ta zone. Réactive-le plus bas pour voir les autres et apparaître dans leurs suggestions.")}
+        {hasPos && sharing && loading && msg("Recherche en cours…")}
+        {hasPos && sharing && !loading && users && users.length===0 && msg("Personne dans ta zone pour l'instant. Invite tes amis à rejoindre GrouZ, ou élargis le rayon.")}
+
+        {hasPos && sharing && users && users.map(u=>(
+          <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderTop:`1px solid ${t.border}`}}>
+            <div onClick={()=>onOpenProfile(u)} style={{cursor:"pointer"}}><Avatar user={u} size={46} t={t} /></div>
+            <div onClick={()=>onOpenProfile(u)} style={{flex:1,minWidth:0,cursor:"pointer"}}>
+              <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.name}</p>
+              <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,margin:"2px 0 0"}}>@{u.pseudo} · {u.age} ans</p>
+              <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:10,margin:"2px 0 0"}}>📍 {u.city||"Près de toi"} · {u.distance_km<=5?"à moins de 5 km":`à ~${u.distance_km} km`}</p>
+            </div>
+            {sent[u.id]
+              ? <span style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace"}}>✓ Envoyée</span>
+              : <Btn accent small t={t} onClick={()=>{ setSent(p=>({...p,[u.id]:true})); onAdd(u); }}>Ajouter</Btn>}
+          </div>
+        ))}
+
+        {hasPos && (
+          <button onClick={onToggleShare} style={{display:"block",width:"100%",marginTop:10,padding:"10px",background:"none",border:`1px dashed ${t.border}`,borderRadius:10,color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,cursor:"pointer"}}>
+            {sharing ? "Ne plus apparaître dans les suggestions des autres" : "Réactiver le partage de ma zone"}
+          </button>
+        )}
+        <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:9,textAlign:"center",margin:"10px 0 0",lineHeight:1.5}}>Les autres voient uniquement ta ville et une distance approximative, jamais ta position exacte.</p>
+      </div>
+    </div>
+  );
+}
+
 function MessagesPage({ friends, last, myId, onOpenDM, onGoFriends, t }) {
   const sorted = [...friends].sort((a,b)=>(last[b.id]?.created_at||"").localeCompare(last[a.id]?.created_at||""));
   return (
@@ -1293,6 +1388,65 @@ export default function App() {
     (filter==="Tous"||a.category===filter)&&
     (a.title.toLowerCase().includes(search.toLowerCase())||a.location.toLowerCase().includes(search.toLowerCase()))
   );
+
+  // ── Localisation + personnes proches ───────────────────────────────────────
+  const [userPos, setUserPos] = useState(null);           // position précise, reste sur l'appareil
+  const [geoStatus, setGeoStatus] = useState("unknown");  // unknown | granted | denied | unsupported | error
+  const [showGeoAsk, setShowGeoAsk] = useState(false);
+  const [showNearby, setShowNearby] = useState(false);
+  const [nearbyRadius, setNearbyRadius] = useState(50);
+  const [nearby, setNearby] = useState(null);
+  const [nearLoading, setNearLoading] = useState(false);
+  const [sharing, setSharing] = useState(()=>LS.get("grouz_share",true));
+  const [locVersion, setLocVersion] = useState(0);
+
+  // Enregistre une position ARRONDIE (~1 km) + la ville, visible seulement par soi
+  const shareMyZone = async (lat, lng) => {
+    const rl = Math.round(lat*100)/100, rg = Math.round(lng*100)/100;
+    let city = null;
+    try {
+      const r = await fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${rg}&lat=${rl}`);
+      city = (await r.json()).features?.[0]?.properties?.city || null;
+    } catch {}
+    try { await api.saveMyLocation(me0.id, rl, rg, city); setLocVersion(v=>v+1); } catch(e) { console.error(e); }
+  };
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) { setGeoStatus("unsupported"); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        setUserPos({ lat, lng }); setGeoStatus("granted"); LS.set("grouz_geo","on");
+        if (LS.get("grouz_share",true)) shareMyZone(lat, lng);
+      },
+      err => setGeoStatus(err.code===1 ? "denied" : "error"),
+      { enableHighAccuracy:false, timeout:12000, maximumAge:300000 }
+    );
+  };
+
+  // Première ouverture : on explique puis on demande ; ensuite mise à jour silencieuse
+  useEffect(()=>{
+    if (!me0) return;
+    if (!navigator.geolocation) { setGeoStatus("unsupported"); return; }
+    if (LS.get("grouz_geo")==="on") { requestLocation(); return; }
+    if (!LS.get("grouz_geo_asked")) setShowGeoAsk(true);
+  },[me0?.id]);
+
+  useEffect(()=>{
+    if (!showNearby || !me0) return;
+    setNearLoading(true);
+    api.nearbyUsers(nearbyRadius).then(r=>setNearby(r.map(shapeUser))).catch(e=>{ console.error(e); setNearby([]); }).finally(()=>setNearLoading(false));
+  },[showNearby, nearbyRadius, locVersion, sharing, me0?.id]);
+
+  const toggleSharing = async () => {
+    if (sharing) {
+      try { await api.removeMyLocation(me0.id); } catch(e) { return fail(e); }
+      setSharing(false); LS.set("grouz_share",false); setNearby([]);
+    } else {
+      setSharing(true); LS.set("grouz_share",true);
+      if (userPos) shareMyZone(userPos.lat, userPos.lng); else requestLocation();
+    }
+  };
 
   // ── Liste des conversations (dernier message par ami) ──────────────────────
   const [lastDMs, setLastDMs] = useState({});
@@ -1440,13 +1594,13 @@ export default function App() {
         {/* ── TOP BAR (logo + DM icon) ── */}
         {showNav && page!=="detail" && (
           <div style={{height:`calc(${TOP_BAR_H}px + env(safe-area-inset-top, 0px))`,padding:"env(safe-area-inset-top, 0px) 20px 0",display:"flex",alignItems:"center",justifyContent:"space-between",background:t.navBg,flexShrink:0,zIndex:40,borderBottom:`1px solid ${t.border}`}}>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={()=>setShowNearby(true)} aria-label="Personnes près de toi" style={{display:"flex",alignItems:"center",gap:10,background:"none",border:"none",cursor:"pointer",padding:0}}>
               <div style={{position:"relative"}}>
                 <div style={{position:"absolute",inset:-2,borderRadius:"50%",background:t.gradient,opacity:0.6,filter:"blur(6px)"}}/>
                 <img src={LOGO_B64} alt="GrouZ" style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",position:"relative",border:`2px solid #D4AF37`}} />
               </div>
               <span style={{fontFamily:"'Fraunces',serif",fontSize:22,fontStyle:"italic",background:t.gradient,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontWeight:700}}>GrouZ</span>
-            </div>
+            </button>
             {/* right: notifications */}
             <button onClick={()=>setShowNotifs(v=>!v)} style={{position:"relative",background:"none",border:"none",cursor:"pointer",color:showNotifs?"#E8008A":t.text2,padding:4}}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill={showNotifs?"currentColor":"none"} stroke="currentColor" strokeWidth={showNotifs?0:2} strokeLinecap="round" strokeLinejoin="round">
@@ -1518,7 +1672,7 @@ export default function App() {
           {/* MAP */}
           {page==="map"&&(
             <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column"}}>
-              <MapPage activities={activities} currentUser={currentUser} onOpenActivity={(a)=>{ setSelected(a); setPage("detail"); }} t={t} />
+              <MapPage activities={activities} currentUser={currentUser} userPos={userPos} onRequestLocation={requestLocation} onOpenActivity={(a)=>{ setSelected(a); setPage("detail"); }} t={t} />
             </div>
           )}
 
@@ -1591,6 +1745,13 @@ export default function App() {
         {showNotifs&&page!=="notifs"&&(
           <NotifPanel notifs={notifs} onMarkRead={markNotifsRead} onClose={()=>setShowNotifs(false)} t={t}/>
         )}
+
+        {showGeoAsk && <GeoAskModal t={t}
+          onAllow={()=>{ LS.set("grouz_geo_asked",true); setShowGeoAsk(false); requestLocation(); }}
+          onLater={()=>{ LS.set("grouz_geo_asked",true); setShowGeoAsk(false); }} />}
+        {showNearby && <NearbySheet t={t} users={nearby} loading={nearLoading} radius={nearbyRadius} onRadius={setNearbyRadius}
+          geoStatus={geoStatus} hasPos={!!userPos} sharing={sharing} onToggleShare={toggleSharing} onAskLocation={requestLocation}
+          onAdd={u=>sendFriendReq(u.id)} onOpenProfile={u=>setProfileUser(u)} onClose={()=>setShowNearby(false)} />}
 
         {/* ── PROFILE MODAL ── */}
         {profileUser&&(
