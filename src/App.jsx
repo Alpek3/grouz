@@ -681,10 +681,10 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onBack, 
 // ════════════════════════════════════════════════════════════════════════════════
 // NOTIFICATIONS PANEL
 // ════════════════════════════════════════════════════════════════════════════════
-function NotifPanel({notifs, onMarkRead, onClose, t}) {
+function NotifPanel({notifs, onMarkRead, onOpen, onClose, t}) {
   return (
     <div style={{position:"fixed",inset:0,zIndex:150}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:56,right:16,width:320,maxHeight:400,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:16,overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
+      <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(56px + env(safe-area-inset-top, 0px))",right:16,width:320,maxWidth:"calc(100% - 32px)",maxHeight:400,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:16,overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
         <div style={{padding:"14px 16px",borderBottom:`1px solid ${t.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:t.text,fontWeight:700}}>NOTIFICATIONS</span>
           <button onClick={onMarkRead} style={{background:"none",border:"none",color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:11,cursor:"pointer"}}>Tout lu</button>
@@ -692,9 +692,12 @@ function NotifPanel({notifs, onMarkRead, onClose, t}) {
         <div style={{overflowY:"auto",maxHeight:340}}>
           {notifs.length===0&&<p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,padding:"24px",textAlign:"center"}}>Aucune notification</p>}
           {notifs.map((n,i)=>(
-            <div key={i} style={{padding:"12px 16px",borderBottom:`1px solid ${t.border}`,background:n.read?"transparent":t.accentBg}}>
-              <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:13,margin:"0 0 3px",lineHeight:1.4}}>{n.text}</p>
-              <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,margin:0}}>{n.time}</p>
+            <div key={n.id||i} onClick={()=>onOpen&&onOpen(n)} style={{padding:"12px 16px",borderBottom:`1px solid ${t.border}`,background:n.read?"transparent":t.accentBg,cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:13,margin:"0 0 3px",lineHeight:1.4}}>{n.text}</p>
+                <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,margin:0}}>{n.time}</p>
+              </div>
+              <span style={{color:t.text3,fontSize:18,flexShrink:0}}>›</span>
             </div>
           ))}
         </div>
@@ -1399,7 +1402,11 @@ export default function App() {
   useEffect(()=>{
     if (!me0) return;
     refreshActivities(); refreshFriends(); refreshUsers(); refreshNotifs();
-    const n = api.subscribeNotifications(me0.id, ()=>{ refreshNotifs(); refreshActivities(); refreshFriends(); });
+    const n = api.subscribeNotifications(me0.id, row=>{
+      if (row.kind==="message" && dmPartnerRef.current?.id===row.ref_id) api.markNotifRead(row.id).finally(refreshNotifs);
+      else refreshNotifs();
+      refreshActivities(); refreshFriends();
+    });
     const d = api.subscribeDMs(me0.id, m=>{
       if (dmPartnerRef.current?.id === m.sender_id) setDmMessages(prev=>[...prev, shapeMsg(m)]);
       setLastDMs(p=>({...p,[m.sender_id]:m}));
@@ -1439,7 +1446,10 @@ export default function App() {
 
   // ── Messages privés ────────────────────────────────────────────────────────
   const loadDMs = otherId => api.listDMs(me0.id, otherId).then(r=>setDmMessages(r.map(shapeMsg))).catch(console.error);
-  const openDM = (user) => { setDmPartner(user); setDmMessages([]); loadDMs(user.id); setPage("dm"); };
+  const openDM = (user) => {
+    setDmPartner(user); setDmMessages([]); loadDMs(user.id); setPage("dm");
+    api.markMessageNotifsRead(me0.id, user.id).then(refreshNotifs).catch(()=>{});
+  };
   const sendDM = text => api.sendDM(me0.id, dmPartner.id, text).then(()=>loadDMs(dmPartner.id)).catch(fail);
   const sendVoiceDM = (url, dur, blob) => api.sendDMVoice(me0.id, dmPartner.id, blob, dur).then(()=>loadDMs(dmPartner.id)).catch(fail);
 
@@ -1520,6 +1530,30 @@ export default function App() {
     }
   };
 
+  // ── Toucher une notification = aller à l'endroit concerné ──────────────────
+  const openNotif = (n) => {
+    setShowNotifs(false);
+    if (!n.read) api.markNotifRead(n.id).then(refreshNotifs).catch(()=>{});
+    // anciennes notifications sans type : on le devine d'après le texte
+    const kind = n.kind || (/^(👋)/.test(n.text) || /ami/i.test(n.text) ? "friend_request" : null);
+    if (kind==="message") {
+      const u = allUsers.find(x=>x.id===n.ref_id);
+      if (u) openDM(u); else setPage("messages");
+      return;
+    }
+    if (kind==="friend_request" || kind==="friend_accepted") { refreshFriends(); setPage("friends"); return; }
+    let actId = n.ref_id;
+    if (!actId) {
+      const m = n.text.match(/"([^"]+)"/);
+      actId = m && activities.find(a=>a.title===m[1])?.id;
+    }
+    if (!actId) return;
+    const act = activities.find(a=>a.id===actId);
+    if (!act) { alert("Cette sortie n'est plus disponible (elle est peut-être passée ou supprimée)."); return; }
+    refreshActivities();
+    setSelected(act); setDetailBack(page); setPage("detail");
+  };
+
   // ── Liste des conversations (dernier message par ami) ──────────────────────
   const [lastDMs, setLastDMs] = useState({});
   useEffect(()=>{
@@ -1571,6 +1605,7 @@ export default function App() {
   if (!session) return <AuthScreen onAuth={()=>{}} t={t} />;
 
   const unreadNotifs = notifs.filter(n=>!n.read).length;
+  const unreadMsgs = notifs.filter(n=>!n.read && n.kind==="message").length;
   const friendReqCount = (me.friendReqs||[]).length;
 
   // Nav tabs: home, notifs, [create button], map, friends, profile
@@ -1582,9 +1617,12 @@ export default function App() {
       </svg>
     )},
     { id:"messages", icon: (active) => (
-      <svg width="26" height="26" viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth={active?0:2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-      </svg>
+      <div style={{position:"relative",display:"inline-flex"}}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth={active?0:2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        </svg>
+        {unreadMsgs>0&&<span style={{position:"absolute",top:-4,right:-6,minWidth:16,height:16,borderRadius:8,background:"#E8008A",color:"#fff",fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{unreadMsgs}</span>}
+      </div>
     )},
     { id:"create",  icon: () => (
       <div style={{width:48,height:48,borderRadius:16,background:t.gradient,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 20px rgba(232,0,138,0.5)`,marginBottom:4}}>
@@ -1815,7 +1853,7 @@ export default function App() {
 
         {/* ── NOTIF DROPDOWN (from top on notif icon click if on home) ── */}
         {showNotifs&&page!=="notifs"&&(
-          <NotifPanel notifs={notifs} onMarkRead={markNotifsRead} onClose={()=>setShowNotifs(false)} t={t}/>
+          <NotifPanel notifs={notifs} onMarkRead={markNotifsRead} onOpen={openNotif} onClose={()=>setShowNotifs(false)} t={t}/>
         )}
 
         {showGeoAsk && <GeoAskModal t={t}
