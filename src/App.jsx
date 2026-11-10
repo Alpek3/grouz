@@ -743,10 +743,65 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
 // ════════════════════════════════════════════════════════════════════════════════
 // CREATE MODAL
 // ════════════════════════════════════════════════════════════════════════════════
+// ── Recherche de lieu (API Adresse officielle data.gouv.fr — gratuite, sans clé) ──
+function PlaceInput({ value, onText, onPick, onOffline, hasCoords, t }) {
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [picked, setPicked] = useState(false);
+
+  useEffect(() => {
+    if (picked || value.trim().length < 2) { setResults([]); return; }
+    const ctrl = new AbortController();
+    const id = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(value.trim())}&limit=6&autocomplete=1`, { signal: ctrl.signal });
+        const j = await r.json();
+        setResults(j.features || []); setOpen(true); onOffline(false);
+      } catch (e) { if (e.name !== "AbortError") { setResults([]); onOffline(true); } }
+      setLoading(false);
+    }, 300);
+    return () => { clearTimeout(id); ctrl.abort(); };
+  }, [value, picked]);
+
+  const choose = (f) => {
+    const p = f.properties;
+    const label = p.type === "municipality" ? `${p.city} ${p.postcode}` : p.label;
+    setPicked(true); setOpen(false); setResults([]);
+    onPick(label, f.geometry.coordinates[1], f.geometry.coordinates[0]);
+  };
+
+  return (
+    <div style={{position:"relative"}}>
+      <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Lieu</label>
+      <input value={value} onChange={e=>{ setPicked(false); onText(e.target.value); }} onFocus={()=>results.length&&setOpen(true)}
+        placeholder="Tape une ville, un code postal ou une adresse…"
+        style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${hasCoords?"#AAEE00":t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Mono',monospace",outline:"none",boxSizing:"border-box"}} />
+      <p style={{margin:"6px 2px 0",fontSize:11,fontFamily:"'DM Mono',monospace",color:hasCoords?"#AAEE00":t.text3}}>
+        {hasCoords ? "📍 Position confirmée sur la carte" : loading ? "Recherche…" : "Choisis une proposition pour placer le pin au bon endroit"}
+      </p>
+      {open && results.length>0 && (
+        <div style={{position:"absolute",left:0,right:0,top:"100%",marginTop:-18,zIndex:10,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:12,overflow:"hidden",boxShadow:"0 12px 32px rgba(0,0,0,0.45)"}}>
+          {results.map((f,i)=>{
+            const p=f.properties;
+            return (
+              <button key={i} onClick={()=>choose(f)} style={{display:"block",width:"100%",textAlign:"left",padding:"10px 14px",background:"transparent",border:"none",borderBottom:i<results.length-1?`1px solid ${t.border}`:"none",cursor:"pointer"}}>
+                <span style={{display:"block",color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>📍 {p.type==="municipality"?p.city:p.name}</span>
+                <span style={{display:"block",color:t.text3,fontSize:11,fontFamily:"'DM Mono',monospace",marginTop:2}}>{p.postcode} {p.type==="municipality"?"":p.city} · {p.context}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CreateModal({onClose,onSave,currentUser,t}) {
-  const [form,setForm]=useState({title:"",category:"Nature",date:"",time:"",location:"",maxPeople:6,description:""});
+  const [form,setForm]=useState({title:"",category:"Nature",date:"",time:"",location:"",lat:null,lng:null,noGeo:false,maxPeople:6,description:""});
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  const valid=form.title&&form.date&&form.time&&form.location&&form.description;
+  const valid=form.title&&form.date&&form.time&&form.location&&form.description&&(form.lat!=null||form.noGeo);
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",padding:32}}>
@@ -767,7 +822,10 @@ function CreateModal({onClose,onSave,currentUser,t}) {
             </div>
           </div>
           <div style={{display:"flex",gap:12}}><Field label="Date" type="date" value={form.date} onChange={v=>set("date",v)} t={t} half /><Field label="Heure" type="time" value={form.time} onChange={v=>set("time",v)} t={t} half /></div>
-          <Field label="Lieu" value={form.location} onChange={v=>set("location",v)} placeholder="Adresse ou quartier" t={t} />
+          <PlaceInput value={form.location} hasCoords={form.lat!=null} t={t}
+            onText={v=>setForm(f=>({...f,location:v,lat:null,lng:null}))}
+            onPick={(label,lat,lng)=>setForm(f=>({...f,location:label,lat,lng}))}
+            onOffline={off=>setForm(f=>f.noGeo===off?f:{...f,noGeo:off})} />
           <div>
             <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Max participants : <span style={{color:t.accent}}>{form.maxPeople}</span></label>
             <input type="range" min={2} max={20} value={form.maxPeople} onChange={e=>set("maxPeople",+e.target.value)} style={{width:"100%",accentColor:t.accent,marginTop:8}} />
@@ -1176,7 +1234,7 @@ export default function App() {
   const handleSendVoice = (id,blob,dur) => api.sendActivityVoice(id,me0.id,blob,dur).then(()=>loadActMessages(id)).catch(fail);
   const handleCreate = async (form) => {
     try {
-      const [lat,lng] = guessLatLng({ ...form, id: String(Date.now()) });
+      const [lat,lng] = form.lat != null ? [form.lat, form.lng] : guessLatLng({ ...form, id: String(Date.now()) });
       await api.createActivity(me0.id, { ...form, maxPeople:+form.maxPeople, lat, lng });
       setShowCreate(false); refreshActivities();
     } catch(e) { fail(e); }
