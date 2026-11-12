@@ -9,9 +9,10 @@ workflows:
   # Ne relance pas ce workflow après avoir importé le keystore : il en créerait un autre.
   make-keystore:
     name: Creer le keystore Android (une seule fois)
-    instance_type: linux_x2
+    instance_type: mac_mini_m2        # le forfait gratuit ne donne que des minutes macOS (500 par mois)
     max_build_duration: 10
     environment:
+      java: 21
       groups:
         - grouz_keystore_pw
     scripts:
@@ -72,7 +73,7 @@ workflows:
   # ───────────────────────── Android → fichier .aab ─────────────────────────
   android-release:
     name: GrouZ Android (AAB)
-    instance_type: linux_x2
+    instance_type: mac_mini_m2        # le forfait gratuit ne donne que des minutes macOS (500 par mois)
     max_build_duration: 60
     environment:
       groups:
