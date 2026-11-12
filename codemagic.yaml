@@ -4,6 +4,28 @@
 
 workflows:
 
+  # ───────────── À lancer UNE SEULE FOIS : crée la clé de signature Android ─────────────
+  # Le mot de passe vient du groupe de variables « grouz_keystore_pw » (variable secrète KEYSTORE_PASSWORD).
+  # Ne relance pas ce workflow après avoir importé le keystore : il en créerait un autre.
+  make-keystore:
+    name: Creer le keystore Android (une seule fois)
+    instance_type: linux_x2
+    max_build_duration: 10
+    environment:
+      groups:
+        - grouz_keystore_pw
+    scripts:
+      - name: Generer le keystore
+        script: |
+          keytool -genkeypair -v \
+            -keystore grouz-upload.jks -storetype PKCS12 \
+            -alias grouz -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
+            -dname "CN=GrouZ, OU=Mobile, O=GrouZ, C=FR"
+          keytool -list -keystore grouz-upload.jks -storepass "$KEYSTORE_PASSWORD" | head -5
+    artifacts:
+      - grouz-upload.jks
+
   # ───────────────────────── iPhone → TestFlight ─────────────────────────
   ios-testflight:
     name: GrouZ iOS (TestFlight)
