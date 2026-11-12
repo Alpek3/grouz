@@ -1,0 +1,81 @@
+# Construction des applications mobiles GrouZ avec Codemagic (sans Mac, sans Android Studio).
+# Les projets natifs (ios/ et android/) sont régénérés à chaque build à partir du site web.
+# Mode d'emploi complet : MOBILE.md
+
+workflows:
+
+  # ───────────────────────── iPhone → TestFlight ─────────────────────────
+  ios-testflight:
+    name: GrouZ iOS (TestFlight)
+    instance_type: mac_mini_m2        # si Codemagic refuse ce nom, prends celui indiqué dans leur documentation
+    max_build_duration: 60
+    integrations:
+      app_store_connect: GrouZ        # nom de la clé API App Store Connect enregistrée dans Codemagic
+    environment:
+      groups:
+        - grouz_env                   # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (et VITE_KLIPY_KEY)
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: fr.grouz.app
+      node: 22
+      xcode: latest                   # Apple exige Xcode 26 ou plus récent
+    scripts:
+      - name: Installer le site web
+        script: npm ci
+      - name: Installer Capacitor (sans modifier le site)
+        script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/ios@8 @capacitor/assets
+      - name: Construire le site web
+        script: npm run build
+      - name: Créer le projet iPhone
+        script: |
+          npx cap add ios
+          npx @capacitor/assets generate --ios
+          node scripts/configure-native.mjs
+          npx cap sync ios
+      - name: Préparer la signature
+        script: xcode-project use-profiles
+      - name: Construire l'application (.ipa)
+        script: |
+          xcode-project build-ipa \
+            --project "ios/App/App.xcodeproj" \
+            --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  # ───────────────────────── Android → fichier .aab ─────────────────────────
+  android-release:
+    name: GrouZ Android (AAB)
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      groups:
+        - grouz_env
+      android_signing:
+        - grouz_keystore              # nom du keystore généré dans Codemagic
+      node: 22
+      java: 21
+    scripts:
+      - name: Installer le site web
+        script: npm ci
+      - name: Installer Capacitor (sans modifier le site)
+        script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8 @capacitor/assets
+      - name: Construire le site web
+        script: npm run build
+      - name: Créer le projet Android
+        script: |
+          npx cap add android
+          npx @capacitor/assets generate --android
+          node scripts/configure-native.mjs
+          npx cap sync android
+      - name: Construire l'application (.aab)
+        script: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.aab
