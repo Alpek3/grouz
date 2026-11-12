@@ -44,7 +44,7 @@ workflows:
       xcode: latest                   # Apple exige Xcode 26 ou plus récent
     scripts:
       - name: Installer le site web
-        script: npm ci
+        script: npm install
       - name: Installer Capacitor (sans modifier le site)
         script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/ios@8 @capacitor/assets
       - name: Construire le site web
@@ -84,7 +84,7 @@ workflows:
       java: 21
     scripts:
       - name: Installer le site web
-        script: npm ci
+        script: npm install
       - name: Installer Capacitor (sans modifier le site)
         script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8 @capacitor/assets
       - name: Construire le site web
