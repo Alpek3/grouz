@@ -998,10 +998,10 @@ let _sw = null;
 const swStart = e => { const p = e.touches[0]; _sw = { x: p.clientX, y: p.clientY, tgt: e.target, root: e.currentTarget }; };
 const scrolledInside = (el, root) => { for (let n = el; n && n !== root && n.nodeType === 1; n = n.parentElement) { if (n.scrollTop > 0) return true; } return false; };
 // glisser depuis le bord gauche vers la droite = retour
-function swipeBack(onBack) {
+function swipeBack(onBack, anywhere) {
   return {
-    onTouchStart: e => { swStart(e); if (_sw.x > 40) _sw = null; },
-    onTouchEnd: e => { const s = _sw; _sw = null; if (!s) return; const p = e.changedTouches[0]; const dx = p.clientX - s.x, dy = p.clientY - s.y; if (dx > 70 && Math.abs(dy) < 60 && dx > Math.abs(dy) * 1.8) onBack(); },
+    onTouchStart: e => { swStart(e); if (!anywhere && _sw.x > 60) _sw = null; else if (e.target.closest?.('input,textarea,video,[data-noswipe]')) _sw = null; },
+    onTouchEnd: e => { const s = _sw; _sw = null; if (!s) return; const p = e.changedTouches[0]; const dx = p.clientX - s.x, dy = p.clientY - s.y; if (dx > (anywhere ? 90 : 70) && Math.abs(dy) < 60 && dx > Math.abs(dy) * 1.8) onBack(); },
   };
 }
 // glisser vers le bas = fermer (ignoré si le contenu défile)
@@ -3658,7 +3658,7 @@ export default function App() {
 
           {/* DETAIL */}
           {page==="detail"&&selected&&(
-            <div {...swipeBack(()=>setPage(detailBack))} style={{display:"flex",flexDirection:"column",height:"100%"}}>
+            <div {...swipeBack(()=>setPage(detailBack),true)} style={{display:"flex",flexDirection:"column",height:"100%"}}>
               <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendMedia={handleSendMedia} onSendGif={handleSendGif} onUnsend={handleUnsendAct} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} t={t} />
             </div>
           )}
@@ -3732,13 +3732,13 @@ export default function App() {
 
         {/* DM — replaces everything */}
         {page==="dm"&&dmPartner&&(
-          <div {...swipeBack(()=>setPage("messages"))} style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
+          <div {...swipeBack(()=>setPage("messages"),true)} style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
             <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onOpenProfile={()=>setProfileUser(dmPartner)} onBack={()=>setPage("messages")} onCall={v=>calls.start(dmPartner,v)} onUnsend={m=>api.unsendMessage("dm",m).then(()=>loadDMs(dmPartner.id)).catch(fail)} t={t} />
           </div>
         )}
 
         {page==="group"&&group&&(
-          <div {...swipeBack(()=>setPage("messages"))} style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
+          <div {...swipeBack(()=>setPage("messages"),true)} style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
             <DMChat currentUser={currentUser} otherUser={{id:group.id,name:group.name,pseudo:""}} group={group} messages={groupMsgs}
               onSend={sendGroupText} onVoiceSend={sendGroupVoice} onSendMedia={sendGroupMedia} onSendGif={sendGroupGif} onStatus={sendGroupStatus} partnerStatus={groupStatus?.status||null} statusName={groupStatus?.name}
               onOpenProfile={u=>u&&setProfileUser(u)} onOpenInfo={()=>setShowGroupInfo(true)} onCall={v=>calls.startGroup(group,v)} onUnsend={m=>api.unsendMessage("group",m).then(()=>{ loadGroupMsgs(group.id); refreshGroups(); }).catch(fail)} onBack={()=>setPage("messages")} t={t} />
