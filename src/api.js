@@ -359,3 +359,21 @@ export async function sendActivityMedia(activityId, userId, kind, file) {
 }
 export const sendActivityGif = (activityId, userId, url) =>
   supabase.from("activity_messages").insert({ activity_id: activityId, sender_id: userId, type: "gif", media_url: url }).then(ok);
+
+// ── RÉACTIONS / ANNULATION D'ENVOI ──────────────────────────────
+export const listReactions = (scope, ids) =>
+  ids.length ? supabase.from("message_reactions").select("message_id, user_id, emoji").eq("scope", scope).in("message_id", ids).then(ok) : Promise.resolve([]);
+export const setReaction = (scope, messageId, userId, emoji) =>
+  supabase.from("message_reactions").upsert({ scope, message_id: messageId, user_id: userId, emoji }, { onConflict: "scope,message_id,user_id" }).then(ok);
+export const removeReaction = (scope, messageId, userId) =>
+  supabase.from("message_reactions").delete().eq("scope", scope).eq("message_id", messageId).eq("user_id", userId).then(ok);
+
+const TABLES = { dm: "direct_messages", group: "group_messages", activity: "activity_messages" };
+export async function unsendMessage(scope, msg) {
+  ok(await supabase.from(TABLES[scope]).delete().eq("id", msg.id));
+  // on retire aussi le fichier (vocal, photo, vidéo) s'il m'appartient
+  try {
+    if (msg.audio_path) await supabase.storage.from("voices").remove([msg.audio_path]);
+    if (msg.media_path) await supabase.storage.from("media").remove([msg.media_path]);
+  } catch {}
+}

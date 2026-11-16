@@ -993,13 +993,121 @@ function GifPicker({ userId, onPick, onClose, t }) {
   );
 }
 
-function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onOpenProfile, onBack, onCall, group, onOpenInfo, statusName, t}) {
+// ── RÉACTIONS ET ANNULATION D'ENVOI ─────────────────────────────
+const QUICK_EMOJIS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
+const MORE_EMOJIS = ["🔥", "🎉", "🙏", "👏", "😍", "🤔", "😅", "🥳", "💯", "😎", "🤝", "👀", "💀", "🥹", "😭", "🤣", "🙌", "✨", "🍀", "🫶"];
+
+function useReactions(scope, messages, meId) {
+  const [map, setMap] = useState({});
+  const ids = messages.map(m => m.id).filter(Boolean);
+  const key = ids.join(",");
+  const load = useCallback(() => {
+    if (!ids.length) { setMap({}); return; }
+    api.listReactions(scope, ids).then(rows => {
+      const m = {}; rows.forEach(r => { (m[r.message_id] = m[r.message_id] || []).push(r); }); setMap(m);
+    }).catch(() => {});
+  }, [scope, key]);
+  useEffect(() => {
+    load();
+    const id = setInterval(() => { if (document.visibilityState === "visible") load(); }, 6000);
+    return () => clearInterval(id);
+  }, [load]);
+  const react = async (msg, emoji) => {
+    const mine = (map[msg.id] || []).find(r => r.user_id === meId);
+    const same = mine && mine.emoji === emoji;
+    setMap(prev => {
+      const list = (prev[msg.id] || []).filter(r => r.user_id !== meId);
+      return { ...prev, [msg.id]: same ? list : [...list, { message_id: msg.id, user_id: meId, emoji }] };
+    });
+    try { await (same ? api.removeReaction(scope, msg.id, meId) : api.setReaction(scope, msg.id, meId, emoji)); }
+    catch (e) { console.error(e); load(); }
+  };
+  return { map, react };
+}
+
+function MessageSheet({ msg, isMe, canModerate, myEmoji, onReact, onUnsend, onClose, t }) {
+  const [more, setMore] = useState(false);
+  const act = { display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 6px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 15, cursor: "pointer", textAlign: "left" };
+  const pick = (e) => { onReact(msg, e); onClose(); };
+  const emojiBtn = (e) => (
+    <button key={e} onClick={() => pick(e)} style={{ fontSize: 26, width: 46, height: 46, borderRadius: "50%", border: "none", cursor: "pointer", background: myEmoji === e ? t.accentBg : "transparent", outline: myEmoji === e ? `2px solid ${t.accent}` : "none" }}>{e}</button>
+  );
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 350, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: t.bg2, borderRadius: "22px 22px 0 0", padding: "14px 16px calc(14px + env(safe-area-inset-bottom, 0px))", border: `1px solid ${t.border}` }}>
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: t.border2 || t.border, margin: "0 auto 12px" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: t.bg3, borderRadius: 30, padding: "4px 8px", marginBottom: 10 }}>
+          {QUICK_EMOJIS.map(emojiBtn)}
+          <button onClick={() => setMore(m => !m)} aria-label="Plus d'emojis" style={{ width: 40, height: 40, borderRadius: "50%", border: "none", cursor: "pointer", background: t.bg2, color: t.text2, fontSize: 20 }}>{more ? "–" : "＋"}</button>
+        </div>
+        {more && <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 2, marginBottom: 8 }}>{MORE_EMOJIS.map(emojiBtn)}</div>}
+        {msg.text && <button style={act} onClick={() => { navigator.clipboard?.writeText(msg.text).catch(() => {}); onClose(); }}>📋 Copier</button>}
+        {isMe && <button style={{ ...act, color: "#FF3B30" }} onClick={() => { if (window.confirm("Annuler l'envoi ? Ce message disparaîtra pour tout le monde.")) { onUnsend(msg); onClose(); } }}>↩️ Annuler l'envoi</button>}
+        {!isMe && canModerate && <button style={{ ...act, color: "#FF3B30" }} onClick={() => { if (window.confirm("Supprimer ce message pour tout le monde ?")) { onUnsend(msg); onClose(); } }}>🗑 Supprimer le message</button>}
+      </div>
+    </div>
+  );
+}
+
+function ReactionList({ reactions, myId, resolveUser, onRemove, onClose, t }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 350, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, maxHeight: "60vh", overflowY: "auto", background: t.bg2, borderRadius: "22px 22px 0 0", padding: "16px 18px calc(16px + env(safe-area-inset-bottom, 0px))", border: `1px solid ${t.border}` }}>
+        <h3 style={{ margin: "0 0 10px", fontFamily: "'Fraunces',serif", color: t.text, fontSize: 18 }}>Réactions</h3>
+        {reactions.map(r => { const u = resolveUser(r.user_id); const mine = r.user_id === myId; return (
+          <div key={r.user_id} onClick={mine ? () => { onRemove(); onClose(); } : undefined} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", cursor: mine ? "pointer" : "default" }}>
+            {u && <Avatar user={u} size={38} t={t} />}
+            <div style={{ flex: 1, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14 }}>{mine ? "Toi" : (u?.name || "Membre")}{mine && <div style={{ color: t.text3, fontSize: 11, fontFamily: "'DM Mono',monospace" }}>Touche pour retirer</div>}</div>
+            <span style={{ fontSize: 24 }}>{r.emoji}</span>
+          </div>); })}
+      </div>
+    </div>
+  );
+}
+
+// Entoure une bulle de message : appui long / clic droit = menu, double toucher = ❤️, pastille de réactions
+function MsgWrap({ msg, isMe, canModerate, reactions = [], myId, onReact, onUnsend, resolveUser, t, children }) {
+  const [sheet, setSheet] = useState(false);
+  const [list, setList] = useState(false);
+  const [hover, setHover] = useState(false);
+  const timer = useRef(null), lastTap = useRef(0), lastTouch = useRef(0), moved = useRef(false);
+  const mine = reactions.find(r => r.user_id === myId);
+  const start = () => { lastTouch.current = Date.now(); moved.current = false; clearTimeout(timer.current); timer.current = setTimeout(() => { if (!moved.current) { setSheet(true); try { navigator.vibrate?.(15); } catch {} } }, 450); };
+  const cancel = () => clearTimeout(timer.current);
+  const end = () => { cancel(); if (moved.current) return; const n = Date.now(); if (n - lastTap.current < 320) { onReact(msg, "❤️"); lastTap.current = 0; } else lastTap.current = n; };
+  const counts = {}; reactions.forEach(r => { counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", maxWidth: "100%" }}>
+      <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{ display: "flex", alignItems: "center", gap: 6, flexDirection: isMe ? "row-reverse" : "row", maxWidth: "100%" }}>
+        <div onTouchStart={start} onTouchMove={() => { moved.current = true; cancel(); }} onTouchEnd={end} onTouchCancel={cancel}
+          onContextMenu={e => { e.preventDefault(); setSheet(true); }}
+          onDoubleClick={() => { if (Date.now() - lastTouch.current > 800) onReact(msg, "❤️"); }}
+          style={{ userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", minWidth: 0 }}>
+          {children}
+        </div>
+        {hover && <button onClick={() => setSheet(true)} aria-label="Réagir" style={{ border: `1px solid ${t.border}`, background: t.bg2, color: t.text3, borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 15, flexShrink: 0 }}>☺</button>}
+      </div>
+      {top.length > 0 && (
+        <button onClick={() => setList(true)} style={{ marginTop: -7, marginLeft: 8, marginRight: 8, display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 7px", borderRadius: 12, cursor: "pointer", background: t.bg2, border: `1.5px solid ${mine ? t.accent : t.border}`, color: t.text2, fontSize: 13, fontFamily: "'DM Mono',monospace", lineHeight: 1.4, position: "relative" }}>
+          {top.map(([e]) => <span key={e}>{e}</span>)}{reactions.length > 1 && <span style={{ fontSize: 11 }}>{reactions.length}</span>}
+        </button>
+      )}
+      {sheet && <MessageSheet msg={msg} isMe={isMe} canModerate={canModerate} myEmoji={mine?.emoji} onReact={onReact} onUnsend={onUnsend} onClose={() => setSheet(false)} t={t} />}
+      {list && <ReactionList reactions={reactions} myId={myId} resolveUser={resolveUser} onRemove={() => onReact(msg, mine?.emoji)} onClose={() => setList(false)} t={t} />}
+    </div>
+  );
+}
+
+function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onOpenProfile, onBack, onCall, group, onOpenInfo, statusName, onUnsend, t}) {
+  const reactions = useReactions(group ? "group" : "dm", messages, currentUser.id);
+  const resolveUser = id => id===currentUser.id ? currentUser : group ? group.memberUsers.find(u=>u.id===id) : otherUser;
   const bottomRef = useRef();
   const [pending, setPending] = useState(null);   // fichier choisi, en attente de confirmation
   const [sending, setSending] = useState(false);
   const [gifOpen, setGifOpen] = useState(false);
   const [viewer, setViewer] = useState(null);
-  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[messages, partnerStatus]);
+  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[messages.length, messages[messages.length-1]?.id, partnerStatus]);
 
   const statusText = partnerStatus==="recording" ? "est en train d'enregistrer un vocal…" : partnerStatus==="typing" ? "est en train d'écrire…" : null;
 
@@ -1053,6 +1161,7 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
               {!isMe&&<div onClick={group?()=>onOpenProfile(sender):undefined} style={{cursor:group?"pointer":"default",display:"flex"}}><Avatar user={sender} size={28} t={t} /></div>}
               <div style={{maxWidth:"72%",display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start"}}>
                 {group && !isMe && <span style={{fontSize:11,color:t.accent,fontFamily:"'DM Mono',monospace",margin:"0 0 3px 4px"}}>{sender?.pseudo}</span>}
+                <MsgWrap msg={m} isMe={isMe} myId={currentUser.id} reactions={reactions.map[m.id]||[]} onReact={reactions.react} onUnsend={onUnsend} resolveUser={resolveUser} t={t}>
                 {m.type==="voice" ? (
                   <VoiceMessageBubble msg={m} isMe={isMe} t={t} />
                 ) : isMedia ? (
@@ -1062,6 +1171,7 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
                     {m.text}
                   </div>
                 )}
+                </MsgWrap>
                 <p style={{fontSize:10,color:t.text3,fontFamily:"'DM Mono',monospace",margin:"3px 0 0"}}>{m.time}</p>
               </div>
             </div>
@@ -1110,8 +1220,10 @@ function NotifPanel({notifs, onMarkRead, onOpen, onClose, t}) {
 // ════════════════════════════════════════════════════════════════════════════════
 // ACTIVITY DETAIL
 // ════════════════════════════════════════════════════════════════════════════════
-function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMessage,onSendVoice,onSendMedia,onSendGif,onJoin,onOpenProfile,onDelete,t}) {
+function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMessage,onSendVoice,onSendMedia,onSendGif,onUnsend,onJoin,onOpenProfile,onDelete,t}) {
   const bottomRef=useRef();
+  const reactions=useReactions("activity",activity.messages||[],currentUser.id);
+  const resolveUser=id=>id===currentUser.id?currentUser:[activity.creator,...(activity.accepted||[])].find(u=>u?.id===id);
   const [pending,setPending]=useState(null);
   const [sending,setSending]=useState(false);
   const [gifOpen,setGifOpen]=useState(false);
@@ -1130,7 +1242,7 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
   const isCreator=activity.creator?.id===currentUser.id;
   const isMember=activity.accepted?.some(u=>u.id===currentUser.id);
   const isPending=activity.pending?.some(u=>u.id===currentUser.id);
-  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"})},[activity.messages]);
+  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"})},[activity.messages?.length, activity.messages?.[activity.messages.length-1]?.id]);
   const formatDate=d=>new Date(d).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
 
   return (
@@ -1201,6 +1313,7 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
                     {!isMe&&<div onClick={()=>onOpenProfile(m.sender)} style={{cursor:"pointer"}}><Avatar user={m.sender} size={30} t={t}/></div>}
                     <div style={{maxWidth:"72%"}}>
                       {!isMe&&<p style={{margin:"0 0 3px",fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace"}}>{m.sender?.name}</p>}
+                      <MsgWrap msg={m} isMe={isMe} canModerate={isCreator} myId={currentUser.id} reactions={reactions.map[m.id]||[]} onReact={reactions.react} onUnsend={(mm)=>onUnsend(activity.id,mm)} resolveUser={resolveUser} t={t}>
                       {m.type==="voice" ? (
                         <VoiceMessageBubble msg={m} isMe={isMe} t={t} />
                       ) : (m.type==="image"||m.type==="video"||m.type==="gif") ? (
@@ -1208,6 +1321,7 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
                       ) : (
                         <div style={{background:isMe?t.accent:t.bg3,borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",color:isMe?"#fff":t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,border:isMe?"none":`1px solid ${t.border}`}}>{m.text}</div>
                       )}
+                      </MsgWrap>
                       <p style={{margin:"3px 0 0",fontSize:10,color:t.text3,fontFamily:"'DM Mono',monospace",textAlign:isMe?"right":"left"}}>{m.time}</p>
                     </div>
                   </div>
@@ -3267,6 +3381,16 @@ export default function App() {
   const sendGroupVoice = (url, dur, blob) => api.sendGroupVoice(groupId, me0.id, blob, dur).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
   const sendGroupMedia = (kind, file) => api.sendGroupMedia(groupId, me0.id, kind, file).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
   const sendGroupGif = url => api.sendGroupGif(groupId, me0.id, url).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
+  // rafraîchit la conversation ouverte (messages annulés, nouveaux messages manqués)
+  useEffect(()=>{
+    if (!me0 || !(page==="dm" || page==="group")) return;
+    const id = setInterval(()=>{
+      if (document.visibilityState!=="visible") return;
+      if (page==="dm" && dmPartnerRef.current) loadDMs(dmPartnerRef.current.id);
+      if (page==="group" && groupIdRef.current) loadGroupMsgs(groupIdRef.current);
+    }, 6000);
+    return ()=>clearInterval(id);
+  },[me0?.id, page]);
   useEffect(()=>{
     if (!me0 || !groupId || page!=="group") return;
     const tc = api.supabase.channel(`gtyping-${groupId}`, { config: { broadcast: { self: false } } });
@@ -3324,6 +3448,7 @@ export default function App() {
   const handleAccept = (id,userId) => api.acceptMember(id,userId).then(refreshActivities).catch(e=>fail(/complète/i.test(e.message)?new Error("La sortie est complète."):e));
   const handleReject = (id,userId) => api.rejectMember(id,userId).then(refreshActivities).catch(fail);
   const handleSendMessage = (id,text) => api.sendActivityMessage(id,me0.id,text).then(()=>loadActMessages(id)).catch(fail);
+  const handleUnsendAct = (id,m) => api.unsendMessage("activity",m).then(()=>loadActMessages(id)).catch(fail);
   const handleSendMedia = (id,kind,file) => api.sendActivityMedia(id,me0.id,kind,file).then(()=>loadActMessages(id)).catch(fail);
   const handleSendGif = (id,url) => api.sendActivityGif(id,me0.id,url).then(()=>loadActMessages(id)).catch(fail);
   const handleSendVoice = (id,blob,dur) => api.sendActivityVoice(id,me0.id,blob,dur).then(()=>loadActMessages(id)).catch(fail);
@@ -3511,7 +3636,7 @@ export default function App() {
           {/* DETAIL */}
           {page==="detail"&&selected&&(
             <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendMedia={handleSendMedia} onSendGif={handleSendGif} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} t={t} />
+              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendMedia={handleSendMedia} onSendGif={handleSendGif} onUnsend={handleUnsendAct} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} t={t} />
             </div>
           )}
 
@@ -3585,7 +3710,7 @@ export default function App() {
         {/* DM — replaces everything */}
         {page==="dm"&&dmPartner&&(
           <div style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
-            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onOpenProfile={()=>setProfileUser(dmPartner)} onBack={()=>setPage("messages")} onCall={v=>calls.start(dmPartner,v)} t={t} />
+            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onOpenProfile={()=>setProfileUser(dmPartner)} onBack={()=>setPage("messages")} onCall={v=>calls.start(dmPartner,v)} onUnsend={m=>api.unsendMessage("dm",m).then(()=>loadDMs(dmPartner.id)).catch(fail)} t={t} />
           </div>
         )}
 
@@ -3593,7 +3718,7 @@ export default function App() {
           <div style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
             <DMChat currentUser={currentUser} otherUser={{id:group.id,name:group.name,pseudo:""}} group={group} messages={groupMsgs}
               onSend={sendGroupText} onVoiceSend={sendGroupVoice} onSendMedia={sendGroupMedia} onSendGif={sendGroupGif} onStatus={sendGroupStatus} partnerStatus={groupStatus?.status||null} statusName={groupStatus?.name}
-              onOpenProfile={u=>u&&setProfileUser(u)} onOpenInfo={()=>setShowGroupInfo(true)} onCall={v=>calls.startGroup(group,v)} onBack={()=>setPage("messages")} t={t} />
+              onOpenProfile={u=>u&&setProfileUser(u)} onOpenInfo={()=>setShowGroupInfo(true)} onCall={v=>calls.startGroup(group,v)} onUnsend={m=>api.unsendMessage("group",m).then(()=>{ loadGroupMsgs(group.id); refreshGroups(); }).catch(fail)} onBack={()=>setPage("messages")} t={t} />
           </div>
         )}
         {showNewGroup && <NewGroupModal friends={allUsers.filter(u=>friendIds.includes(u.id))} onCreate={createGroup} onClose={()=>setShowNewGroup(false)} t={t} />}
