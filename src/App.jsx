@@ -1242,8 +1242,10 @@ function NotifPanel({notifs, onMarkRead, onOpen, onClose, t}) {
 // ════════════════════════════════════════════════════════════════════════════════
 // ACTIVITY DETAIL
 // ════════════════════════════════════════════════════════════════════════════════
-function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMessage,onSendVoice,onSendMedia,onSendGif,onUnsend,onJoin,onOpenProfile,onDelete,t}) {
+function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMessage,onSendVoice,onSendMedia,onSendGif,onUnsend,onJoin,onOpenProfile,onDelete,isFav,onToggleFav,t}) {
   const bottomRef=useRef();
+  const [copied,setCopied]=useState(false);
+  const shareLink=async()=>{ const url=`${window.location.origin}/?a=${activity.id}`; const text=`Rejoins-moi à « ${activity.title} » sur GrouZ !`; try{ if(navigator.share){ await navigator.share({title:activity.title,text,url}); return; } }catch(e){ if(e?.name==='AbortError') return; } try{ await navigator.clipboard.writeText(url); setCopied(true); setTimeout(()=>setCopied(false),2000); }catch{ window.prompt('Copie ce lien :',url); } };
   const reactions=useReactions("activity",activity.messages||[],currentUser.id);
   const resolveUser=id=>id===currentUser.id?currentUser:[activity.creator,...(activity.accepted||[])].find(u=>u?.id===id);
   const [pending,setPending]=useState(null);
@@ -1270,7 +1272,13 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
       <div style={{padding:"20px 24px 0",overflowY:"auto",flex:isMember?undefined:1}}>
-        <button onClick={onBack} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:13,padding:0,marginBottom:16}}>← Retour</button>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <button onClick={onBack} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:13,padding:0}}>← Retour</button>
+          <div style={{display:"flex",gap:8}}>
+            {onToggleFav&&<button onClick={onToggleFav} aria-label="Favori" style={{background:t.bg2,border:`1px solid ${isFav?"#D4AF37":t.border}`,color:isFav?"#D4AF37":t.text3,borderRadius:20,padding:"6px 12px",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:12}}>{isFav?"★ Favori":"☆ Favori"}</button>}
+            <button onClick={shareLink} style={{background:t.bg2,border:`1px solid ${t.border}`,color:t.text2,borderRadius:20,padding:"6px 12px",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:12}}>{copied?"✓ Lien copié":"🔗 Partager"}</button>
+          </div>
+        </div>
         <div style={{background:t.bg2,borderRadius:16,border:`1px solid ${t.border}`,padding:20,marginBottom:16}}>
           {activity.photo_url&&<img src={activity.photo_url} alt="" style={{width:"100%",maxHeight:240,objectFit:"cover",borderRadius:14,marginBottom:14,display:"block"}}/>}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
@@ -3103,6 +3111,7 @@ export default function App() {
   const blockedRef = useRef([]);
   const [blockedIds, setBlockedIds] = useState([]);
   const refreshBlocks = useCallback(()=>api.listBlocks().then(r=>{ const ids=r.map(x=>x.blocked_id); blockedRef.current=ids; setBlockedIds(ids); }).catch(console.error),[]);
+  const deepLinkRef = useRef((()=>{ try { const p=new URLSearchParams(window.location.search); return p.get('a'); } catch { return null; } })());
   const refreshActivities = useCallback(()=>api.listActivities().then(r=>setActivities(r.map(shapeAct).filter(isUpcoming).filter(a=>!blockedRef.current.includes(a.creator?.id)))).catch(console.error),[]);
   const refreshFriends = useCallback(()=>api.listFriendships().then(setFriendships).catch(console.error),[]);
   const refreshUsers = useCallback(()=>api.listProfiles().then(r=>setAllUsers(r.map(shapeUser))).catch(console.error),[]);
@@ -3209,18 +3218,47 @@ export default function App() {
   const setSelected = a => setSelectedId(a ? a.id : null);
   const selectedBase = activities.find(a=>a.id===selectedId);
   const selected = selectedBase ? { ...selectedBase, messages: actMessages[selectedId] || [] } : null;
+  useEffect(()=>{
+    const id=deepLinkRef.current; if(!id||!activities.length) return;
+    const a=activities.find(x=>x.id===id);
+    if(a){ deepLinkRef.current=null; setSelectedId(a.id); setDetailBack("home"); setPage("detail"); try{ window.history.replaceState({},"",window.location.pathname); }catch{} }
+  },[activities]);
   const [filter, setFilter] = useState("Tous");
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
 
+  const [userPos, setUserPos] = useState(null);           // position précise, reste sur l'appareil
+  const [fDate,setFDate]=useState("all");        // all | today | weekend | week
+  const [fRadius,setFRadius]=useState(0);         // 0 = toutes distances
+  const [fFree,setFFree]=useState(false);         // seulement places libres
+  const [fFav,setFFav]=useState(false);           // seulement favoris
+  const [showFilters,setShowFilters]=useState(false);
+  const favKey=`grouz_favs_${me0?.id||""}`;
+  const [favs,setFavs]=useState(()=>LS.get(favKey,[]));
+  useEffect(()=>{ setFavs(LS.get(favKey,[])); },[favKey]);
+  const toggleFav=id=>setFavs(p=>{ const n=p.includes(id)?p.filter(x=>x!==id):[...p,id]; LS.set(favKey,n); return n; });
+  const dateOk=a=>{
+    if(fDate==="all") return true;
+    const d=new Date(`${a.date}T00:00:00`), now=new Date(); now.setHours(0,0,0,0);
+    const diff=Math.round((d-now)/86400000);
+    if(fDate==="today") return diff===0;
+    if(fDate==="week") return diff>=0&&diff<=7;
+    if(fDate==="weekend") return [0,6].includes(d.getDay())&&diff>=0&&diff<=7;
+    return true;
+  };
+  const q=search.trim().toLowerCase();
   const filtered = activities.filter(a=>
     (filter==="Tous"||a.category===filter)&&
-    (a.title.toLowerCase().includes(search.toLowerCase())||a.location.toLowerCase().includes(search.toLowerCase()))
+    (!q||[a.title,a.location,a.description,a.category].some(v=>(v||"").toLowerCase().includes(q)))&&
+    dateOk(a)&&
+    (!fFree||(a.accepted?.length||0)<a.maxPeople)&&
+    (!fFav||favs.includes(a.id))&&
+    (!fRadius||!userPos||a.lat==null||distKm(userPos,{lat:a.lat,lng:a.lng})<=fRadius)
   );
+  const nbFilters=(fDate!=="all")+(fRadius>0)+fFree+fFav;
 
   // ── Localisation + personnes proches ───────────────────────────────────────
-  const [userPos, setUserPos] = useState(null);           // position précise, reste sur l'appareil
   const [geoStatus, setGeoStatus] = useState("unknown");  // unknown | granted | denied | unsupported | error
   const [showGeoAsk, setShowGeoAsk] = useState(false);
   const [showNearby, setShowNearby] = useState(false);
@@ -3634,6 +3672,16 @@ export default function App() {
               </div>
               <div style={{marginBottom:20}}>
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Rechercher une sortie ou un lieu…" style={{...inputStyle,width:"100%",marginBottom:10,padding:"12px 16px",borderRadius:14,fontSize:14,flex:"none"}} />
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  <button onClick={()=>setShowFilters(v=>!v)} style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${nbFilters?"#E8008A":t.border}`,background:t.bg2,color:nbFilters?"#E8008A":t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>⚙️ Filtres{nbFilters?` (${nbFilters})`:""}</button>
+                  {nbFilters>0&&<button onClick={()=>{setFDate("all");setFRadius(0);setFFree(false);setFFav(false);}} style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>Réinitialiser</button>}
+                </div>
+                {showFilters&&(()=>{ const chip=(on,label,fn)=>(<button key={label} onClick={fn} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${on?"#E8008A":t.border}`,background:on?"#E8008A":"transparent",color:on?"#fff":t.text3,cursor:"pointer",fontSize:11,fontFamily:"'DM Mono',monospace"}}>{label}</button>); return (
+                  <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:14,marginBottom:10,display:"flex",flexDirection:"column",gap:10}}>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",width:64}}>Quand</span>{[["all","Toutes"],["today","Aujourd'hui"],["weekend","Ce week-end"],["week","7 jours"]].map(([k,l])=>chip(fDate===k,l,()=>setFDate(k)))}</div>
+                    {userPos&&<div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",width:64}}>Distance</span>{[[0,"Toutes"],[5,"5 km"],[10,"10 km"],[25,"25 km"],[50,"50 km"]].map(([k,l])=>chip(fRadius===k,l,()=>setFRadius(k)))}</div>}
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",width:64}}>Autres</span>{chip(fFree,"Places libres",()=>setFFree(v=>!v))}{chip(fFav,"★ Favoris",()=>setFFav(v=>!v))}</div>
+                  </div>); })()}
                 <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
                   {CATEGORIES.map(c=>(
                     <button key={c} onClick={()=>setFilter(c)} style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${filter===c?"#E8008A":t.border}`,background:filter===c?"#E8008A":t.bg2,color:filter===c?"#fff":t.text3,cursor:"pointer",fontSize:11,fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",transition:"all 0.15s",fontWeight:filter===c?700:400}}>
@@ -3659,7 +3707,7 @@ export default function App() {
           {/* DETAIL */}
           {page==="detail"&&selected&&(
             <div {...swipeBack(()=>setPage(detailBack),true)} style={{display:"flex",flexDirection:"column",height:"100%"}}>
-              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendMedia={handleSendMedia} onSendGif={handleSendGif} onUnsend={handleUnsendAct} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} t={t} />
+              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendMedia={handleSendMedia} onSendGif={handleSendGif} onUnsend={handleUnsendAct} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} isFav={favs.includes(selected.id)} onToggleFav={()=>toggleFav(selected.id)} t={t} />
             </div>
           )}
 
