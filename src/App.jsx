@@ -287,7 +287,7 @@ function ReportModal({ user, onSend, onClose, t }) {
   const [details, setDetails] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:400,maxHeight:"90%",overflowY:"auto",padding:24}}>
         <h2 style={{fontFamily:"'Fraunces',serif",fontSize:21,color:t.text,margin:"0 0 4px"}}>Signaler {user.name}</h2>
         <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:12,margin:"0 0 14px",lineHeight:1.5}}>Ton signalement est confidentiel : la personne ne saura pas que c'est toi.</p>
@@ -306,7 +306,7 @@ function ReportModal({ user, onSend, onClose, t }) {
 
 function BlockedListModal({ users, onUnblock, onClose, t }) {
   return (
-    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:400,maxHeight:"80%",overflowY:"auto",padding:24}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <h2 style={{fontFamily:"'Fraunces',serif",fontSize:21,color:t.text,margin:0}}>Utilisateurs bloqués</h2>
@@ -331,7 +331,7 @@ function BlockedListModal({ users, onUnblock, onClose, t }) {
 function DeleteAccountModal({ onConfirm, onClose, t }) {
   const [txt, setTxt] = useState(""); const [busy, setBusy] = useState(false);
   return (
-    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.accent}`,borderRadius:20,width:"100%",maxWidth:380,padding:24}}>
         <h2 style={{fontFamily:"'Fraunces',serif",fontSize:21,color:t.text,margin:"0 0 8px"}}>Supprimer mon compte</h2>
         <p style={{color:t.text2,fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.55,margin:"0 0 14px"}}>Cette action est <b>définitive</b> : ton profil, tes sorties, tes messages, tes photos et tes vocaux seront supprimés, et tes amis ne te verront plus.</p>
@@ -349,7 +349,7 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
   const isMe = user.id===currentUser.id;
   const [menu, setMenu] = useState(false);
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose} {...swipeDown(onClose)}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:380,padding:28,position:"relative"}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:20}}>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em"}}>PROFIL</span>
@@ -993,6 +993,28 @@ function GifPicker({ userId, onPick, onClose, t }) {
   );
 }
 
+// ── GESTES TACTILES (glisser pour revenir / fermer) ─────────────
+let _sw = null;
+const swStart = e => { const p = e.touches[0]; _sw = { x: p.clientX, y: p.clientY, tgt: e.target, root: e.currentTarget }; };
+const scrolledInside = (el, root) => { for (let n = el; n && n !== root && n.nodeType === 1; n = n.parentElement) { if (n.scrollTop > 0) return true; } return false; };
+// glisser depuis le bord gauche vers la droite = retour
+function swipeBack(onBack) {
+  return {
+    onTouchStart: e => { swStart(e); if (_sw.x > 40) _sw = null; },
+    onTouchEnd: e => { const s = _sw; _sw = null; if (!s) return; const p = e.changedTouches[0]; const dx = p.clientX - s.x, dy = p.clientY - s.y; if (dx > 70 && Math.abs(dy) < 60 && dx > Math.abs(dy) * 1.8) onBack(); },
+  };
+}
+// glisser vers le bas = fermer (ignoré si le contenu défile)
+function swipeDown(onClose, onUp) {
+  return {
+    onTouchStart: swStart,
+    onTouchEnd: e => { const s = _sw; _sw = null; if (!s) return; const p = e.changedTouches[0]; const dx = p.clientX - s.x, dy = p.clientY - s.y;
+      if (Math.abs(dy) < 80 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+      if (dy > 0 && !scrolledInside(s.tgt, s.root)) onClose && onClose();
+      else if (dy < 0 && onUp) onUp(); },
+  };
+}
+
 // ── RÉACTIONS ET ANNULATION D'ENVOI ─────────────────────────────
 const QUICK_EMOJIS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
 const MORE_EMOJIS = ["🔥", "🎉", "🙏", "👏", "😍", "🤔", "😅", "🥳", "💯", "😎", "🤝", "👀", "💀", "🥹", "😭", "🤣", "🙌", "✨", "🍀", "🫶"];
@@ -1426,7 +1448,7 @@ function PremiumModal({currentUser,onClose,onOpenProfile,onRefresh,t}) {
   useEffect(()=>{ if(prem) api.myProfileViewers().then(setViewers).catch(e=>setErr(e.message||"Erreur")); },[prem]);
   const perks=["✍️ Jusqu'à 5 sorties créées par jour (1 en gratuit)","📸 Une photo sur chacune de tes sorties","★ Un badge doré à côté de ton profil","👀 Voir qui a visité ton profil (30 derniers jours)","🚫 Aucune publicité"];
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:210,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:210,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose} {...swipeDown(onClose)}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid #D4AF3788`,borderRadius:20,width:"100%",maxWidth:460,maxHeight:"88vh",overflowY:"auto",padding:28}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:24,color:t.text,display:"flex",alignItems:"center",gap:10}}><PremiumBadge size={24}/> GrouZ Premium</h2>
@@ -1477,7 +1499,7 @@ function CreateModal({onClose,onSave,currentUser,usedToday,t}) {
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const valid=!blocked&&form.title&&form.date&&form.time&&form.location&&form.description&&(form.lat!=null||form.noGeo);
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",padding:32}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
           <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:24,color:t.text}}>Nouvelle sortie</h2>
@@ -1984,7 +2006,7 @@ function NewGroupModal({ friends, onCreate, onClose, t }) {
   const toggle = id => setSel(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
   const ok = name.trim() && sel.length >= 2;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",padding:24}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:22,color:t.text}}>Nouveau groupe</h2>
@@ -2007,7 +2029,7 @@ function GroupInfoModal({ group, me, friends, onClose, onRename, onAdd, onRemove
   const memberIds = group.memberUsers.map(u=>u.id);
   const candidates = friends.filter(u=>!memberIds.includes(u.id));
   return (
-    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:260,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:260,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",padding:24}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:22,color:t.text}}>Infos du groupe</h2>
@@ -2142,7 +2164,7 @@ function CropModal({ file, onCancel, onDone, t }) {
     c.toBlob(b => { if (!b) return; const f = new File([b], "avatar.jpg", { type:"image/jpeg" }); onDone(f, c.toDataURL("image/jpeg", 0.85)); }, "image/jpeg", 0.9);
   };
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div {...swipeDown(onCancel)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,padding:24,width:"100%",maxWidth:360,textAlign:"center"}}>
         <h3 style={{margin:"0 0 6px",fontFamily:"'Fraunces',serif",color:t.text}}>Cadre ta photo</h3>
         <p style={{margin:"0 0 14px",fontSize:12,color:t.text3,fontFamily:"'DM Sans',sans-serif"}}>Glisse pour déplacer, utilise le curseur pour zoomer.</p>
@@ -2220,6 +2242,7 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
   const mine = story.user_id === me.id;
   const liked = !!likedMap[story.id];
   const likeCount = (story.likes?.length || 0);
+  const openViewers = () => { setViewersOpen(true); setPaused(true); setViewers(null); actions.listStoryViews(story).then(setViewers).catch(()=>setViewers([])); };
   const toggleLike = () => { setLikedMap(m => ({ ...m, [story.id]: !liked })); (liked ? actions.unlikeStory : actions.likeStory)(story); };
   const reply = async () => {
     const v = text.trim(); if (!v) return;
@@ -2228,7 +2251,7 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
     setTimeout(() => setSent(false), 1800);
   };
   return (
-    <div style={{position:"fixed",inset:0,background:"#000",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div {...swipeDown(()=>{ if (viewersOpen) { setViewersOpen(false); setPaused(false); } else onClose(); }, ()=>{ if (mine && !viewersOpen) openViewers(); })} style={{position:"fixed",inset:0,background:"#000",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{position:"relative",width:"100%",maxWidth:480,height:"100%",background:"#000"}}>
         {story.media_type === "video"
           ? <video ref={vref} key={story.id} src={story.url} autoPlay playsInline onEnded={next} onTimeUpdate={e=>{ const v=e.currentTarget; if (v.duration) setProg(v.currentTime / v.duration); }} style={{width:"100%",height:"100%",objectFit:"contain"}} />
@@ -2264,7 +2287,7 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
         )}
         <div style={{position:"absolute",left:0,right:0,bottom:0,padding:"30px 12px calc(14px + env(safe-area-inset-bottom, 0px))",background:"linear-gradient(transparent,rgba(0,0,0,0.65))"}}>
           {mine ? (
-            <button onClick={()=>{ setViewersOpen(true); setPaused(true); setViewers(null); actions.listStoryViews(story).then(setViewers).catch(()=>setViewers([])); }} style={{display:"flex",alignItems:"center",gap:14,margin:"0 auto",background:"rgba(0,0,0,0.35)",border:"none",color:"#fff",fontFamily:"'DM Mono',monospace",fontSize:13,padding:"10px 18px",borderRadius:22,cursor:"pointer"}}>
+            <button onClick={openViewers} style={{display:"flex",alignItems:"center",gap:14,margin:"0 auto",background:"rgba(0,0,0,0.35)",border:"none",color:"#fff",fontFamily:"'DM Mono',monospace",fontSize:13,padding:"10px 18px",borderRadius:22,cursor:"pointer"}}>
               <span>👁 {story.views?.length || 0} vue{(story.views?.length||0)>1?"s":""}</span><span>❤️ {likeCount}</span><span style={{opacity:0.7}}>▲</span>
             </button>
           ) : (
@@ -2371,7 +2394,7 @@ function ShareModal({ post, friends, onSend, onClose, t }) {
     else { navigator.clipboard?.writeText(post.url).catch(()=>{}); alert("Lien copié !"); }
   };
   return (
-    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+    <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:520,maxHeight:"70vh",overflowY:"auto",padding:"18px 18px calc(18px + env(safe-area-inset-bottom, 0px))",border:`1px solid ${t.border}`}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <h3 style={{margin:0,fontFamily:"'Fraunces',serif",color:t.text}}>Partager</h3>
@@ -2426,7 +2449,7 @@ function PostViewer({ post, me, onClose, onOpenProfile, onDelete, actions, t }) 
   };
   const ab = {background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:6,color:t.text,padding:4,fontFamily:"'DM Mono',monospace",fontSize:13};
   return (
-    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:260,display:"flex",alignItems:"center",justifyContent:"center",padding:14}}>
+    <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:260,display:"flex",alignItems:"center",justifyContent:"center",padding:14}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,borderRadius:18,width:"100%",maxWidth:520,maxHeight:"94vh",overflowY:"auto",border:`1px solid ${t.border}`}}>
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px"}}>
           <div onClick={()=>{ onClose(); onOpenProfile(post.author); }} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",flex:1}}>
@@ -3635,7 +3658,7 @@ export default function App() {
 
           {/* DETAIL */}
           {page==="detail"&&selected&&(
-            <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+            <div {...swipeBack(()=>setPage(detailBack))} style={{display:"flex",flexDirection:"column",height:"100%"}}>
               <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendMedia={handleSendMedia} onSendGif={handleSendGif} onUnsend={handleUnsendAct} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} t={t} />
             </div>
           )}
@@ -3685,7 +3708,7 @@ export default function App() {
 
           {/* AMIS : dans le profil */}
           {page==="friends"&&(
-            <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
+            <div {...swipeBack(()=>setPage("home"))} style={{paddingBottom:BOTTOM_NAV_H+16}}>
               <MyProfilePage currentUser={me} startTab="friends" onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser} actions={postActions}
                 friendsView={<FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onOpenDM={openDM} embedded t={t} />} t={t} />
             </div>
@@ -3693,7 +3716,7 @@ export default function App() {
 
           {/* MY PROFILE */}
           {page==="profile"&&(
-            <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
+            <div {...swipeBack(()=>setPage("home"))} style={{paddingBottom:BOTTOM_NAV_H+16}}>
               <MyProfilePage currentUser={me} onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser} actions={postActions}
                 friendsView={<FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onOpenDM={openDM} embedded t={t} />} t={t} />
             </div>
@@ -3701,7 +3724,7 @@ export default function App() {
 
           {/* SETTINGS */}
           {page==="settings"&&(
-            <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
+            <div {...swipeBack(()=>setPage("profile"))} style={{paddingBottom:BOTTOM_NAV_H+16}}>
               <SettingsPage onOpenPremium={()=>setShowPremium(true)} currentUser={me} darkMode={darkMode} onToggleDark={toggleDark} onLogout={handleLogout} onBack={()=>setPage("profile")} onChangePassword={()=>setShowPassword(true)} onOpenBlocked={()=>setShowBlocked(true)} onDeleteAccount={()=>setShowDelete(true)} blockedCount={blockedIds.length} t={t} />
             </div>
           )}
@@ -3709,13 +3732,13 @@ export default function App() {
 
         {/* DM — replaces everything */}
         {page==="dm"&&dmPartner&&(
-          <div style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
+          <div {...swipeBack(()=>setPage("messages"))} style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
             <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onOpenProfile={()=>setProfileUser(dmPartner)} onBack={()=>setPage("messages")} onCall={v=>calls.start(dmPartner,v)} onUnsend={m=>api.unsendMessage("dm",m).then(()=>loadDMs(dmPartner.id)).catch(fail)} t={t} />
           </div>
         )}
 
         {page==="group"&&group&&(
-          <div style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
+          <div {...swipeBack(()=>setPage("messages"))} style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
             <DMChat currentUser={currentUser} otherUser={{id:group.id,name:group.name,pseudo:""}} group={group} messages={groupMsgs}
               onSend={sendGroupText} onVoiceSend={sendGroupVoice} onSendMedia={sendGroupMedia} onSendGif={sendGroupGif} onStatus={sendGroupStatus} partnerStatus={groupStatus?.status||null} statusName={groupStatus?.name}
               onOpenProfile={u=>u&&setProfileUser(u)} onOpenInfo={()=>setShowGroupInfo(true)} onCall={v=>calls.startGroup(group,v)} onUnsend={m=>api.unsendMessage("group",m).then(()=>{ loadGroupMsgs(group.id); refreshGroups(); }).catch(fail)} onBack={()=>setPage("messages")} t={t} />
