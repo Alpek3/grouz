@@ -377,3 +377,9 @@ export async function unsendMessage(scope, msg) {
     if (msg.media_path) await supabase.storage.from("media").remove([msg.media_path]);
   } catch {}
 }
+
+// ── Liste d'attente + dispo ce soir ──
+export const myWaitlistState = (activityId, userId) => supabase.from("activity_waitlist").select("user_id").eq("activity_id", activityId).eq("user_id", userId).then(ok).then(r => r.length > 0);
+export const joinWaitlist = (activityId, userId) => supabase.from("activity_waitlist").insert({ activity_id: activityId, user_id: userId }).then(ok);
+export const leaveWaitlist = (activityId, userId) => supabase.from("activity_waitlist").delete().eq("activity_id", activityId).eq("user_id", userId).then(ok);
+export const setAvailableUntil = (userId, iso) => supabase.from("profiles").update({ available_until: iso }).eq("id", userId).select().single().then(ok);
