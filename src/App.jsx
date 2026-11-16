@@ -1885,7 +1885,7 @@ function GeoAskModal({ onAllow, onLater, t }) {
         <div style={{fontSize:44,marginBottom:10}}>📍</div>
         <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"0 0 10px"}}>Autoriser la localisation ?</h2>
         <p style={{color:t.text2,fontFamily:"'DM Sans',sans-serif",fontSize:14,lineHeight:1.5,margin:"0 0 10px"}}>GrouZ utilise ta position pour centrer la carte sur toi et te proposer des sorties et des personnes près de chez toi.</p>
-        <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,lineHeight:1.5,margin:"0 0 20px"}}>Ta position exacte n'est jamais montrée : les autres voient seulement ta ville et une distance approximative. Tu peux arrêter à tout moment.</p>
+        <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,lineHeight:1.5,margin:"0 0 20px"}}>Ta position exacte n'est jamais montrée : les autres voient seulement ta ville. Tu peux arrêter à tout moment.</p>
         <Btn accent onClick={onAllow} t={t} style={{width:"100%",padding:14,marginBottom:10}}>AUTORISER</Btn>
         <button onClick={onLater} style={{background:"none",border:"none",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer",padding:8}}>Plus tard</button>
       </div>
@@ -1927,7 +1927,7 @@ function NearbySheet({ users, loading, radius, onRadius, geoStatus, hasPos, shar
             <div onClick={()=>onOpenProfile(u)} style={{flex:1,minWidth:0,cursor:"pointer"}}>
               <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.name}</p>
               <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,margin:"2px 0 0"}}>@{u.pseudo} · {u.age} ans</p>
-              <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:10,margin:"2px 0 0"}}>📍 {u.city||"Près de toi"} · {u.distance_km<=5?"à moins de 5 km":`à ~${u.distance_km} km`}</p>
+              <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:10,margin:"2px 0 0"}}>📍 {u.city||"Près de toi"}</p>
             </div>
             {sent[u.id]
               ? <span style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace"}}>✓ Envoyée</span>
@@ -1940,7 +1940,7 @@ function NearbySheet({ users, loading, radius, onRadius, geoStatus, hasPos, shar
             {sharing ? "Ne plus apparaître dans les suggestions des autres" : "Réactiver le partage de ma zone"}
           </button>
         )}
-        <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:9,textAlign:"center",margin:"10px 0 0",lineHeight:1.5}}>Les autres voient uniquement ta ville et une distance approximative, jamais ta position exacte.</p>
+        <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:9,textAlign:"center",margin:"10px 0 0",lineHeight:1.5}}>Les autres voient uniquement ta ville, jamais ta position exacte.</p>
       </div>
     </div>
   );
