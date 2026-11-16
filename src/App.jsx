@@ -992,7 +992,7 @@ function GifPicker({ userId, onPick, onClose, t }) {
   );
 }
 
-function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onOpenProfile, onBack, t}) {
+function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onOpenProfile, onBack, onCall, t}) {
   const bottomRef = useRef();
   const [pending, setPending] = useState(null);   // fichier choisi, en attente de confirmation
   const [sending, setSending] = useState(false);
@@ -1032,6 +1032,14 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
             ? <p style={{color:t.accent,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic",fontSize:11,margin:0}}>{statusText}</p>
             : <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>@{otherUser.pseudo}</p>}
         </div>
+        {onCall && <div style={{marginLeft:"auto",display:"flex",gap:4}}>
+          <button onClick={()=>onCall(false)} aria-label="Appel audio" style={{background:"none",border:"none",color:t.accent,cursor:"pointer",padding:8,display:"flex"}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"/></svg>
+          </button>
+          <button onClick={()=>onCall(true)} aria-label="Appel vidéo" style={{background:"none",border:"none",color:t.accent,cursor:"pointer",padding:8,display:"flex"}}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          </button>
+        </div>}
       </div>
       <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
         {messages.length===0&&<p style={{color:t.text3,textAlign:"center",fontFamily:"'DM Mono',monospace",fontSize:12,padding:"40px 0"}}>Commencez la conversation !</p>}
@@ -2118,6 +2126,208 @@ function GalleryPage({ me, posts, stories, activities, onOpenProfile, onAddPost,
   );
 }
 
+// ── APPELS AUDIO / VIDÉO (WebRTC, signalisation Supabase Realtime) ─────────
+// Serveurs STUN publics par défaut. Pour de meilleurs résultats en 4G, ajouter un serveur TURN :
+// variable VITE_ICE_SERVERS = [{"urls":"stun:..."},{"urls":"turn:...","username":"...","credential":"..."}]
+const getIceServers = () => {
+  try { const j = import.meta.env.VITE_ICE_SERVERS; if (j) return JSON.parse(j); } catch {}
+  return [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
+};
+const RING_TIMEOUT = 45000;
+
+function useCalls(meId, isFriend, findUser, t) {
+  const [call, setCall] = useState(null);      // { peer, video, status, incoming, callId }
+  const [remote, setRemote] = useState(null);
+  const [local, setLocal] = useState(null);
+  const [muted, setMuted] = useState(false);
+  const [camOff, setCamOff] = useState(false);
+  const [secs, setSecs] = useState(0);
+  const R = useRef({ pc: null, local: null, callId: null, peerId: null, ice: [], timers: [], senders: {}, ring: null });
+  const callRef = useRef(null); callRef.current = call;
+  const handleRef = useRef(() => {});
+
+  // ── envoi d'un message de signalisation à un ami
+  const send = useCallback(async (toId, payload) => {
+    try {
+      let p = R.current.senders[toId];
+      if (!p) {
+        const ch = api.supabase.channel(`calls:${toId}`);
+        p = new Promise(res => ch.subscribe(s => { if (s === "SUBSCRIBED") res(ch); }));
+        R.current.senders[toId] = p;
+      }
+      const ch = await p;
+      ch.send({ type: "broadcast", event: "sig", payload: { ...payload, from: meId } });
+    } catch (e) { console.warn("call send", e); }
+  }, [meId]);
+
+  // ── sonnerie
+  const stopRing = () => { const r = R.current.ring; if (r) { clearInterval(r.id); try { r.ctx.close(); } catch {} R.current.ring = null; } try { navigator.vibrate?.(0); } catch {} };
+  const startRing = () => {
+    stopRing();
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const beep = () => { [0, 0.25].forEach(d => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 520; g.gain.value = 0.08; o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + d); o.stop(ctx.currentTime + d + 0.18); }); try { navigator.vibrate?.([300, 150, 300]); } catch {} };
+      beep(); R.current.ring = { ctx, id: setInterval(beep, 2000) };
+    } catch {}
+  };
+
+  const cleanup = useCallback(() => {
+    const r = R.current;
+    stopRing();
+    r.timers.forEach(clearTimeout); r.timers = [];
+    try { r.pc?.close(); } catch {}
+    r.local?.getTracks().forEach(x => x.stop());
+    Object.assign(r, { pc: null, local: null, callId: null, peerId: null, ice: [] });
+    setCall(null); setRemote(null); setLocal(null); setMuted(false); setCamOff(false); setSecs(0);
+  }, []);
+
+  const getMedia = async (video) => {
+    try { return await navigator.mediaDevices.getUserMedia({ audio: true, video: video ? { facingMode: "user" } : false }); }
+    catch { alert(video ? "Impossible d'accéder à la caméra ou au micro. Vérifie les autorisations." : "Impossible d'accéder au micro. Vérifie les autorisations."); return null; }
+  };
+
+  const makePc = useCallback((peerId) => {
+    const r = R.current;
+    const pc = new RTCPeerConnection({ iceServers: getIceServers() });
+    r.pc = pc;
+    r.local?.getTracks().forEach(tr => pc.addTrack(tr, r.local));
+    pc.ontrack = e => setRemote(e.streams[0]);
+    pc.onicecandidate = e => { if (e.candidate) send(peerId, { type: "ice", callId: r.callId, candidate: e.candidate.toJSON() }); };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected") setCall(c => c && { ...c, status: "active" });
+      if (pc.connectionState === "failed") { alert("L'appel a échoué (connexion impossible)."); cleanup(); }
+      if (pc.connectionState === "closed") return;
+    };
+    return pc;
+  }, [send, cleanup]);
+
+  const flushIce = async () => { const r = R.current; for (const c of r.ice) { try { await r.pc.addIceCandidate(c); } catch {} } r.ice = []; };
+
+  // ── actions de l'utilisateur
+  const start = async (peer, video) => {
+    if (callRef.current) return;
+    const stream = await getMedia(video); if (!stream) return;
+    const r = R.current; r.local = stream; setLocal(stream);
+    r.callId = (crypto.randomUUID?.() || String(Date.now())); r.peerId = peer.id;
+    setCall({ peer, video, status: "calling", incoming: false, callId: r.callId });
+    send(peer.id, { type: "invite", callId: r.callId, video });
+    r.timers.push(setTimeout(() => { if (callRef.current?.status === "calling") { send(peer.id, { type: "cancel", callId: r.callId }); alert("Pas de réponse."); cleanup(); } }, RING_TIMEOUT));
+  };
+
+  const accept = async () => {
+    const c = callRef.current; if (!c || !c.incoming) return;
+    stopRing();
+    const stream = await getMedia(c.video);
+    if (!stream) { send(c.peer.id, { type: "reject", callId: c.callId }); cleanup(); return; }
+    const r = R.current; r.local = stream; setLocal(stream);
+    setCall({ ...c, status: "connecting" });
+    send(c.peer.id, { type: "accept", callId: c.callId });
+  };
+
+  const hangup = () => {
+    const c = callRef.current, r = R.current; if (!c) return;
+    if (c.incoming && c.status === "ringing") send(c.peer.id, { type: "reject", callId: c.callId });
+    else if (!c.incoming && c.status === "calling") send(c.peer.id, { type: "cancel", callId: c.callId });
+    else send(c.peer.id, { type: "hangup", callId: c.callId });
+    cleanup();
+  };
+
+  const toggleMute = () => { const tr = R.current.local?.getAudioTracks(); tr?.forEach(x => x.enabled = !x.enabled); setMuted(m => !m); };
+  const toggleCam = () => { const tr = R.current.local?.getVideoTracks(); tr?.forEach(x => x.enabled = !x.enabled); setCamOff(v => !v); };
+
+  // ── messages reçus
+  handleRef.current = async (p) => {
+    const r = R.current; const c = callRef.current;
+    if (!p?.from || !isFriend(p.from)) return;
+    if (p.type === "invite") {
+      if (c) { send(p.from, { type: "busy", callId: p.callId }); return; }
+      const peer = findUser(p.from); if (!peer) return;
+      r.callId = p.callId; r.peerId = p.from;
+      setCall({ peer, video: !!p.video, status: "ringing", incoming: true, callId: p.callId });
+      startRing();
+      r.timers.push(setTimeout(() => { if (callRef.current?.status === "ringing") cleanup(); }, RING_TIMEOUT));
+      return;
+    }
+    if (!c || p.callId !== r.callId) return;
+    if (p.type === "cancel" || p.type === "hangup" || p.type === "reject" || p.type === "busy") {
+      if (p.type === "reject") alert("Appel refusé.");
+      if (p.type === "busy") alert("Ton ami est déjà en appel.");
+      cleanup(); return;
+    }
+    if (p.type === "accept" && !c.incoming) {
+      r.timers.forEach(clearTimeout); r.timers = [];
+      setCall({ ...c, status: "connecting" });
+      const pc = makePc(c.peer.id);
+      const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+      send(c.peer.id, { type: "offer", callId: r.callId, sdp: pc.localDescription });
+      return;
+    }
+    if (p.type === "offer" && c.incoming) {
+      const pc = makePc(c.peer.id);
+      await pc.setRemoteDescription(p.sdp); await flushIce();
+      const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
+      send(c.peer.id, { type: "answer", callId: r.callId, sdp: pc.localDescription });
+      return;
+    }
+    if (p.type === "answer" && r.pc) { await r.pc.setRemoteDescription(p.sdp); await flushIce(); return; }
+    if (p.type === "ice") { if (r.pc?.remoteDescription) { try { await r.pc.addIceCandidate(p.candidate); } catch {} } else r.ice.push(p.candidate); }
+  };
+
+  // ── boîte de réception de signalisation
+  useEffect(() => {
+    if (!meId) return;
+    const ch = api.supabase.channel(`calls:${meId}`).on("broadcast", { event: "sig" }, ({ payload }) => handleRef.current(payload)).subscribe();
+    return () => { api.supabase.removeChannel(ch); };
+  }, [meId]);
+
+  useEffect(() => () => cleanup(), [meId]);
+
+  // chronomètre
+  useEffect(() => {
+    if (call?.status !== "active") return;
+    const id = setInterval(() => setSecs(s => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [call?.status]);
+
+  // ── interface
+  const rv = useRef(null), lv = useRef(null);
+  useEffect(() => { if (rv.current) rv.current.srcObject = remote; }, [remote, call?.status]);
+  useEffect(() => { if (lv.current) lv.current.srcObject = local; }, [local, call?.status]);
+
+  let ui = null;
+  if (call) {
+    const mm = String(Math.floor(secs / 60)).padStart(2, "0"), ss = String(secs % 60).padStart(2, "0");
+    const label = call.status === "ringing" ? (call.video ? "Appel vidéo entrant…" : "Appel entrant…")
+      : call.status === "calling" ? "Appel en cours…" : call.status === "connecting" ? "Connexion…" : `${mm}:${ss}`;
+    const showVideo = call.video && remote && call.status === "active";
+    const rb = (bg) => ({ width: 62, height: 62, borderRadius: "50%", border: "none", background: bg, color: "#fff", fontSize: 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" });
+    ui = (
+      <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "#0D0A12", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", color: "#fff", padding: "calc(40px + env(safe-area-inset-top, 0px)) 20px calc(36px + env(safe-area-inset-bottom, 0px))" }}>
+        <video ref={rv} autoPlay playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: showVideo ? 1 : 0, background: "#000" }} />
+        <div style={{ position: "relative", textAlign: "center", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>
+          {!showVideo && <div style={{ display: "inline-block", marginBottom: 16 }}><Avatar user={call.peer} size={120} t={t} /></div>}
+          <div style={{ fontFamily: "'Fraunces',serif", fontSize: 26 }}>{call.peer?.name}</div>
+          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 14, opacity: 0.85, marginTop: 6 }}>{label}</div>
+        </div>
+        {call.video && local && call.status !== "ringing" && (
+          <video ref={lv} autoPlay playsInline muted style={{ position: "absolute", right: 16, top: "calc(16px + env(safe-area-inset-top, 0px))", width: 96, height: 140, objectFit: "cover", borderRadius: 14, border: "2px solid rgba(255,255,255,0.5)", background: "#000", transform: "scaleX(-1)", opacity: camOff ? 0.2 : 1 }} />
+        )}
+        <div style={{ position: "relative", display: "flex", gap: 22, alignItems: "center" }}>
+          {call.status === "ringing" ? (<>
+            <button onClick={hangup} style={rb("#E5334B")} aria-label="Refuser">✕</button>
+            <button onClick={accept} style={rb("#2BB673")} aria-label="Répondre">{call.video ? "🎥" : "📞"}</button>
+          </>) : (<>
+            <button onClick={toggleMute} style={rb(muted ? "#555" : "rgba(255,255,255,0.18)")} aria-label="Micro">{muted ? "🔇" : "🎤"}</button>
+            {call.video && <button onClick={toggleCam} style={rb(camOff ? "#555" : "rgba(255,255,255,0.18)")} aria-label="Caméra">{camOff ? "🚫" : "📷"}</button>}
+            <button onClick={hangup} style={rb("#E5334B")} aria-label="Raccrocher">📵</button>
+          </>)}
+        </div>
+      </div>
+    );
+  }
+  return { start, ui, busy: !!call };
+}
+
 const colorFor = id => AVATAR_COLORS[(id?.charCodeAt(1)||0) % AVATAR_COLORS.length];
 const shapeUser = p => p && ({ ...p, avatar: p.avatar_url || null, avatarColor: colorFor(p.id), friends: [], friendReqs: [] });
 const fmtTime = iso => { const d = new Date(iso); return d.getHours().toString().padStart(2,"0")+":"+d.getMinutes().toString().padStart(2,"0"); };
@@ -2225,6 +2435,7 @@ export default function App() {
   useEffect(()=>{ if (profileUser && me0 && profileUser.id!==me0.id) api.recordProfileView(profileUser.id); },[profileUser?.id]);
   const me = me0 ? { ...me0, friends: friendIds, friendReqs: reqIds } : null;
   const isFriend = id => friendIds.includes(id);
+  const calls = useCalls(me0?.id, id=>friendIds.includes(id), id=>allUsers.find(u=>u.id===id), t);
   const hasPendingReq = id => friendships.some(f=>f.status==="pending"&&f.requester_id===me0?.id&&f.addressee_id===id);
   const sendFriendReq = id => api.sendFriendRequest(me0.id,id).then(refreshFriends).catch(fail);
   const acceptFriendReq = fromId => {
@@ -2699,7 +2910,7 @@ export default function App() {
         {/* DM — replaces everything */}
         {page==="dm"&&dmPartner&&(
           <div style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
-            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onOpenProfile={()=>setProfileUser(dmPartner)} onBack={()=>setPage("messages")} t={t} />
+            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onOpenProfile={()=>setProfileUser(dmPartner)} onBack={()=>setPage("messages")} onCall={v=>calls.start(dmPartner,v)} t={t} />
           </div>
         )}
 
@@ -2744,6 +2955,7 @@ export default function App() {
           geoStatus={geoStatus} hasPos={!!userPos} sharing={sharing} onToggleShare={toggleSharing} onAskLocation={requestLocation}
           onAdd={u=>sendFriendReq(u.id)} onOpenProfile={u=>setProfileUser(u)} onClose={()=>setShowNearby(false)} />}
 
+        {calls.ui}
         {/* ── PROFILE MODAL ── */}
         {profileUser&&(
           <ProfileModal
