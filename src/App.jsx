@@ -369,6 +369,7 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
           <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"10px 0 4px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{user.name}{user.is_premium&&<PremiumBadge size={20}/>}</h2>
           <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:13,margin:"0 0 8px"}}>@{user.pseudo}</p>
           {user.bio&&<p style={{color:t.text2,fontSize:14,lineHeight:1.5,fontFamily:"'DM Sans',sans-serif"}}>{user.bio}</p>}
+          <SocialLinks user={user} t={t} />
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
           {[["Âge",user.age+" ans"],["Genre",user.gender]].map(([l,v])=>(
@@ -397,8 +398,10 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
 // ════════════════════════════════════════════════════════════════════════════════
 // MY PROFILE EDITOR
 // ════════════════════════════════════════════════════════════════════════════════
-function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, t}) {
-  const [form, setForm] = useState({name:currentUser.name,pseudo:currentUser.pseudo,bio:currentUser.bio||"",age:currentUser.age,gender:currentUser.gender});
+function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, friendsView, t}) {
+  const [tab, setTab] = useState(startTab||"profile");
+  const [cropFile, setCropFile] = useState(null);
+  const [form, setForm] = useState({name:currentUser.name,pseudo:currentUser.pseudo,bio:currentUser.bio||"",age:currentUser.age,gender:currentUser.gender,instagram:currentUser.instagram||"",tiktok:currentUser.tiktok||""});
   const [preview, setPreview] = useState(currentUser.avatar);
   const [photoFile, setPhotoFile] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -406,14 +409,16 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, t}) {
   const set = (k,v)=>setForm(f=>({...f,[k]:v}));
 
   const handlePhoto = (e) => {
-    const f = e.target.files?.[0]; if(!f) return; setPhotoFile(f);
-    const reader = new FileReader();
-    reader.onload = ev => setPreview(ev.target.result);
-    reader.readAsDataURL(f);
+    const f = e.target.files?.[0]; e.target.value=""; if(!f) return;
+    if (!(f.type||"").startsWith("image")) { alert("Choisis une image."); return; }
+    setCropFile(f);   // ouvre l'écran de recadrage
   };
 
   const save = () => {
-    onUpdate({...form, age:+form.age, avatarFile:photoFile});
+    const ig = normInsta(form.instagram), tk = normTikTok(form.tiktok);
+    if (ig === undefined) { alert("Lien Instagram invalide. Écris ton @pseudo ou colle l'adresse de ton profil."); return; }
+    if (tk === undefined) { alert("Lien TikTok invalide. Écris ton @pseudo ou colle l'adresse de ton profil."); return; }
+    onUpdate({...form, age:+form.age, instagram:ig, tiktok:tk, avatarFile:photoFile});
     setSaved(true); setTimeout(()=>setSaved(false),2000);
   };
 
@@ -425,6 +430,13 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, t}) {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
       </div>
+      <div style={{display:"flex",gap:8,marginBottom:20}}>
+        {[["profile","Profil"],["friends",`Amis${currentUser.friendReqs?.length?` (${currentUser.friendReqs.length})`:""}`]].map(([id,l])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px",borderRadius:12,border:"1px solid",borderColor:tab===id?t.accent:t.border,background:tab===id?t.accentBg:"transparent",color:tab===id?t.accent:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer"}}>{l}</button>
+        ))}
+      </div>
+      {cropFile && <CropModal file={cropFile} t={t} onCancel={()=>setCropFile(null)} onDone={(f,url)=>{ setPhotoFile(f); setPreview(url); setCropFile(null); }} />}
+      {tab==="friends" ? friendsView : (<>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:28}}>
         <div style={{position:"relative",cursor:"pointer"}} onClick={()=>fileRef.current?.click()}>
           {preview ? <img src={preview} style={{width:90,height:90,borderRadius:"50%",objectFit:"cover",border:`3px solid ${t.accent}`}} alt="" />
@@ -443,10 +455,19 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, t}) {
           <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Bio</label>
           <textarea value={form.bio} onChange={e=>set("bio",e.target.value)} rows={3} placeholder="Parle-nous de toi..." style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
         </div>
+        <div style={{flex:"1 1 100%"}}>
+          <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase",display:"flex",alignItems:"center",gap:6}}><InstagramIcon size={14}/> Instagram</label>
+          <input value={form.instagram} onChange={e=>set("instagram",e.target.value)} placeholder="@tonpseudo ou lien du profil" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}} />
+        </div>
+        <div style={{flex:"1 1 100%"}}>
+          <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase",display:"flex",alignItems:"center",gap:6}}><TikTokIcon size={14}/> TikTok</label>
+          <input value={form.tiktok} onChange={e=>set("tiktok",e.target.value)} placeholder="@tonpseudo ou lien du profil" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}} />
+        </div>
       </div>
       <Btn accent onClick={save} t={t} style={{marginTop:20,width:"100%",padding:"14px"}}>
         {saved?"✓ SAUVEGARDÉ !":"ENREGISTRER LES MODIFICATIONS"}
       </Btn>
+      </>)}
     </div>
   );
 }
@@ -524,12 +545,12 @@ function SettingsPage({onOpenPremium, currentUser, darkMode, onToggleDark, onLog
 // ════════════════════════════════════════════════════════════════════════════════
 // FRIENDS PAGE
 // ════════════════════════════════════════════════════════════════════════════════
-function FriendsPage({currentUser, allUsers, onOpenProfile, onAcceptFriend, onBack, onOpenDM, t}) {
+function FriendsPage({currentUser, allUsers, onOpenProfile, onAcceptFriend, onBack, onOpenDM, embedded, t}) {
   const friends = allUsers.filter(u=>currentUser.friends?.includes(u.id));
   const reqs = allUsers.filter(u=>currentUser.friendReqs?.includes(u.id));
   return (
-    <div style={{padding:"20px 24px",maxWidth:600,margin:"0 auto"}}>
-      <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,marginBottom:24}}>Amis</h2>
+    <div style={{padding:embedded?"0":"20px 24px",maxWidth:600,margin:"0 auto"}}>
+      {!embedded&&<h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,marginBottom:24}}>Amis</h2>}
       {reqs.length>0&&<>
         <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.accent,letterSpacing:"0.1em",marginBottom:10}}>🔔 DEMANDES D'AMITIÉ ({reqs.length})</p>
         {reqs.map(u=>(
@@ -1764,6 +1785,296 @@ function MessagesPage({ friends, last, myId, onOpenDM, onGoFriends, t }) {
   );
 }
 
+// ── RÉSEAUX SOCIAUX (liens du profil) ───────────────────────────
+// Renvoie null (vide), undefined (invalide) ou l'adresse complète
+function normSocial(v, host, base, at) {
+  v = (v || "").trim(); if (!v) return null;
+  if (/^https?:\/\//i.test(v)) {
+    try { const u = new URL(v); if (u.hostname.replace(/^www\./, "") === host) return "https://" + u.hostname + u.pathname + u.search; } catch {}
+    return undefined;
+  }
+  const h = v.replace(/^@/, "").replace(/[^A-Za-z0-9._]/g, ""); if (!h) return undefined;
+  return base + (at ? "@" : "") + h;
+}
+const normInsta  = v => normSocial(v, "instagram.com", "https://www.instagram.com/", false);
+const normTikTok = v => normSocial(v, "tiktok.com", "https://www.tiktok.com/", true);
+
+function InstagramIcon({ size=22 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>;
+}
+function TikTokIcon({ size=22 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c.4 2.6 2.1 4.2 5 4.4"/></svg>;
+}
+function SocialLinks({ user, t }) {
+  if (!user?.instagram && !user?.tiktok) return null;
+  const open = (url) => window.open(url, "_blank", "noopener,noreferrer");
+  const btn = { width:40, height:40, borderRadius:"50%", border:`1px solid ${t.border2||t.border}`, background:t.bg3, color:t.text, display:"inline-flex", alignItems:"center", justifyContent:"center", cursor:"pointer", padding:0 };
+  return (
+    <div style={{display:"flex",gap:10,justifyContent:"center",margin:"10px 0 4px"}}>
+      {user.instagram && <button style={btn} onClick={()=>open(user.instagram)} aria-label="Instagram"><InstagramIcon /></button>}
+      {user.tiktok && <button style={btn} onClick={()=>open(user.tiktok)} aria-label="TikTok"><TikTokIcon /></button>}
+    </div>
+  );
+}
+
+// ── RECADRAGE DE LA PHOTO DE PROFIL ─────────────────────────────
+function CropModal({ file, onCancel, onDone, t }) {
+  const V = 280;
+  const [img, setImg] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const [pos, setPos] = useState({ x:0, y:0 });
+  const drag = useRef(null);
+  useEffect(()=>{ const u = URL.createObjectURL(file); const i = new Image(); i.onload = ()=>setImg(i); i.src = u; return ()=>URL.revokeObjectURL(u); },[file]);
+  const sc = img ? (V / Math.min(img.naturalWidth, img.naturalHeight)) * zoom : 1;
+  const clamp = (p) => {
+    if (!img) return p;
+    const mx = Math.max(0, (img.naturalWidth * sc - V) / 2), my = Math.max(0, (img.naturalHeight * sc - V) / 2);
+    return { x: Math.min(mx, Math.max(-mx, p.x)), y: Math.min(my, Math.max(-my, p.y)) };
+  };
+  useEffect(()=>{ setPos(p=>clamp(p)); },[zoom, img]);
+  const down = e => { drag.current = { sx:e.clientX, sy:e.clientY, p:pos }; e.currentTarget.setPointerCapture?.(e.pointerId); };
+  const move = e => { if (!drag.current) return; setPos(clamp({ x: drag.current.p.x + e.clientX - drag.current.sx, y: drag.current.p.y + e.clientY - drag.current.sy })); };
+  const up = () => { drag.current = null; };
+  const confirm = () => {
+    const OUT = 512, k = OUT / V;
+    const c = document.createElement("canvas"); c.width = OUT; c.height = OUT;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(img, (V/2 + pos.x - img.naturalWidth*sc/2)*k, (V/2 + pos.y - img.naturalHeight*sc/2)*k, img.naturalWidth*sc*k, img.naturalHeight*sc*k);
+    c.toBlob(b => { if (!b) return; const f = new File([b], "avatar.jpg", { type:"image/jpeg" }); onDone(f, c.toDataURL("image/jpeg", 0.85)); }, "image/jpeg", 0.9);
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,padding:24,width:"100%",maxWidth:360,textAlign:"center"}}>
+        <h3 style={{margin:"0 0 6px",fontFamily:"'Fraunces',serif",color:t.text}}>Cadre ta photo</h3>
+        <p style={{margin:"0 0 14px",fontSize:12,color:t.text3,fontFamily:"'DM Sans',sans-serif"}}>Glisse pour déplacer, utilise le curseur pour zoomer.</p>
+        <div onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+          style={{width:V,height:V,margin:"0 auto",borderRadius:"50%",overflow:"hidden",position:"relative",background:"#000",touchAction:"none",cursor:"grab",border:`3px solid ${t.accent}`,boxSizing:"content-box"}}>
+          {img && <img src={img.src} alt="" draggable={false} style={{position:"absolute",userSelect:"none",pointerEvents:"none",maxWidth:"none",
+            width:img.naturalWidth*sc,height:img.naturalHeight*sc,left:V/2+pos.x-img.naturalWidth*sc/2,top:V/2+pos.y-img.naturalHeight*sc/2}} />}
+        </div>
+        <input type="range" min={1} max={4} step={0.01} value={zoom} onChange={e=>setZoom(+e.target.value)} style={{width:"80%",marginTop:18,accentColor:t.accent}} />
+        <div style={{display:"flex",gap:10,marginTop:14}}>
+          <Btn onClick={onCancel} t={t} style={{flex:1}}>Annuler</Btn>
+          <Btn accent onClick={confirm} disabled={!img} t={t} style={{flex:1}}>Valider</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── STORIES + SOUVENIRS ─────────────────────────────────────────
+const agoLabel = (iso) => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.floor(m/60)} h` : `il y a ${Math.floor(m/1440)} j`;
+};
+const SEEN_KEY = "grouz_seen_stories";
+const readSeen = () => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}"); } catch { return {}; } };
+const writeSeen = (id) => { try { const s = readSeen(); s[id] = 1; localStorage.setItem(SEEN_KEY, JSON.stringify(s)); } catch {} };
+const MAX_IMG = 15 * 1024 * 1024, MAX_VID = 50 * 1024 * 1024;
+const checkMedia = (f) => {
+  if (!f) return "Aucun fichier.";
+  const vid = (f.type || "").startsWith("video"), img = (f.type || "").startsWith("image");
+  if (!vid && !img) return "Choisis une photo ou une vidéo.";
+  if (vid && f.size > MAX_VID) return "Vidéo trop lourde (50 Mo maximum).";
+  if (img && f.size > MAX_IMG) return "Photo trop lourde (15 Mo maximum).";
+  return null;
+};
+
+function StoryViewer({ groups, startGroup, me, onClose, onDelete, t }) {
+  const [gi, setGi] = useState(startGroup);
+  const [si, setSi] = useState(0);
+  const [prog, setProg] = useState(0);
+  const group = groups[gi]; const story = group?.items[si];
+  const next = useCallback(() => {
+    if (si + 1 < group.items.length) { setSi(si + 1); setProg(0); }
+    else if (gi + 1 < groups.length) { setGi(gi + 1); setSi(0); setProg(0); }
+    else onClose();
+  }, [si, gi, group, groups, onClose]);
+  const prev = () => { if (si > 0) { setSi(si - 1); setProg(0); } else if (gi > 0) { setGi(gi - 1); setSi(0); setProg(0); } else setProg(0); };
+  useEffect(()=>{ if (story) writeSeen(story.id); },[story?.id]);
+  useEffect(()=>{
+    if (!story || story.media_type === "video") return;
+    const start = Date.now();
+    const id = setInterval(()=>{ const p = (Date.now() - start) / 5000; if (p >= 1) { clearInterval(id); next(); } else setProg(p); }, 50);
+    return ()=>clearInterval(id);
+  },[story?.id, next]);
+  if (!story) return null;
+  const mine = story.user_id === me.id;
+  return (
+    <div style={{position:"fixed",inset:0,background:"#000",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{position:"relative",width:"100%",maxWidth:480,height:"100%",background:"#000"}}>
+        {story.media_type === "video"
+          ? <video key={story.id} src={story.url} autoPlay playsInline onEnded={next} onTimeUpdate={e=>{ const v=e.currentTarget; if (v.duration) setProg(v.currentTime / v.duration); }} style={{width:"100%",height:"100%",objectFit:"contain"}} />
+          : <img key={story.id} src={story.url} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} />}
+        <div style={{position:"absolute",top:0,left:0,right:0,padding:"calc(10px + env(safe-area-inset-top, 0px)) 12px 0",background:"linear-gradient(rgba(0,0,0,0.55),transparent)",paddingBottom:24}}>
+          <div style={{display:"flex",gap:4,marginBottom:10}}>
+            {group.items.map((s,i)=>(<div key={s.id} style={{flex:1,height:3,borderRadius:2,background:"rgba(255,255,255,0.3)",overflow:"hidden"}}><div style={{height:"100%",background:"#fff",width:i<si?"100%":i===si?`${prog*100}%`:"0%"}}/></div>))}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <Avatar user={group.user} size={34} t={t}/>
+            <div style={{flex:1,color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:14}}><b>{group.user.pseudo}</b> <span style={{opacity:0.7,fontSize:12}}>{agoLabel(story.created_at)}</span></div>
+            {mine && <button onClick={()=>{ if (window.confirm("Supprimer cette story ?")) { onDelete(story); onClose(); } }} style={{background:"none",border:"none",color:"#fff",fontSize:18,cursor:"pointer"}} aria-label="Supprimer">🗑</button>}
+            <button onClick={onClose} style={{background:"none",border:"none",color:"#fff",fontSize:22,cursor:"pointer"}} aria-label="Fermer">✕</button>
+          </div>
+        </div>
+        <div onClick={prev} style={{position:"absolute",left:0,top:80,bottom:0,width:"33%"}}/>
+        <div onClick={next} style={{position:"absolute",right:0,top:80,bottom:0,width:"67%"}}/>
+      </div>
+    </div>
+  );
+}
+
+function StoriesBar({ me, stories, onAddFile, onOpen, t }) {
+  const fileRef = useRef(null);
+  const groups = [];
+  for (const s of stories) { let g = groups.find(x=>x.user.id===s.user_id); if (!g) { g = { user: s.author, items: [] }; groups.push(g); } g.items.push(s); }
+  groups.sort((a,b)=> (a.user.id===me.id ? -1 : b.user.id===me.id ? 1 : 0));
+  const mineGroup = groups.find(g=>g.user.id===me.id);
+  const others = groups.filter(g=>g.user.id!==me.id);
+  const seen = readSeen();
+  const unseen = g => g.items.some(s=>!seen[s.id]);
+  const ring = (on) => ({ padding:3, borderRadius:"50%", background: on ? t.gradient : t.border, display:"inline-flex" });
+  const pick = e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onAddFile(f); };
+  return (
+    <div style={{display:"flex",gap:14,overflowX:"auto",padding:"4px 2px 12px"}}>
+      <input ref={fileRef} type="file" accept="image/*,video/*" onChange={pick} style={{display:"none"}} />
+      <div style={{textAlign:"center",flexShrink:0,width:70}}>
+        <div style={{position:"relative",display:"inline-block",cursor:"pointer"}} onClick={()=> mineGroup ? onOpen(groups.indexOf(mineGroup), groups) : fileRef.current?.click()}>
+          <span style={ring(!!mineGroup && unseen(mineGroup))}><span style={{background:t.bg,borderRadius:"50%",padding:2,display:"inline-flex"}}><Avatar user={me} size={54} t={t}/></span></span>
+          <span onClick={e=>{ e.stopPropagation(); fileRef.current?.click(); }} style={{position:"absolute",right:0,bottom:0,width:22,height:22,borderRadius:"50%",background:t.accent,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,border:`2px solid ${t.bg}`}}>+</span>
+        </div>
+        <div style={{fontSize:11,color:t.text2,fontFamily:"'DM Mono',monospace",marginTop:4}}>Ma story</div>
+      </div>
+      {others.map(g=>(
+        <div key={g.user.id} onClick={()=>onOpen(groups.indexOf(g), groups)} style={{textAlign:"center",flexShrink:0,width:70,cursor:"pointer"}}>
+          <span style={ring(unseen(g))}><span style={{background:t.bg,borderRadius:"50%",padding:2,display:"inline-flex"}}><Avatar user={g.user} size={54} t={t}/></span></span>
+          <div style={{fontSize:11,color:t.text2,fontFamily:"'DM Mono',monospace",marginTop:4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.user.pseudo}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PostComposer({ me, activities, onClose, onSubmit, t }) {
+  const [file, setFile] = useState(null);
+  const prev = useMemoPhoto(file);
+  const [cat, setCat] = useState("Nature");
+  const [actId, setActId] = useState("");
+  const [caption, setCaption] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+  const isVid = (file?.type || "").startsWith("video");
+  const mine = activities.filter(a => a.creator?.id === me.id || a.accepted?.some(u=>u.id===me.id));
+  const pickFile = e => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const err = checkMedia(f); if (err) { alert(err); return; } setFile(f); };
+  const pickAct = id => { setActId(id); const a = activities.find(x=>x.id===id); if (a?.category && CATEGORIES.includes(a.category)) setCat(a.category); };
+  const go = async () => { setBusy(true); const ok = await onSubmit({ file, category: cat, caption: caption.trim(), activityId: actId || null }); setBusy(false); if (ok) onClose(); };
+  const lbl = {fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"};
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",padding:26}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:22,color:t.text}}>Partager un souvenir</h2>
+          <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*,video/*" onChange={pickFile} style={{display:"none"}} />
+        {prev ? (
+          <div style={{position:"relative",marginBottom:14}}>
+            {isVid ? <video src={prev} controls playsInline style={{width:"100%",maxHeight:260,borderRadius:12,background:"#000"}}/> : <img src={prev} alt="" style={{width:"100%",maxHeight:260,objectFit:"cover",borderRadius:12}}/>}
+            <button onClick={()=>setFile(null)} style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer"}}>✕</button>
+          </div>
+        ) : (
+          <button onClick={()=>fileRef.current?.click()} style={{width:"100%",padding:"28px 10px",borderRadius:12,border:`1px dashed ${t.accent}`,background:"transparent",color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer",marginBottom:14}}>📷 Choisir une photo ou une vidéo</button>
+        )}
+        <label style={lbl}>Sortie concernée (facultatif)</label>
+        <select value={actId} onChange={e=>pickAct(e.target.value)} style={{width:"100%",margin:"6px 0 14px",padding:"10px 12px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>
+          <option value="">— Aucune —</option>
+          {mine.map(a=><option key={a.id} value={a.id}>{a.title}</option>)}
+        </select>
+        <label style={lbl}>Catégorie</label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,margin:"8px 0 14px"}}>
+          {CATEGORIES.filter(c=>c!=="Tous").map(c=>(
+            <button key={c} onClick={()=>setCat(c)} style={{padding:"5px 12px",borderRadius:20,border:"1px solid",borderColor:cat===c?t.accent:t.border,background:cat===c?t.accentBg:"transparent",color:cat===c?t.accent:t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>{CAT_ICONS[c]} {c}</button>
+          ))}
+        </div>
+        <label style={lbl}>Légende (facultatif)</label>
+        <textarea value={caption} onChange={e=>setCaption(e.target.value.slice(0,300))} rows={2} placeholder="Raconte ce moment…" style={{width:"100%",margin:"6px 0 16px",padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
+        <Btn accent disabled={!file||busy} onClick={go} t={t} style={{width:"100%",padding:"14px"}}>{busy?"ENVOI…":"PUBLIER"}</Btn>
+      </div>
+    </div>
+  );
+}
+
+function PostViewer({ post, me, onClose, onOpenProfile, onDelete, t }) {
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:260,display:"flex",alignItems:"center",justifyContent:"center",padding:14}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,borderRadius:18,width:"100%",maxWidth:520,maxHeight:"94vh",overflowY:"auto",border:`1px solid ${t.border}`}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px"}}>
+          <div onClick={()=>{ onClose(); onOpenProfile(post.author); }} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",flex:1}}>
+            <Avatar user={post.author} size={34} t={t}/>
+            <div><div style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:600}}>{post.author?.pseudo}</div><div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>{agoLabel(post.created_at)}</div></div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+        {post.media_type === "video"
+          ? <video src={post.url} controls playsInline style={{width:"100%",maxHeight:"62vh",background:"#000"}} />
+          : <img src={post.url} alt="" style={{width:"100%",maxHeight:"62vh",objectFit:"contain",background:"#000",display:"block"}} />}
+        <div style={{padding:"12px 14px 16px"}}>
+          <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:t.accent,letterSpacing:"0.08em"}}>{CAT_ICONS[post.category]} {post.category?.toUpperCase()}{post.activity?.title ? ` · ${post.activity.title}` : ""}</div>
+          {post.caption && <p style={{margin:"8px 0 0",color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,lineHeight:1.5}}>{post.caption}</p>}
+          {post.user_id === me.id && <button onClick={()=>{ if (window.confirm("Supprimer ce souvenir ?")) { onDelete(post); onClose(); } }} style={{marginTop:12,padding:"8px 12px",borderRadius:10,background:"transparent",border:`1px solid ${t.accent}66`,color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>🗑 Supprimer</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GalleryPage({ me, posts, stories, activities, onOpenProfile, onAddPost, onDeletePost, onAddStory, onDeleteStory, t }) {
+  const [cat, setCat] = useState("Tous");
+  const [composer, setComposer] = useState(false);
+  const [viewPost, setViewPost] = useState(null);
+  const [storyView, setStoryView] = useState(null);
+  const counts = {}; posts.forEach(p=>{ counts[p.category] = (counts[p.category]||0) + 1; });
+  const cats = CATEGORIES.filter(c=>c!=="Tous" && counts[c]);
+  const shown = cat === "Tous" ? cats : [cat];
+  const Thumb = ({p}) => (
+    <div onClick={()=>setViewPost(p)} style={{position:"relative",aspectRatio:"1",background:t.bg3,borderRadius:10,overflow:"hidden",cursor:"pointer"}}>
+      {p.media_type === "video"
+        ? <video src={p.url + "#t=0.1"} preload="metadata" muted playsInline style={{width:"100%",height:"100%",objectFit:"cover",pointerEvents:"none"}} />
+        : <img src={p.url} alt="" loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}} />}
+      {p.media_type === "video" && <span style={{position:"absolute",right:6,top:6,background:"rgba(0,0,0,0.55)",color:"#fff",borderRadius:6,fontSize:11,padding:"1px 6px"}}>▶</span>}
+    </div>
+  );
+  return (
+    <div style={{padding:"20px 16px",maxWidth:680,margin:"0 auto"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:0}}>Souvenirs</h2>
+        <Btn accent small onClick={()=>setComposer(true)} t={t}>＋ Partager</Btn>
+      </div>
+      <StoriesBar me={me} stories={stories} onAddFile={async f=>{ const e=checkMedia(f); if(e){ alert(e); return; } await onAddStory(f); }} onOpen={(i,groups)=>setStoryView({ i, groups })} t={t} />
+      <div style={{display:"flex",gap:6,overflowX:"auto",padding:"6px 0 14px"}}>
+        {CATEGORIES.map(c=>(
+          <button key={c} onClick={()=>setCat(c)} style={{flexShrink:0,padding:"6px 12px",borderRadius:20,border:"1px solid",borderColor:cat===c?t.accent:t.border,background:cat===c?t.accentBg:"transparent",color:cat===c?t.accent:t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>
+            {CAT_ICONS[c]} {c}{c!=="Tous"&&counts[c]?` (${counts[c]})`:""}
+          </button>
+        ))}
+      </div>
+      {posts.length === 0 && <div style={{textAlign:"center",padding:"48px 10px",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13}}>Aucun souvenir pour l'instant. Partage les photos et vidéos de tes sorties !</div>}
+      {posts.length > 0 && cat !== "Tous" && !counts[cat] && <div style={{textAlign:"center",padding:"36px 10px",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13}}>Rien dans cette catégorie pour l'instant.</div>}
+      {shown.filter(c=>counts[c]).map(c=>(
+        <div key={c} style={{marginBottom:22}}>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:t.accent,letterSpacing:"0.08em",marginBottom:8}}>{CAT_ICONS[c]} {c.toUpperCase()} · {counts[c]}</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+            {posts.filter(p=>p.category===c).map(p=><Thumb key={p.id} p={p}/>)}
+          </div>
+        </div>
+      ))}
+      {composer && <PostComposer me={me} activities={activities} onClose={()=>setComposer(false)} onSubmit={onAddPost} t={t} />}
+      {viewPost && <PostViewer post={viewPost} me={me} onClose={()=>setViewPost(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} />}
+      {storyView && <StoryViewer groups={storyView.groups} startGroup={storyView.i} me={me} onClose={()=>setStoryView(null)} onDelete={onDeleteStory} t={t} />}
+    </div>
+  );
+}
+
 const colorFor = id => AVATAR_COLORS[(id?.charCodeAt(1)||0) % AVATAR_COLORS.length];
 const shapeUser = p => p && ({ ...p, avatar: p.avatar_url || null, avatarColor: colorFor(p.id), friends: [], friendReqs: [] });
 const fmtTime = iso => { const d = new Date(iso); return d.getHours().toString().padStart(2,"0")+":"+d.getMinutes().toString().padStart(2,"0"); };
@@ -1849,7 +2160,7 @@ export default function App() {
     try {
       let avatar_url = me0.avatar_url;
       if (u.avatarFile) avatar_url = await api.uploadAvatar(me0.id, u.avatarFile);
-      const p = await api.updateProfile(me0.id, { name:u.name, pseudo:u.pseudo, bio:u.bio, age:u.age, gender:u.gender, avatar_url });
+      const p = await api.updateProfile(me0.id, { name:u.name, pseudo:u.pseudo, bio:u.bio, age:u.age, gender:u.gender, avatar_url, instagram:u.instagram ?? null, tiktok:u.tiktok ?? null });
       setMe0(shapeUser(p)); refreshUsers();
     } catch(e) { fail(/duplicate|unique/i.test(e.message) ? new Error("Ce pseudo est déjà pris.") : e); }
   };
@@ -1858,6 +2169,14 @@ export default function App() {
   const [profileUser, setProfileUser] = useState(null);
   const [showPremium, setShowPremium] = useState(false);
   const [usedToday, setUsedToday] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [stories, setStories] = useState([]);
+  const refreshPosts = useCallback(()=>api.listPosts().then(r=>setPosts(r.map(p=>({...p,author:shapeUser(p.author)})))).catch(console.error),[]);
+  const refreshStories = useCallback(()=>api.listStories().then(r=>setStories(r.map(x=>({...x,author:shapeUser(x.author)})))).catch(console.error),[]);
+  const handleAddPost = async (d) => { try { await api.createPost(me0.id, d); await refreshPosts(); return true; } catch(e) { fail(e); return false; } };
+  const handleDeletePost = async (p) => { try { await api.deletePost(p); refreshPosts(); } catch(e) { fail(e); } };
+  const handleAddStory = async (f) => { try { await api.createStory(me0.id, f); await refreshStories(); } catch(e) { fail(e); } };
+  const handleDeleteStory = async (st) => { try { await api.deleteStory(st); refreshStories(); } catch(e) { fail(e); } };
   const friendIds = me0 ? friendships.filter(f=>f.status==="accepted").map(f=>f.requester_id===me0.id?f.addressee_id:f.requester_id) : [];
   const reqIds = me0 ? friendships.filter(f=>f.status==="pending"&&f.addressee_id===me0.id).map(f=>f.requester_id) : [];
   useEffect(()=>{ if (profileUser && me0 && profileUser.id!==me0.id) api.recordProfileView(profileUser.id); },[profileUser?.id]);
@@ -1882,6 +2201,7 @@ export default function App() {
   // ── Vues ───────────────────────────────────────────────────────────────────
   const pageRef = useRef("home");
   const [page, setPage] = useState("home"); // home | detail | profile | friends | settings | dm | map | notifs
+  useEffect(()=>{ if (me0 && page==="gallery") { refreshPosts(); refreshStories(); } },[page, me0?.id]);
   const [selectedId, setSelectedId] = useState(null);
   const [detailBack, setDetailBack] = useState("home");
   const mapViewRef = useRef(null);
@@ -2141,20 +2461,17 @@ export default function App() {
         <line x1="16" y1="6" x2="16" y2="22" fill="none" stroke="currentColor" strokeWidth="2"/>
       </svg>
     )},
-    { id:"friends", icon: (active) => (
-      <div style={{position:"relative",display:"inline-flex"}}>
-        <svg width="26" height="26" viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth={active?0:2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-          <circle cx="9" cy="7" r="4"/>
-          <path d="M23 21v-2a4 4 0 00-3-3.87" fill="none" stroke="currentColor" strokeWidth="2"/>
-          <path d="M16 3.13a4 4 0 010 7.75" fill="none" stroke="currentColor" strokeWidth="2"/>
-        </svg>
-        {friendReqCount>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:16,height:16,borderRadius:8,background:t.accent,color:"#fff",fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{friendReqCount}</span>}
-      </div>
+    { id:"gallery", icon: (active) => (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth={active?0:2} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="3"/>
+        <circle cx="8.5" cy="8.5" r="1.6" fill={active?"#0D0A12":"currentColor"} stroke="none"/>
+        <path d="M21 15l-5-5L5 21" fill="none" stroke={active?"#0D0A12":"currentColor"} strokeWidth="2"/>
+      </svg>
     )},
     { id:"profile", icon: (active) => (
-      <div style={{borderRadius:"50%",border:`2px solid ${active?t.accent:"transparent"}`,padding:1}}>
+      <div style={{position:"relative",borderRadius:"50%",border:`2px solid ${active?t.accent:"transparent"}`,padding:1}}>
         <Avatar user={me} size={28} t={t} />
+        {friendReqCount>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:16,height:16,borderRadius:8,background:t.accent,color:"#fff",fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{friendReqCount}</span>}
       </div>
     )},
   ];
@@ -2232,7 +2549,7 @@ export default function App() {
           {page==="home"&&(
             <div style={{maxWidth:680,margin:"0 auto",padding:"0 14px",paddingBottom:BOTTOM_NAV_H+16}}>
               <div style={{padding:"28px 8px 20px",textAlign:"center"}}>
-                <h1 style={{fontFamily:"'Fraunces',serif",fontSize:"clamp(26px,5vw,44px)",fontStyle:"italic",lineHeight:1.1,marginBottom:8,background:t.gradient,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>Trouvez votre prochaine aventure</h1>
+                <h1 style={{fontFamily:"'Fraunces',serif",fontSize:"clamp(26px,5vw,44px)",fontStyle:"italic",lineHeight:1.1,marginBottom:8,background:t.gradient,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>Plus jamais seul</h1>
                 <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,letterSpacing:"0.08em"}}>ORGANISEZ • RENCONTREZ • VIBREZ</p>
               </div>
               <div style={{marginBottom:20}}>
@@ -2301,17 +2618,27 @@ export default function App() {
             </div>
           )}
 
-          {/* FRIENDS */}
+          {/* SOUVENIRS (photos, vidéos, stories) */}
+          {page==="gallery"&&(
+            <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
+              <GalleryPage me={me} posts={posts.filter(p=>!blockedIds.includes(p.user_id))} stories={stories.filter(x=>!blockedIds.includes(x.user_id))} activities={activities}
+                onOpenProfile={setProfileUser} onAddPost={handleAddPost} onDeletePost={handleDeletePost} onAddStory={handleAddStory} onDeleteStory={handleDeleteStory} t={t} />
+            </div>
+          )}
+
+          {/* AMIS : dans le profil */}
           {page==="friends"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onBack={()=>setPage("home")} onOpenDM={openDM} t={t} />
+              <MyProfilePage currentUser={me} startTab="friends" onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")}
+                friendsView={<FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onOpenDM={openDM} embedded t={t} />} t={t} />
             </div>
           )}
 
           {/* MY PROFILE */}
           {page==="profile"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <MyProfilePage currentUser={me} onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} t={t} />
+              <MyProfilePage currentUser={me} onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")}
+                friendsView={<FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onOpenDM={openDM} embedded t={t} />} t={t} />
             </div>
           )}
 
@@ -2336,7 +2663,7 @@ export default function App() {
             {/* gradient top border */}
             <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:t.gradient,opacity:0.6}}/>
             {NAV.map(({id,icon})=>{
-              const active = page===id || (id==="notifs"&&page==="notifs");
+              const active = page===id || (id==="profile"&&page==="friends");
               const isCreate = id==="create";
               return (
                 <button
@@ -2347,7 +2674,7 @@ export default function App() {
                   {icon(active)}
                   {!isCreate&&(
                     <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",letterSpacing:"0.04em",color:active?"#E8008A":t.text3,fontWeight:active?700:400,marginTop:1}}>
-                      {id==="home"?"Accueil":id==="messages"?"Messages":id==="map"?"Carte":id==="friends"?"Amis":"Profil"}
+                      {id==="home"?"Accueil":id==="messages"?"Messages":id==="map"?"Carte":id==="gallery"?"Souvenirs":"Profil"}
                     </span>
                   )}
                   {active&&!isCreate&&(

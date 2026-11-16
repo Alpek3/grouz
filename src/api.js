@@ -217,7 +217,7 @@ export const reportUser = (me, other, reason, details = "", context = "profile",
 
 // ── SUPPRESSION DU COMPTE ───────────────────────────────────────
 export async function deleteMyAccount(userId) {
-  for (const bucket of ["avatars", "voices", "media", "activity-photos"]) {   // d'abord les fichiers
+  for (const bucket of ["avatars", "voices", "media", "activity-photos", "posts", "stories"]) {   // d'abord les fichiers
     try {
       const { data } = await supabase.storage.from(bucket).list(userId, { limit: 1000 });
       if (data?.length) await supabase.storage.from(bucket).remove(data.map(f => `${userId}/${f.name}`));
@@ -240,3 +240,53 @@ export const recordProfileView = (profileId) =>
   supabase.rpc("record_profile_view", { p: profileId }).then(({ error }) => { if (error) console.warn(error); });
 
 export const myProfileViewers = () => supabase.rpc("my_profile_viewers").then(ok);
+
+// ── SOUVENIRS (photos / vidéos) ─────────────────────────────────
+const fileExt = (file, kind) => (file.name?.split(".").pop() || (kind === "video" ? "mp4" : "jpg")).toLowerCase().replace(/[^a-z0-9]/g, "");
+const kindOf = (file) => (file.type || "").startsWith("video") ? "video" : "image";
+const pubUrl = (bucket, path) => supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+
+export const listPosts = () =>
+  supabase.from("posts").select("*, author:profiles!user_id(*), activity:activities!activity_id(id,title)")
+    .order("created_at", { ascending: false }).limit(300)
+    .then(ok).then(rows => rows.map(p => ({ ...p, url: pubUrl("posts", p.media_path) })));
+
+export async function createPost(userId, { file, category, caption, activityId }) {
+  const media_type = kindOf(file);
+  const media_path = `${userId}/${Date.now()}.${fileExt(file, media_type)}`;
+  ok(await supabase.storage.from("posts").upload(media_path, file, { contentType: file.type || undefined }));
+  return supabase.from("posts").insert({ user_id: userId, category, caption: caption || null, activity_id: activityId || null, media_path, media_type }).then(ok);
+}
+
+export async function deletePost(post) {
+  ok(await supabase.from("posts").delete().eq("id", post.id));
+  try { await supabase.storage.from("posts").remove([post.media_path]); } catch {}
+}
+
+// ── STORIES (24 h) ──────────────────────────────────────────────
+export const listStories = () =>
+  supabase.from("stories").select("*, author:profiles!user_id(*)")
+    .gt("created_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString())
+    .order("created_at", { ascending: true })
+    .then(ok).then(rows => rows.map(s => ({ ...s, url: pubUrl("stories", s.media_path) })));
+
+export async function createStory(userId, file) {
+  const media_type = kindOf(file);
+  const media_path = `${userId}/${Date.now()}.${fileExt(file, media_type)}`;
+  ok(await supabase.storage.from("stories").upload(media_path, file, { contentType: file.type || undefined }));
+  // ménage : on supprime mes anciennes stories expirées (lignes + fichiers)
+  try {
+    const old = ok(await supabase.from("stories").select("id, media_path").eq("user_id", userId)
+      .lt("created_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString()));
+    if (old?.length) {
+      await supabase.from("stories").delete().in("id", old.map(o => o.id));
+      await supabase.storage.from("stories").remove(old.map(o => o.media_path));
+    }
+  } catch {}
+  return supabase.from("stories").insert({ user_id: userId, media_path, media_type }).then(ok);
+}
+
+export async function deleteStory(story) {
+  ok(await supabase.from("stories").delete().eq("id", story.id));
+  try { await supabase.storage.from("stories").remove([story.media_path]); } catch {}
+}
