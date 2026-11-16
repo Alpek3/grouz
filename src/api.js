@@ -265,7 +265,7 @@ export async function deletePost(post) {
 
 // ── STORIES (24 h) ──────────────────────────────────────────────
 export const listStories = () =>
-  supabase.from("stories").select("*, author:profiles!user_id(*), likes:story_likes(user_id)")
+  supabase.from("stories").select("*, author:profiles!user_id(*), likes:story_likes(user_id), views:story_views(viewer_id)")
     .gt("created_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString())
     .order("created_at", { ascending: true })
     .then(ok).then(rows => rows.map(s => ({ ...s, url: pubUrl("stories", s.media_path) })));
@@ -295,9 +295,67 @@ export async function deleteStory(story) {
 export const likePost = (postId, userId) => supabase.from("post_likes").insert({ post_id: postId, user_id: userId }).then(ok);
 export const unlikePost = (postId, userId) => supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", userId).then(ok);
 export const listComments = (postId) =>
-  supabase.from("post_comments").select("*, author:profiles!user_id(*)").eq("post_id", postId).order("created_at").then(ok);
-export const addComment = (postId, userId, text) =>
-  supabase.from("post_comments").insert({ post_id: postId, user_id: userId, text }).then(ok);
+  supabase.from("post_comments").select("*, author:profiles!user_id(*), likes:comment_likes(user_id)").eq("post_id", postId).order("created_at").then(ok);
+export const addComment = (postId, userId, text, parentId = null) =>
+  supabase.from("post_comments").insert({ post_id: postId, user_id: userId, text, parent_id: parentId }).then(ok);
 export const deleteComment = (id) => supabase.from("post_comments").delete().eq("id", id).then(ok);
 export const likeStory = (storyId, userId) => supabase.from("story_likes").insert({ story_id: storyId, user_id: userId }).then(ok);
 export const unlikeStory = (storyId, userId) => supabase.from("story_likes").delete().eq("story_id", storyId).eq("user_id", userId).then(ok);
+export const likeComment = (commentId, userId) => supabase.from("comment_likes").insert({ comment_id: commentId, user_id: userId }).then(ok);
+export const unlikeComment = (commentId, userId) => supabase.from("comment_likes").delete().eq("comment_id", commentId).eq("user_id", userId).then(ok);
+
+// ── QUI A VU MA STORY ───────────────────────────────────────────
+export const recordStoryView = (storyId, userId) =>
+  supabase.from("story_views").upsert({ story_id: storyId, viewer_id: userId }, { onConflict: "story_id,viewer_id", ignoreDuplicates: true }).then(({ error }) => { if (error) console.warn(error); });
+export const listStoryViews = (storyId) =>
+  supabase.from("story_views").select("viewer_id, viewed_at, viewer:profiles!viewer_id(*)").eq("story_id", storyId).order("viewed_at", { ascending: false }).then(ok);
+
+// ── GROUPES DE DISCUSSION ───────────────────────────────────────
+export const listGroups = () =>
+  supabase.from("group_chats").select("*, members:group_members(user_id, role, user:profiles(*))").order("created_at", { ascending: false }).then(ok);
+
+export async function createGroup(me, name, memberIds) {
+  const g = ok(await supabase.from("group_chats").insert({ name, created_by: me }).select().single());
+  if (memberIds.length) ok(await supabase.from("group_members").insert(memberIds.map(id => ({ group_id: g.id, user_id: id }))));
+  return g;
+}
+export const renameGroup = (id, name) => supabase.from("group_chats").update({ name }).eq("id", id).then(ok);
+export const addGroupMembers = (groupId, ids) => supabase.from("group_members").insert(ids.map(id => ({ group_id: groupId, user_id: id }))).then(ok);
+export const removeGroupMember = (groupId, userId) => supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", userId).then(ok);
+export const deleteGroup = (id) => supabase.from("group_chats").delete().eq("id", id).then(ok);
+
+export const listGroupMessages = (groupId) =>
+  supabase.from("group_messages").select("*, sender:profiles!sender_id(*)").eq("group_id", groupId).order("created_at").limit(500).then(ok);
+export const listRecentGroupMessages = () =>
+  supabase.from("group_messages").select("*").order("created_at", { ascending: false }).limit(300).then(ok);
+export const sendGroupMessage = (groupId, me, text) =>
+  supabase.from("group_messages").insert({ group_id: groupId, sender_id: me, text }).then(ok);
+export async function sendGroupVoice(groupId, me, blob, duration) {
+  const audio_path = await uploadVoice(me, blob);
+  return supabase.from("group_messages").insert({ group_id: groupId, sender_id: me, type: "voice", audio_path, duration }).then(ok);
+}
+export async function sendGroupMedia(groupId, me, kind, file) {
+  const ext = (file.name?.split(".").pop() || (kind === "video" ? "mp4" : "jpg")).toLowerCase();
+  const media_path = `${me}/${Date.now()}.${ext}`;
+  ok(await supabase.storage.from("media").upload(media_path, file, { contentType: file.type || undefined }));
+  return supabase.from("group_messages").insert({ group_id: groupId, sender_id: me, type: kind, media_path }).then(ok);
+}
+export const sendGroupGif = (groupId, me, url) =>
+  supabase.from("group_messages").insert({ group_id: groupId, sender_id: me, type: "gif", media_url: url }).then(ok);
+export const subscribeGroupMessages = (groupId, cb) =>
+  supabase.channel(`grp-${groupId}`)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "group_messages", filter: `group_id=eq.${groupId}` }, p => cb(p.new))
+    .subscribe();
+export const markGroupNotifsRead = (userId, groupId) =>
+  supabase.from("notifications").update({ read: true }).eq("user_id", userId).eq("kind", "group_message").eq("ref_id", groupId).eq("read", false).then(ok);
+export const transferGroupAdmin = (groupId, newAdmin) => supabase.rpc("transfer_group_admin", { g: groupId, new_admin: newAdmin }).then(ok);
+
+// ── PHOTOS / VIDÉOS / GIF dans les discussions de sortie ────────
+export async function sendActivityMedia(activityId, userId, kind, file) {
+  const ext = (file.name?.split(".").pop() || (kind === "video" ? "mp4" : "jpg")).toLowerCase();
+  const media_path = `${userId}/${Date.now()}.${ext}`;
+  ok(await supabase.storage.from("media").upload(media_path, file, { contentType: file.type || undefined }));
+  return supabase.from("activity_messages").insert({ activity_id: activityId, sender_id: userId, type: kind, media_path }).then(ok);
+}
+export const sendActivityGif = (activityId, userId, url) =>
+  supabase.from("activity_messages").insert({ activity_id: activityId, sender_id: userId, type: "gif", media_url: url }).then(ok);

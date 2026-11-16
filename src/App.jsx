@@ -993,7 +993,7 @@ function GifPicker({ userId, onPick, onClose, t }) {
   );
 }
 
-function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onOpenProfile, onBack, onCall, t}) {
+function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onOpenProfile, onBack, onCall, group, onOpenInfo, statusName, t}) {
   const bottomRef = useRef();
   const [pending, setPending] = useState(null);   // fichier choisi, en attente de confirmation
   const [sending, setSending] = useState(false);
@@ -1026,10 +1026,10 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
         <button onClick={onBack} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center"}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <div onClick={onOpenProfile} style={{cursor:"pointer",display:"flex"}}><Avatar user={otherUser} size={36} t={t} /></div>
-        <div onClick={onOpenProfile} style={{minWidth:0,cursor:"pointer"}}>
-          <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0,fontSize:15}}>{otherUser.name}</p>
-          {statusText
+        <div onClick={group?onOpenInfo:onOpenProfile} style={{cursor:"pointer",display:"flex"}}>{group ? <GroupAvatar group={group} size={40} t={t}/> : <Avatar user={otherUser} size={36} t={t} />}</div>
+        <div onClick={group?onOpenInfo:onOpenProfile} style={{minWidth:0,cursor:"pointer"}}>
+          <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0,fontSize:15}}>{group ? group.name : otherUser.name}</p>
+          {group ? <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>{group.memberUsers.length} membres · infos</p> : statusText
             ? <p style={{color:t.accent,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic",fontSize:11,margin:0}}>{statusText}</p>
             : <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>@{otherUser.pseudo}</p>}
         </div>
@@ -1047,10 +1047,12 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
         {messages.map((m,i)=>{
           const isMe = m.senderId===currentUser.id;
           const isMedia = m.type==="image" || m.type==="video" || m.type==="gif";
+          const sender = group ? (m.sender || group.memberUsers.find(u=>u.id===m.senderId)) : otherUser;
           return (
             <div key={m.id||i} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:8,marginBottom:14,alignItems:"flex-end"}}>
-              {!isMe&&<Avatar user={otherUser} size={28} t={t} />}
+              {!isMe&&<div onClick={group?()=>onOpenProfile(sender):undefined} style={{cursor:group?"pointer":"default",display:"flex"}}><Avatar user={sender} size={28} t={t} /></div>}
               <div style={{maxWidth:"72%",display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start"}}>
+                {group && !isMe && <span style={{fontSize:11,color:t.accent,fontFamily:"'DM Mono',monospace",margin:"0 0 3px 4px"}}>{sender?.pseudo}</span>}
                 {m.type==="voice" ? (
                   <VoiceMessageBubble msg={m} isMe={isMe} t={t} />
                 ) : isMedia ? (
@@ -1065,7 +1067,7 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
             </div>
           );
         })}
-        {statusText && <p style={{fontStyle:"italic",fontSize:11,color:t.text3,fontFamily:"'DM Sans',sans-serif",margin:"0 0 6px 36px"}}>{otherUser.name.split(" ")[0]} {statusText}</p>}
+        {statusText && <p style={{fontStyle:"italic",fontSize:11,color:t.text3,fontFamily:"'DM Sans',sans-serif",margin:"0 0 6px 36px"}}>{group ? statusName : otherUser.name.split(" ")[0]} {statusText}</p>}
         <div ref={bottomRef}/>
       </div>
       <ChatInputBar onSend={onSend} onVoiceSend={onVoiceSend} onStatus={onStatus} onPickFile={pickFile}
@@ -1108,8 +1110,23 @@ function NotifPanel({notifs, onMarkRead, onOpen, onClose, t}) {
 // ════════════════════════════════════════════════════════════════════════════════
 // ACTIVITY DETAIL
 // ════════════════════════════════════════════════════════════════════════════════
-function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMessage,onSendVoice,onJoin,onOpenProfile,onDelete,t}) {
+function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMessage,onSendVoice,onSendMedia,onSendGif,onJoin,onOpenProfile,onDelete,t}) {
   const bottomRef=useRef();
+  const [pending,setPending]=useState(null);
+  const [sending,setSending]=useState(false);
+  const [gifOpen,setGifOpen]=useState(false);
+  const [viewer,setViewer]=useState(null);
+  const pickFile=(file)=>{
+    const kind=file.type.startsWith("video/")?"video":file.type.startsWith("image/")?"image":null;
+    if(!kind){ alert("Choisis une photo ou une vidéo."); return; }
+    if(file.size>30*1024*1024){ alert("Fichier trop lourd (30 Mo maximum)."); return; }
+    setPending({file,kind,url:URL.createObjectURL(file)});
+  };
+  const closePending=()=>{ if(pending) URL.revokeObjectURL(pending.url); setPending(null); };
+  const confirmSend=async()=>{
+    if(!pending) return; setSending(true);
+    try{ const f=pending.kind==="image"?await compressImage(pending.file):pending.file; await onSendMedia(activity.id,pending.kind,f); closePending(); } finally{ setSending(false); }
+  };
   const isCreator=activity.creator?.id===currentUser.id;
   const isMember=activity.accepted?.some(u=>u.id===currentUser.id);
   const isPending=activity.pending?.some(u=>u.id===currentUser.id);
@@ -1186,6 +1203,8 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
                       {!isMe&&<p style={{margin:"0 0 3px",fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace"}}>{m.sender?.name}</p>}
                       {m.type==="voice" ? (
                         <VoiceMessageBubble msg={m} isMe={isMe} t={t} />
+                      ) : (m.type==="image"||m.type==="video"||m.type==="gif") ? (
+                        <MediaBubble msg={m} isMe={isMe} t={t} onOpen={setViewer} />
                       ) : (
                         <div style={{background:isMe?t.accent:t.bg3,borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",color:isMe?"#fff":t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,border:isMe?"none":`1px solid ${t.border}`}}>{m.text}</div>
                       )}
@@ -1203,7 +1222,12 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
             t={t}
             placeholder="Écrire au groupe…"
             padH={24}
+            onPickFile={pickFile}
+            onGif={gifsEnabled ? ()=>setGifOpen(true) : null}
           />
+          {pending && <MediaPreviewModal pending={pending} sending={sending} onSend={confirmSend} onCancel={closePending} t={t} />}
+          {gifOpen && <GifPicker userId={currentUser.id} t={t} onClose={()=>setGifOpen(false)} onPick={url=>{ setGifOpen(false); onSendGif(activity.id,url); }} />}
+          {viewer && <MediaViewer item={viewer} onClose={()=>setViewer(null)} />}
         </>
       ):(
         <div style={{padding:"12px 24px 28px",textAlign:"center"}}>
@@ -1808,25 +1832,134 @@ function NearbySheet({ users, loading, radius, onRadius, geoStatus, hasPos, shar
   );
 }
 
-function MessagesPage({ friends, last, myId, onOpenDM, onGoFriends, t }) {
-  const sorted = [...friends].sort((a,b)=>(last[b.id]?.created_at||"").localeCompare(last[a.id]?.created_at||""));
+// ── GROUPES DE DISCUSSION ───────────────────────────────────────
+function GroupAvatar({ group, size=46, t }) {
+  const m = (group.memberUsers || []).slice(0, 2);
+  const s = Math.round(size * 0.66);
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      {m[1] && <div style={{ position: "absolute", right: 0, top: 0 }}><Avatar user={m[1]} size={s} t={t} /></div>}
+      {m[0] && <div style={{ position: "absolute", left: 0, bottom: 0, border: `2px solid ${t.bg2}`, borderRadius: "50%" }}><Avatar user={m[0]} size={s} t={t} /></div>}
+    </div>
+  );
+}
+
+function FriendPicker({ friends, selected, onToggle, t, maxH=260 }) {
+  const [q, setQ] = useState("");
+  const list = friends.filter(u => !q || (u.name + " " + u.pseudo).toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Rechercher un ami…" style={{width:"100%",padding:"10px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:8}} />
+      <div style={{maxHeight:maxH,overflowY:"auto"}}>
+        {list.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Aucun ami.</p>}
+        {list.map(u=>{ const on = selected.includes(u.id); return (
+          <div key={u.id} onClick={()=>onToggle(u.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 4px",cursor:"pointer"}}>
+            <Avatar user={u} size={38} t={t}/>
+            <div style={{flex:1,color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14}}>{u.name}<div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>@{u.pseudo}</div></div>
+            <span style={{width:22,height:22,borderRadius:"50%",border:`2px solid ${on?t.accent:t.border}`,background:on?t.accent:"transparent",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>{on?"✓":""}</span>
+          </div>); })}
+      </div>
+    </div>
+  );
+}
+
+function NewGroupModal({ friends, onCreate, onClose, t }) {
+  const [name, setName] = useState("");
+  const [sel, setSel] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const toggle = id => setSel(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
+  const ok = name.trim() && sel.length >= 2;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",padding:24}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:22,color:t.text}}>Nouveau groupe</h2>
+          <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
+        </div>
+        <input value={name} onChange={e=>setName(e.target.value.slice(0,40))} placeholder="Nom du groupe" style={{width:"100%",padding:"12px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:15,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:14}} />
+        <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.08em",margin:"0 0 6px"}}>AJOUTER DES AMIS ({sel.length}) — 2 MINIMUM</p>
+        <FriendPicker friends={friends} selected={sel} onToggle={toggle} t={t} />
+        <Btn accent disabled={!ok||busy} onClick={async()=>{ setBusy(true); const done = await onCreate(name.trim(), sel); setBusy(false); if (done) onClose(); }} t={t} style={{width:"100%",padding:"14px",marginTop:14}}>{busy?"CRÉATION…":"CRÉER LE GROUPE"}</Btn>
+      </div>
+    </div>
+  );
+}
+
+function GroupInfoModal({ group, me, friends, onClose, onRename, onAdd, onRemove, onLeave, onDelete, onTransfer, onOpenProfile, t }) {
+  const isAdmin = group.created_by === me.id;
+  const [name, setName] = useState(group.name);
+  const [adding, setAdding] = useState(false);
+  const [sel, setSel] = useState([]);
+  const memberIds = group.memberUsers.map(u=>u.id);
+  const candidates = friends.filter(u=>!memberIds.includes(u.id));
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:260,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",padding:24}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:22,color:t.text}}>Infos du groupe</h2>
+          <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
+        </div>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><GroupAvatar group={group} size={72} t={t}/></div>
+        {isAdmin
+          ? <div style={{display:"flex",gap:8,marginBottom:16}}>
+              <input value={name} onChange={e=>setName(e.target.value.slice(0,40))} style={{flex:1,padding:"10px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:15,fontFamily:"'DM Sans',sans-serif",outline:"none"}} />
+              <Btn small accent disabled={!name.trim()||name.trim()===group.name} onClick={()=>onRename(name.trim())} t={t}>OK</Btn>
+            </div>
+          : <h3 style={{textAlign:"center",margin:"0 0 16px",fontFamily:"'Fraunces',serif",color:t.text}}>{group.name}</h3>}
+        <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.08em",margin:"0 0 6px"}}>{group.memberUsers.length} MEMBRES</p>
+        {group.memberUsers.map(u=>(
+          <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0"}}>
+            <div onClick={()=>{ onClose(); onOpenProfile(u); }} style={{cursor:"pointer",display:"flex"}}><Avatar user={u} size={40} t={t}/></div>
+            <div style={{flex:1,color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14}}>{u.name}{u.id===me.id?" (toi)":""}<div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>@{u.pseudo}</div></div>
+            {u.id===group.created_by && <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:t.accent,border:`1px solid ${t.accent}66`,borderRadius:6,padding:"2px 6px"}}>ADMIN</span>}
+            {isAdmin && u.id!==me.id && <button onClick={()=>{ if (window.confirm(`Nommer ${u.name} administrateur ? Tu deviendras simple membre.`)) onTransfer(u); }} style={{background:"none",border:`1px solid ${t.border}`,borderRadius:8,color:t.text2,cursor:"pointer",fontSize:10,fontFamily:"'DM Mono',monospace",padding:"3px 6px"}}>Nommer admin</button>}
+            {isAdmin && u.id!==me.id && <button onClick={()=>{ if (window.confirm(`Retirer ${u.name} du groupe ?`)) onRemove(u); }} aria-label="Retirer" style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontSize:16}}>✕</button>}
+          </div>
+        ))}
+        {isAdmin && (adding ? (
+          <div style={{marginTop:10}}>
+            <FriendPicker friends={candidates} selected={sel} onToggle={id=>setSel(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id])} t={t} maxH={200} />
+            <div style={{display:"flex",gap:8,marginTop:10}}>
+              <Btn onClick={()=>{ setAdding(false); setSel([]); }} t={t} style={{flex:1}}>Annuler</Btn>
+              <Btn accent disabled={!sel.length} onClick={async()=>{ await onAdd(sel); setAdding(false); setSel([]); }} t={t} style={{flex:1}}>Ajouter ({sel.length})</Btn>
+            </div>
+          </div>
+        ) : <Btn onClick={()=>setAdding(true)} disabled={!candidates.length} t={t} style={{width:"100%",marginTop:10}}>{candidates.length?"＋ Ajouter des membres":"Tous tes amis sont déjà dans le groupe"}</Btn>)}
+        <button onClick={()=>{ if (window.confirm(isAdmin ? "Quitter ce groupe ? Le plus ancien membre deviendra administrateur." : "Quitter ce groupe ?")) onLeave(); }}
+          style={{marginTop:16,width:"100%",padding:"12px",borderRadius:12,background:"transparent",border:`1px solid ${t.accent}66`,color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer"}}>🚪 Quitter le groupe</button>
+        {isAdmin && <button onClick={()=>{ if (window.confirm("Supprimer ce groupe pour tout le monde ?")) onDelete(); }}
+          style={{marginTop:8,width:"100%",padding:"12px",borderRadius:12,background:"transparent",border:`1px solid ${t.border}`,color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer"}}>🗑 Supprimer le groupe pour tous</button>}
+      </div>
+    </div>
+  );
+}
+
+function MessagesPage({ friends, last, myId, onOpenDM, onGoFriends, groups=[], lastGroup={}, onOpenGroup, onNewGroup, t }) {
+  const items = [
+    ...friends.map(u=>({ kind:"dm", key:"u"+u.id, user:u, m:last[u.id] })),
+    ...groups.map(g=>({ kind:"group", key:"g"+g.id, group:g, m:lastGroup[g.id] })),
+  ].sort((a,b)=>(b.m?.created_at||b.group?.created_at||"").localeCompare(a.m?.created_at||a.group?.created_at||""));
   return (
     <div style={{padding:"20px 24px",maxWidth:600,margin:"0 auto"}}>
-      <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:"0 0 20px"}}>Messages</h2>
-      {sorted.length===0 && (
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"0 0 20px"}}>
+        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:0}}>Messages</h2>
+        {friends.length>=2 && <Btn accent small onClick={onNewGroup} t={t}>＋ Groupe</Btn>}
+      </div>
+      {items.length===0 && (
         <div style={{textAlign:"center",padding:"40px 12px",background:t.bg2,border:`1px dashed ${t.border}`,borderRadius:16}}>
           <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:14,margin:"0 0 14px",lineHeight:1.5}}>Tu pourras discuter ici avec tes amis.<br/>Ajoute-en depuis leur profil pour commencer.</p>
           <Btn accent onClick={onGoFriends} t={t}>Voir mes amis</Btn>
         </div>
       )}
-      {sorted.map(u=>{
-        const m = last[u.id];
-        const preview = !m ? "Commence la conversation" : (m.sender_id===myId?"Toi : ":"") + dmPreview(m);
+      {items.map(it=>{
+        const m = it.m;
+        const who = m && m.sender_id===myId ? "Toi : " : (it.kind==="group" && m ? ((it.group.memberUsers.find(u=>u.id===m.sender_id)?.pseudo||"") + " : ") : "");
+        const preview = !m ? (it.kind==="group" ? "Groupe créé" : "Commence la conversation") : who + dmPreview(m);
         return (
-          <div key={u.id} onClick={()=>onOpenDM(u)} style={{display:"flex",alignItems:"center",gap:12,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 16px",marginBottom:8,cursor:"pointer"}}>
-            <Avatar user={u} size={46} t={t} />
+          <div key={it.key} onClick={()=>it.kind==="group" ? onOpenGroup(it.group) : onOpenDM(it.user)} style={{display:"flex",alignItems:"center",gap:12,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 16px",marginBottom:8,cursor:"pointer"}}>
+            {it.kind==="group" ? <GroupAvatar group={it.group} size={46} t={t}/> : <Avatar user={it.user} size={46} t={t} />}
             <div style={{flex:1,minWidth:0}}>
-              <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0}}>{u.name}</p>
+              <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0}}>{it.kind==="group" ? "👥 "+it.group.name : it.user.name}</p>
               <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:"2px 0 0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{preview}</p>
             </div>
             {m && <span style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10}}>{fmtTime(m.created_at)}</span>}
@@ -1949,6 +2082,8 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
   const [paused, setPaused] = useState(false);
   const [text, setText] = useState("");
   const [sent, setSent] = useState(false);
+  const [viewersOpen, setViewersOpen] = useState(false);
+  const [viewers, setViewers] = useState(null);
   const [likedMap, setLikedMap] = useState(() => { const m = {}; groups.forEach(g => g.items.forEach(s => { m[s.id] = !!s.likes?.some(l => l.user_id === me.id); })); return m; });
   const elapsed = useRef(0);
   const vref = useRef(null);
@@ -1959,7 +2094,7 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
     else onClose();
   }, [si, gi, group, groups, onClose]);
   const prev = () => { if (si > 0) { setSi(si - 1); setProg(0); } else if (gi > 0) { setGi(gi - 1); setSi(0); setProg(0); } else setProg(0); };
-  useEffect(()=>{ if (story) writeSeen(story.id); elapsed.current = 0; setText(""); setSent(false); },[story?.id]);
+  useEffect(()=>{ if (story) { writeSeen(story.id); if (story.user_id !== me.id) actions.viewStory(story); } elapsed.current = 0; setText(""); setSent(false); setViewersOpen(false); },[story?.id]);
   useEffect(()=>{
     if (!story || story.media_type === "video" || paused) return;
     let last = Date.now();
@@ -1997,9 +2132,27 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
         </div>
         <div onClick={prev} style={{position:"absolute",left:0,top:90,bottom:100,width:"33%"}}/>
         <div onClick={next} style={{position:"absolute",right:0,top:90,bottom:100,width:"67%"}}/>
+        {viewersOpen && (
+          <div style={{position:"absolute",left:0,right:0,bottom:0,maxHeight:"65%",background:t.bg2,borderRadius:"20px 20px 0 0",padding:"16px 16px calc(16px + env(safe-area-inset-bottom, 0px))",overflowY:"auto",zIndex:5}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <h3 style={{margin:0,fontFamily:"'Fraunces',serif",color:t.text,fontSize:18}}>Vu par {viewers ? viewers.length : ""}</h3>
+              <button onClick={()=>{ setViewersOpen(false); setPaused(false); }} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
+            </div>
+            {viewers===null && <p style={{color:t.text3,fontSize:13}}>Chargement…</p>}
+            {viewers && viewers.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Personne n'a encore vu ta story.</p>}
+            {viewers && viewers.map(v=>{ const u = shapeUser(v.viewer); const l = story.likes?.some(x=>x.user_id===v.viewer_id); return (
+              <div key={v.viewer_id} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0"}}>
+                <Avatar user={u} size={40} t={t}/>
+                <div style={{flex:1,color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14}}>{u.name}<div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>@{u.pseudo} · {agoLabel(v.viewed_at)}</div></div>
+                {l && <HeartIcon size={20} filled />}
+              </div>); })}
+          </div>
+        )}
         <div style={{position:"absolute",left:0,right:0,bottom:0,padding:"30px 12px calc(14px + env(safe-area-inset-bottom, 0px))",background:"linear-gradient(transparent,rgba(0,0,0,0.65))"}}>
           {mine ? (
-            <div style={{color:"#fff",fontFamily:"'DM Mono',monospace",fontSize:13,textAlign:"center",opacity:0.9}}>❤️ {likeCount} j'aime</div>
+            <button onClick={()=>{ setViewersOpen(true); setPaused(true); setViewers(null); actions.listStoryViews(story).then(setViewers).catch(()=>setViewers([])); }} style={{display:"flex",alignItems:"center",gap:14,margin:"0 auto",background:"rgba(0,0,0,0.35)",border:"none",color:"#fff",fontFamily:"'DM Mono',monospace",fontSize:13,padding:"10px 18px",borderRadius:22,cursor:"pointer"}}>
+              <span>👁 {story.views?.length || 0} vue{(story.views?.length||0)>1?"s":""}</span><span>❤️ {likeCount}</span><span style={{opacity:0.7}}>▲</span>
+            </button>
           ) : (
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <input value={text} onChange={e=>setText(e.target.value.slice(0,300))} onFocus={()=>setPaused(true)} onBlur={()=>setPaused(false)} onKeyDown={e=>{ if (e.key==="Enter") reply(); }}
@@ -2128,10 +2281,35 @@ function PostViewer({ post, me, onClose, onOpenProfile, onDelete, actions, t }) 
   const [showC, setShowC] = useState(false);
   const [comments, setComments] = useState(null);
   const [txt, setTxt] = useState("");
+  const [replyTo, setReplyTo] = useState(null);   // { rootId, pseudo }
   const liked = !!post.likes?.some(l=>l.user_id===me.id);
+  const toggleCLike = (c) => {
+    const isL = c.likes?.some(l=>l.user_id===me.id);
+    setComments(cs=>cs.map(x=>x.id!==c.id?x:{...x, likes: isL ? x.likes.filter(l=>l.user_id!==me.id) : [...(x.likes||[]),{user_id:me.id}]}));
+    actions.likeComment(c, isL);
+  };
   const loadC = () => actions.loadComments(post.id).then(r=>setComments(r.map(c=>({...c,author:shapeUser(c.author)})))).catch(()=>setComments([]));
   useEffect(()=>{ if (showC) loadC(); },[showC]);
-  const sendC = async () => { const v = txt.trim(); if (!v) return; setTxt(""); await actions.addComment(post, v); loadC(); };
+  const sendC = async () => { const v = txt.trim(); if (!v) return; setTxt(""); const parent = replyTo?.rootId || null; setReplyTo(null); await actions.addComment(post, v, parent); loadC(); };
+  const startReply = (c) => { const root = c.parent_id || c.id; setReplyTo({ rootId: root, pseudo: c.author?.pseudo }); setTxt(`@${c.author?.pseudo} `); };
+  const CommentRow = ({c, reply}) => {
+    const isL = c.likes?.some(l=>l.user_id===me.id);
+    return (
+      <div style={{display:"flex",gap:10,padding:"6px 0",marginLeft:reply?38:0}}>
+        <div onClick={()=>{ onClose(); onOpenProfile(c.author); }} style={{cursor:"pointer"}}><Avatar user={c.author} size={reply?24:28} t={t}/></div>
+        <div style={{flex:1,fontFamily:"'DM Sans',sans-serif",fontSize:13,color:t.text,lineHeight:1.4}}>
+          <b>{c.author?.pseudo}</b> {c.text}
+          <div style={{display:"flex",gap:12,alignItems:"center",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,marginTop:2}}>
+            <span>{agoLabel(c.created_at)}</span>
+            {c.likes?.length>0 && <span>{c.likes.length} j'aime</span>}
+            <button onClick={()=>startReply(c)} style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontFamily:"inherit",fontSize:10,padding:0,fontWeight:700}}>Répondre</button>
+            {(c.user_id===me.id || post.user_id===me.id) && <button onClick={async()=>{ await actions.deleteComment(post, c); loadC(); }} style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontFamily:"inherit",fontSize:10,padding:0}}>Supprimer</button>}
+          </div>
+        </div>
+        <button onClick={()=>toggleCLike(c)} aria-label="J'aime ce commentaire" style={{background:"none",border:"none",cursor:"pointer",padding:2,alignSelf:"flex-start",display:"flex"}}><HeartIcon size={16} filled={isL} color={t.text3}/></button>
+      </div>
+    );
+  };
   const ab = {background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:6,color:t.text,padding:4,fontFamily:"'DM Mono',monospace",fontSize:13};
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:260,display:"flex",alignItems:"center",justifyContent:"center",padding:14}}>
@@ -2158,13 +2336,13 @@ function PostViewer({ post, me, onClose, onOpenProfile, onDelete, actions, t }) 
             <div style={{marginTop:12,borderTop:`1px solid ${t.border}`,paddingTop:10}}>
               {comments===null && <p style={{color:t.text3,fontSize:13}}>Chargement…</p>}
               {comments && comments.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Aucun commentaire. Sois le premier !</p>}
-              {comments && comments.map(c=>(
-                <div key={c.id} style={{display:"flex",gap:10,padding:"6px 0"}}>
-                  <div onClick={()=>{ onClose(); onOpenProfile(c.author); }} style={{cursor:"pointer"}}><Avatar user={c.author} size={28} t={t}/></div>
-                  <div style={{flex:1,fontFamily:"'DM Sans',sans-serif",fontSize:13,color:t.text,lineHeight:1.4}}><b>{c.author?.pseudo}</b> {c.text}<div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10}}>{agoLabel(c.created_at)}</div></div>
-                  {(c.user_id===me.id || post.user_id===me.id) && <button onClick={async()=>{ await actions.deleteComment(post, c); loadC(); }} aria-label="Supprimer" style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontSize:14}}>🗑</button>}
+              {comments && comments.filter(c=>!c.parent_id).map(c=>(
+                <div key={c.id}>
+                  <CommentRow c={c} />
+                  {comments.filter(r=>r.parent_id===c.id).map(r=><CommentRow key={r.id} c={r} reply />)}
                 </div>
               ))}
+              {replyTo && <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6,fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace"}}>Réponse à @{replyTo.pseudo}<button onClick={()=>{ setReplyTo(null); setTxt(""); }} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontSize:12}}>Annuler</button></div>}
               <div style={{display:"flex",gap:8,marginTop:8}}>
                 <input value={txt} onChange={e=>setTxt(e.target.value.slice(0,300))} onKeyDown={e=>{ if (e.key==="Enter") sendC(); }} placeholder="Ajouter un commentaire…" style={{flex:1,padding:"10px 14px",borderRadius:20,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none"}} />
                 <Btn accent small disabled={!txt.trim()} onClick={sendC} t={t}>Publier</Btn>
@@ -2258,6 +2436,21 @@ function CallIcon({ name, size=28 }) {
   return null;
 }
 
+// Vignette d'un participant à un appel de groupe
+function PeerTile({ stream, user, video, mine, mirror, off, hidden, t }) {
+  const ref = useRef(null);
+  useEffect(() => { if (ref.current) ref.current.srcObject = stream || null; }, [stream]);
+  const hasVideo = !!video && !!stream?.getVideoTracks?.().length && !off;
+  if (hidden) return <video ref={ref} autoPlay playsInline style={{ position: "fixed", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />;
+  return (
+    <div style={{ position: "relative", borderRadius: 16, overflow: "hidden", background: "#1B1426", aspectRatio: video ? "3/4" : "1", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
+      <video ref={ref} autoPlay playsInline muted={!!mine} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: hasVideo ? 1 : 0, transform: mine && mirror ? "scaleX(-1)" : "none" }} />
+      {!hasVideo && user && <Avatar user={user} size={64} t={t} />}
+      <div style={{ position: "absolute", left: 8, bottom: 6, fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>{mine ? "Toi" : user?.pseudo}</div>
+    </div>
+  );
+}
+
 let _audioCtx = null;
 const getAudioCtx = () => { try { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; } catch { return null; } };
 const unlockAudio = () => {            // à appeler lors d'un geste de l'utilisateur : débloque le son (navigateurs / iPhone)
@@ -2266,15 +2459,20 @@ const unlockAudio = () => {            // à appeler lors d'un geste de l'utilis
   try { const b = c.createBuffer(1, 1, 22050), src = c.createBufferSource(); src.buffer = b; src.connect(c.destination); src.start(0); } catch {}
 };
 
-function useCalls(meId, isFriend, findUser, t) {
+function useCalls(meId, isFriend, findUser, findGroup, t) {
+  const [gcall, setGcall] = useState(null);       // appel de groupe : { callId, group, video, status, incoming, from }
+  const [gStreams, setGStreams] = useState({});   // peerId -> MediaStream
+  const gcallRef = useRef(null); gcallRef.current = gcall;
   const [min, setMin] = useState(false);   // appel réduit : on peut naviguer dans l'app
+  const [swap, setSwap] = useState(false);  // true : ma caméra en grand (comme WhatsApp)
+  const [facing, setFacing] = useState("user");
   const [call, setCall] = useState(null);      // { peer, video, status, incoming, callId }
   const [remote, setRemote] = useState(null);
   const [local, setLocal] = useState(null);
   const [muted, setMuted] = useState(false);
   const [camOff, setCamOff] = useState(false);
   const [secs, setSecs] = useState(0);
-  const R = useRef({ pc: null, local: null, callId: null, peerId: null, ice: [], timers: [], senders: {}, ring: null });
+  const R = useRef({ pc: null, local: null, callId: null, peerId: null, ice: [], timers: [], senders: {}, ring: null, gpcs: {}, gice: {}, gHad: false });
   const callRef = useRef(null); callRef.current = call;
   const handleRef = useRef(() => {});
 
@@ -2334,9 +2532,11 @@ function useCalls(meId, isFriend, findUser, t) {
     stopRing();
     r.timers.forEach(clearTimeout); r.timers = [];
     try { r.pc?.close(); } catch {}
+    Object.values(r.gpcs).forEach(pc => { try { pc.close(); } catch {} });
     r.local?.getTracks().forEach(x => x.stop());
-    Object.assign(r, { pc: null, local: null, callId: null, peerId: null, ice: [] });
-    setCall(null); setMin(false); setRemote(null); setLocal(null); setMuted(false); setCamOff(false); setSecs(0);
+    Object.assign(r, { pc: null, local: null, callId: null, peerId: null, ice: [], facing: "user", gpcs: {}, gice: {}, gHad: false });
+    setGcall(null); setGStreams({});
+    setCall(null); setMin(false); setSwap(false); setFacing("user"); setRemote(null); setLocal(null); setMuted(false); setCamOff(false); setSecs(0);
   }, []);
 
   const getMedia = async (video) => {
@@ -2363,7 +2563,7 @@ function useCalls(meId, isFriend, findUser, t) {
 
   // ── actions de l'utilisateur
   const start = async (peer, video) => {
-    if (callRef.current) return;
+    if (callRef.current || gcallRef.current) return;
     const stream = await getMedia(video); if (!stream) return;
     const r = R.current; r.local = stream; setLocal(stream);
     r.callId = (crypto.randomUUID?.() || String(Date.now())); r.peerId = peer.id;
@@ -2374,6 +2574,7 @@ function useCalls(meId, isFriend, findUser, t) {
   };
 
   const accept = async () => {
+    if (gcallRef.current) { acceptGroup(); return; }
     const c = callRef.current; if (!c || !c.incoming) return;
     stopRing();
     const stream = await getMedia(c.video);
@@ -2384,6 +2585,7 @@ function useCalls(meId, isFriend, findUser, t) {
   };
 
   const hangup = () => {
+    if (gcallRef.current) { hangupGroup(); return; }
     const c = callRef.current, r = R.current; if (!c) return;
     if (c.incoming && c.status === "ringing") send(c.peer.id, { type: "reject", callId: c.callId });
     else if (!c.incoming && c.status === "calling") send(c.peer.id, { type: "cancel", callId: c.callId });
@@ -2391,16 +2593,131 @@ function useCalls(meId, isFriend, findUser, t) {
     cleanup();
   };
 
+  const flip = async () => {
+    const r = R.current; if (!r.local || !(call?.video || gcallRef.current?.video)) return;
+    const nextF = (r.facing || "user") === "user" ? "environment" : "user";
+    const old = r.local.getVideoTracks()[0];
+    old?.stop();                                     // iPhone : on libère l'ancienne caméra avant d'ouvrir l'autre
+    let nt = null, used = nextF;
+    try { nt = (await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: nextF } }, audio: false })).getVideoTracks()[0]; }
+    catch {
+      try { used = r.facing || "user"; nt = (await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: used } }, audio: false })).getVideoTracks()[0]; } catch {}
+    }
+    if (!nt) { alert("Impossible de changer de caméra."); return; }
+    nt.enabled = !camOff;
+    const pcs = [r.pc, ...Object.values(r.gpcs)].filter(Boolean);
+    for (const pc of pcs) { const sender = pc.getSenders().find(x => x.track?.kind === "video" || x.track === null); try { await sender?.replaceTrack(nt); } catch (e) { console.warn(e); } }
+    const stream = new MediaStream([...r.local.getAudioTracks(), nt]);
+    r.local = stream; r.facing = used; setFacing(used); setLocal(stream);
+  };
   const ignore = () => { stopRing(); setMin(true); };   // met l'appel de côté sans raccrocher
   const toggleMute = () => { const tr = R.current.local?.getAudioTracks(); tr?.forEach(x => x.enabled = !x.enabled); setMuted(m => !m); };
   const toggleCam = () => { const tr = R.current.local?.getVideoTracks(); tr?.forEach(x => x.enabled = !x.enabled); setCamOff(v => !v); };
 
+  // ── APPEL DE GROUPE (maillage WebRTC : une connexion par participant) ──
+  const gSend = (gc, payload) => gc.group.memberUsers.filter(u => u.id !== meId).forEach(u => send(u.id, { ...payload, callId: gc.callId }));
+  const dropPeer = (id) => {
+    const r = R.current;
+    try { r.gpcs[id]?.close(); } catch {}
+    delete r.gpcs[id]; delete r.gice[id];
+    setGStreams(m => { const n = { ...m }; delete n[id]; return n; });
+    if (Object.keys(r.gpcs).length === 0 && r.gHad) cleanup();
+  };
+  const makeGPc = (peerId) => {
+    const r = R.current; if (r.gpcs[peerId]) return r.gpcs[peerId];
+    const pc = new RTCPeerConnection({ iceServers: getIceServers() });
+    r.gpcs[peerId] = pc; r.gice[peerId] = []; r.gHad = true;
+    r.local?.getTracks().forEach(tr => pc.addTrack(tr, r.local));
+    pc.ontrack = e => setGStreams(m => ({ ...m, [peerId]: e.streams[0] }));
+    pc.onicecandidate = e => { if (e.candidate) send(peerId, { type: "gice", callId: gcallRef.current?.callId, candidate: e.candidate.toJSON() }); };
+    pc.onconnectionstatechange = () => {
+      const st = pc.connectionState;
+      if (st === "connected") { stopRing(); setGcall(c => c && { ...c, status: "active" }); }
+      if (st === "failed" || st === "closed") dropPeer(peerId);
+    };
+    return pc;
+  };
+  const handleGroup = async (p) => {
+    const r = R.current; const gc = gcallRef.current;
+    if (p.type === "ginvite") {
+      if (callRef.current || gc) return;
+      const g = findGroup(p.groupId);
+      if (!g || !g.memberUsers.some(u => u.id === p.from) || !g.memberUsers.some(u => u.id === meId)) return;
+      setGcall({ callId: p.callId, group: g, video: !!p.video, status: "ringing", incoming: true, from: findUser(p.from) });
+      startRing("in");
+      r.timers.push(setTimeout(() => { if (gcallRef.current?.status === "ringing") cleanup(); }, RING_TIMEOUT));
+      return;
+    }
+    if (!gc || p.callId !== gc.callId || !gc.group.memberUsers.some(u => u.id === p.from)) return;
+    if (p.type === "gcancel") { if (gc.status === "ringing") cleanup(); return; }
+    if (gc.status === "ringing") return;            // je n'ai pas encore rejoint
+    if (p.type === "gleave") { dropPeer(p.from); return; }
+    if (p.type === "ghello") {
+      stopRing();
+      const first = !r.gpcs[p.from];
+      const pc = makeGPc(p.from);
+      if (!p.reply && first) send(p.from, { type: "ghello", callId: gc.callId, reply: true });
+      if (first && meId < p.from) {                 // une seule des deux personnes envoie l'offre
+        const off = await pc.createOffer(); await pc.setLocalDescription(off);
+        send(p.from, { type: "goffer", callId: gc.callId, sdp: pc.localDescription });
+      }
+      return;
+    }
+    if (p.type === "goffer") {
+      const pc = makeGPc(p.from);
+      await pc.setRemoteDescription(p.sdp);
+      for (const c of r.gice[p.from] || []) { try { await pc.addIceCandidate(c); } catch {} } r.gice[p.from] = [];
+      const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
+      send(p.from, { type: "ganswer", callId: gc.callId, sdp: pc.localDescription });
+      return;
+    }
+    if (p.type === "ganswer") {
+      const pc = r.gpcs[p.from]; if (!pc) return;
+      await pc.setRemoteDescription(p.sdp);
+      for (const c of r.gice[p.from] || []) { try { await pc.addIceCandidate(c); } catch {} } r.gice[p.from] = [];
+      return;
+    }
+    if (p.type === "gice") {
+      const pc = r.gpcs[p.from];
+      if (pc?.remoteDescription) { try { await pc.addIceCandidate(p.candidate); } catch {} }
+      else (r.gice[p.from] = r.gice[p.from] || []).push(p.candidate);
+    }
+  };
+  const startGroup = async (group, video) => {
+    if (callRef.current || gcallRef.current) return;
+    const stream = await getMedia(video); if (!stream) return;
+    const r = R.current; r.local = stream; setLocal(stream);
+    const gc = { callId: (crypto.randomUUID?.() || String(Date.now())), group, video, status: "calling", incoming: false };
+    setGcall(gc);
+    gSend(gc, { type: "ginvite", groupId: group.id, video });
+    startRing("out");
+    r.timers.push(setTimeout(() => {
+      if (gcallRef.current && Object.keys(R.current.gpcs).length === 0) { gSend(gc, { type: "gcancel" }); alert("Personne n'a rejoint l'appel."); cleanup(); }
+    }, RING_TIMEOUT));
+  };
+  const acceptGroup = async () => {
+    const gc = gcallRef.current; if (!gc || !gc.incoming) return;
+    stopRing();
+    const stream = await getMedia(gc.video);
+    if (!stream) { cleanup(); return; }
+    const r = R.current; r.local = stream; setLocal(stream);
+    setGcall({ ...gc, status: "connecting" });
+    gSend(gc, { type: "ghello", reply: false });
+    r.timers.push(setTimeout(() => { if (gcallRef.current && Object.keys(R.current.gpcs).length === 0) { alert("Personne n'est dans l'appel."); cleanup(); } }, 30000));
+  };
+  const hangupGroup = () => {
+    const gc = gcallRef.current; if (!gc) return;
+    if (!(gc.incoming && gc.status === "ringing")) gSend(gc, { type: Object.keys(R.current.gpcs).length || gc.incoming ? "gleave" : "gcancel" });
+    cleanup();
+  };
+
   // ── messages reçus
   handleRef.current = async (p) => {
     const r = R.current; const c = callRef.current;
+    if (p?.type && p.type[0] === "g") { await handleGroup(p); return; }
     if (!p?.from || !isFriend(p.from)) return;
     if (p.type === "invite") {
-      if (c) { send(p.from, { type: "busy", callId: p.callId }); return; }
+      if (c || gcallRef.current) { send(p.from, { type: "busy", callId: p.callId }); return; }
       const peer = findUser(p.from); if (!peer) return;
       r.callId = p.callId; r.peerId = p.from;
       setCall({ peer, video: !!p.video, status: "ringing", incoming: true, callId: p.callId });
@@ -2449,10 +2766,10 @@ function useCalls(meId, isFriend, findUser, t) {
 
   // chronomètre
   useEffect(() => {
-    if (call?.status !== "active") return;
+    if (call?.status !== "active" && gcall?.status !== "active") return;
     const id = setInterval(() => setSecs(s => s + 1), 1000);
     return () => clearInterval(id);
-  }, [call?.status]);
+  }, [call?.status, gcall?.status]);
 
   // ── interface
   const rv = useRef(null), lv = useRef(null);
@@ -2465,30 +2782,34 @@ function useCalls(meId, isFriend, findUser, t) {
     const label = call.status === "ringing" ? (call.video ? "Appel vidéo entrant…" : "Appel entrant…")
       : call.status === "calling" ? "Appel en cours…" : call.status === "connecting" ? "Connexion…" : `${mm}:${ss}`;
     const showVideo = call.video && remote && call.status === "active";
-    const rb = (bg) => ({ width: 64, height: 64, borderRadius: "50%", border: "none", background: bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)", padding: 0 });
+    const rb = (bg) => ({ width: 58, height: 58, borderRadius: "50%", border: "none", background: bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)", padding: 0 });
     const lbl = (txt) => <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, marginTop: 8, opacity: 0.85, textAlign: "center" }}>{txt}</div>;
     const item = (btn, txt) => <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>{btn}{lbl(txt)}</div>;
     const GLASS = "rgba(255,255,255,0.22)", GLASS_ON = "#fff";
+    const bigLocal = swap && call.video && !!local && call.status !== "ringing";
+    const bigStyle = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" };
+    const pipStyle = { position: "absolute", right: 16, top: "calc(16px + env(safe-area-inset-top, 0px))", width: 96, height: 140, objectFit: "cover", borderRadius: 14, border: "2px solid rgba(255,255,255,0.6)", zIndex: 3, boxShadow: "0 4px 14px rgba(0,0,0,0.4)" };
     const full = (
       <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "#0D0A12", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", color: "#fff", padding: "calc(40px + env(safe-area-inset-top, 0px)) 20px calc(36px + env(safe-area-inset-bottom, 0px))" }}>
-        <video ref={rv} autoPlay playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: showVideo ? 1 : 0, background: "#000" }} />
+        <video ref={rv} autoPlay playsInline onClick={bigLocal ? () => setSwap(false) : undefined} style={{ ...(bigLocal ? pipStyle : bigStyle), opacity: showVideo ? 1 : 0, background: "#000", cursor: bigLocal ? "pointer" : "default" }} />
         <button onClick={call.status === "ringing" ? ignore : () => setMin(true)} style={{ position: "absolute", left: 14, top: "calc(14px + env(safe-area-inset-top, 0px))", zIndex: 2, display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: "none", background: "rgba(255,255,255,0.2)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", color: "#fff", fontFamily: "'DM Sans',sans-serif", fontSize: 13, cursor: "pointer" }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           {call.status === "ringing" ? "Ignorer" : "Réduire"}
         </button>
         <div style={{ position: "relative", textAlign: "center", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>
-          {!showVideo && <div style={{ display: "inline-block", marginBottom: 16 }}><Avatar user={call.peer} size={120} t={t} /></div>}
+          {!showVideo && !bigLocal && <div style={{ display: "inline-block", marginBottom: 16 }}><Avatar user={call.peer} size={120} t={t} /></div>}
           <div style={{ fontFamily: "'Fraunces',serif", fontSize: 26 }}>{call.peer?.name}</div>
           <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 14, opacity: 0.85, marginTop: 6 }}>{label}</div>
         </div>
         {call.video && local && call.status !== "ringing" && (
-          <video ref={lv} autoPlay playsInline muted style={{ position: "absolute", right: 16, top: "calc(16px + env(safe-area-inset-top, 0px))", width: 96, height: 140, objectFit: "cover", borderRadius: 14, border: "2px solid rgba(255,255,255,0.5)", background: "#000", transform: "scaleX(-1)", opacity: camOff ? 0.2 : 1 }} />
+          <video ref={lv} autoPlay playsInline muted onClick={() => setSwap(v => !v)} style={{ ...(bigLocal ? bigStyle : pipStyle), background: "#000", transform: facing === "user" ? "scaleX(-1)" : "none", opacity: camOff ? 0.25 : 1, cursor: "pointer" }} />
         )}
-        <div style={{ position: "relative", display: "flex", gap: 26, alignItems: "flex-start", justifyContent: "center" }}>
+        <div style={{ position: "relative", display: "flex", gap: 14, alignItems: "flex-start", justifyContent: "center" }}>
           {call.status === "ringing" ? (<>
             {item(<button onClick={hangup} style={rb("#FF3B30")} aria-label="Refuser"><CallIcon name="hangup" /></button>, "Refuser")}
             {item(<button onClick={accept} style={rb("#34C759")} aria-label="Répondre"><CallIcon name={call.video ? "acceptVideo" : "accept"} /></button>, "Répondre")}
           </>) : (<>
+            {call.video && item(<button onClick={flip} style={rb(GLASS)} aria-label="Retourner la caméra"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.9-3M4 5v4h4M4 13a8 8 0 0014.9 3M20 19v-4h-4"/></svg></button>, "Retourner")}
             {call.video && item(<button onClick={toggleCam} style={rb(camOff ? GLASS_ON : GLASS)} aria-label="Caméra">{camOff ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 16v1a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2h2m5.7 0H14a2 2 0 012 2v3.3l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/></svg> : <CallIcon name="cam" />}</button>, camOff ? "Caméra off" : "Caméra")}
             {item(<button onClick={toggleMute} style={rb(muted ? GLASS_ON : GLASS)} aria-label="Micro">{muted ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9v2a3 3 0 005.1 2.1M15 9.3V5a3 3 0 00-5.9-.8"/><path d="M5 11a7 7 0 0011.3 5.5M19 11a7 7 0 01-.5 2.6M12 18v4M8 22h8"/><line x1="2" y1="2" x2="22" y2="22"/></svg> : <CallIcon name="mic" />}</button>, muted ? "Micro off" : "Micro")}
             {item(<button onClick={hangup} style={rb("#FF3B30")} aria-label="Raccrocher"><CallIcon name="hangup" /></button>, "Raccrocher")}
@@ -2520,7 +2841,79 @@ function useCalls(meId, isFriend, findUser, t) {
     );
     ui = min ? banner : full;
   }
-  return { start, ui, busy: !!call };
+  // ── APPEL DE GROUPE : interface ──
+  if (gcall) {
+    const peers = Object.keys(gStreams);
+    const mm2 = String(Math.floor(secs / 60)).padStart(2, "0"), ss2 = String(secs % 60).padStart(2, "0");
+    const glabel = gcall.status === "ringing" ? (gcall.video ? "Appel vidéo de groupe…" : "Appel de groupe…")
+      : gcall.status === "active" ? `${mm2}:${ss2} · ${peers.length + 1} participant${peers.length ? "s" : ""}` : gcall.status === "calling" ? "Appel en cours…" : "Connexion…";
+    const rb2 = (bg) => ({ width: 58, height: 58, borderRadius: "50%", border: "none", background: bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)", padding: 0 });
+    const it2 = (btn, txt) => <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>{btn}<div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, marginTop: 8, opacity: 0.85 }}>{txt}</div></div>;
+    const GL = "rgba(255,255,255,0.22)", GL_ON = "#fff";
+    const members = gcall.group.memberUsers;
+    const meUser = members.find(u => u.id === meId) || { id: meId, name: "Moi", pseudo: "moi" };
+    const cols = (peers.length + 1) <= 1 ? 1 : (peers.length + 1) <= 4 ? 2 : 3;
+    const gfull = (
+      <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "#0D0A12", display: "flex", flexDirection: "column", color: "#fff", padding: "calc(14px + env(safe-area-inset-top, 0px)) 12px calc(24px + env(safe-area-inset-bottom, 0px))" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <button onClick={gcall.status === "ringing" ? ignore : () => setMin(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: "none", background: "rgba(255,255,255,0.2)", color: "#fff", fontFamily: "'DM Sans',sans-serif", fontSize: 13, cursor: "pointer" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            {gcall.status === "ringing" ? "Ignorer" : "Réduire"}
+          </button>
+          <div style={{ flex: 1, textAlign: "center", marginRight: 70 }}>
+            <div style={{ fontFamily: "'Fraunces',serif", fontSize: 18 }}>👥 {gcall.group.name}</div>
+            <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, opacity: 0.8 }}>{glabel}</div>
+          </div>
+        </div>
+        {gcall.status === "ringing" ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center" }}>
+            <GroupAvatar group={gcall.group} size={120} t={t} />
+            <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 15, opacity: 0.9 }}>{gcall.from?.pseudo ? "@" + gcall.from.pseudo + " t'appelle" : "Appel de groupe"}</div>
+          </div>
+        ) : (
+          <div style={{ flex: 1, display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 8, alignContent: "center", minHeight: 0 }}>
+            {peers.map(id => <PeerTile key={id} stream={gStreams[id]} user={members.find(u => u.id === id)} video={gcall.video} t={t} />)}
+            <PeerTile stream={local} user={meUser} video={gcall.video} mine mirror={facing === "user"} off={camOff} t={t} />
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", justifyContent: "center", paddingTop: 14 }}>
+          {gcall.status === "ringing" ? (<>
+            {it2(<button onClick={hangup} style={rb2("#FF3B30")} aria-label="Refuser"><CallIcon name="hangup" /></button>, "Refuser")}
+            {it2(<button onClick={accept} style={rb2("#34C759")} aria-label="Rejoindre"><CallIcon name={gcall.video ? "acceptVideo" : "accept"} /></button>, "Rejoindre")}
+          </>) : (<>
+            {gcall.video && it2(<button onClick={flip} style={rb2(GL)} aria-label="Retourner la caméra"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.9-3M4 5v4h4M4 13a8 8 0 0014.9 3M20 19v-4h-4"/></svg></button>, "Retourner")}
+            {gcall.video && it2(<button onClick={toggleCam} style={rb2(camOff ? GL_ON : GL)} aria-label="Caméra">{camOff ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 16v1a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2h2m5.7 0H14a2 2 0 012 2v3.3l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/></svg> : <CallIcon name="cam" />}</button>, camOff ? "Caméra off" : "Caméra")}
+            {it2(<button onClick={toggleMute} style={rb2(muted ? GL_ON : GL)} aria-label="Micro">{muted ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9v2a3 3 0 005.1 2.1M15 9.3V5a3 3 0 00-5.9-.8"/><path d="M5 11a7 7 0 0011.3 5.5M19 11a7 7 0 01-.5 2.6M12 18v4M8 22h8"/><line x1="2" y1="2" x2="22" y2="22"/></svg> : <CallIcon name="mic" />}</button>, muted ? "Micro off" : "Micro")}
+            {it2(<button onClick={hangup} style={rb2("#FF3B30")} aria-label="Raccrocher"><CallIcon name="hangup" /></button>, "Quitter")}
+          </>)}
+        </div>
+      </div>
+    );
+    const sb2 = (bg) => ({ width: 40, height: 40, borderRadius: "50%", border: "none", background: bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, flexShrink: 0 });
+    const gbanner = (
+      <>
+        {peers.map(id => <PeerTile key={id} stream={gStreams[id]} hidden t={t} />)}
+        <div style={{ position: "fixed", left: 10, right: 10, top: "calc(8px + env(safe-area-inset-top, 0px))", zIndex: 500, maxWidth: 480, margin: "0 auto", background: "rgba(24,18,32,0.96)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 18, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10, color: "#fff", boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
+          <div onClick={() => setMin(false)} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, cursor: "pointer" }}>
+            <GroupAvatar group={gcall.group} size={40} t={t} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{gcall.group.name}</div>
+              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, opacity: 0.8 }}>{glabel}</div>
+            </div>
+          </div>
+          {gcall.status === "ringing" ? (<>
+            <button onClick={hangup} style={sb2("#FF3B30")} aria-label="Refuser"><CallIcon name="hangup" size={20} /></button>
+            <button onClick={() => { setMin(false); accept(); }} style={sb2("#34C759")} aria-label="Rejoindre"><CallIcon name={gcall.video ? "acceptVideo" : "accept"} size={20} /></button>
+          </>) : (<>
+            <button onClick={() => setMin(false)} style={{ ...sb2("rgba(255,255,255,0.18)"), width: "auto", padding: "0 14px", borderRadius: 20, fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "#fff" }}>Ouvrir</button>
+            <button onClick={hangup} style={sb2("#FF3B30")} aria-label="Quitter"><CallIcon name="hangup" size={20} /></button>
+          </>)}
+        </div>
+      </>
+    );
+    ui = min ? gbanner : gfull;
+  }
+  return { start, startGroup, ui, busy: !!call || !!gcall };
 }
 
 const colorFor = id => AVATAR_COLORS[(id?.charCodeAt(1)||0) % AVATAR_COLORS.length];
@@ -2580,10 +2973,12 @@ export default function App() {
 
   useEffect(()=>{
     if (!me0) return;
-    refreshBlocks().finally(refreshActivities); refreshFriends(); refreshUsers(); refreshNotifs();
+    refreshBlocks().finally(refreshActivities); refreshFriends(); refreshUsers(); refreshNotifs(); refreshGroups();
     const n = api.subscribeNotifications(me0.id, row=>{
       if (row.kind==="message" && pageRef.current==="dm" && dmPartnerRef.current?.id===row.ref_id) api.markNotifRead(row.id).finally(refreshNotifs);
+      else if (row.kind==="group_message" && pageRef.current==="group" && groupIdRef.current===row.ref_id) api.markNotifRead(row.id).finally(refreshNotifs);
       else refreshNotifs();
+      if (row.kind==="group_message" || row.kind==="group_added") refreshGroups();
       refreshActivities(); refreshFriends();
     });
     const d = api.subscribeDMs(me0.id, m=>{
@@ -2630,9 +3025,12 @@ export default function App() {
       try { await (liked ? api.unlikePost(p.id, me0.id) : api.likePost(p.id, me0.id)); } catch(e) { fail(e); refreshPosts(); }
     },
     loadComments: (id) => api.listComments(id),
-    addComment: async (p, text) => { try { await api.addComment(p.id, me0.id, text); refreshPosts(); } catch(e) { fail(e); } },
+    addComment: async (p, text, parentId) => { try { await api.addComment(p.id, me0.id, text, parentId); refreshPosts(); } catch(e) { fail(e); } },
+    likeComment: (c, wasLiked) => (wasLiked ? api.unlikeComment(c.id, me0.id) : api.likeComment(c.id, me0.id)).catch(console.error),
     deleteComment: async (p, c) => { try { await api.deleteComment(c.id); refreshPosts(); } catch(e) { fail(e); } },
     share: (p) => setSharePost(p),
+    viewStory: (st) => api.recordStoryView(st.id, me0.id),
+    listStoryViews: (st) => api.listStoryViews(st.id),
     likeStory: (st) => api.likeStory(st.id, me0.id).catch(console.error),
     unlikeStory: (st) => api.unlikeStory(st.id, me0.id).catch(console.error),
     replyStory: (st, text) => api.sendDM(me0.id, st.user_id, "↩️ Réponse à ta story : " + text).catch(fail),
@@ -2647,7 +3045,7 @@ export default function App() {
   useEffect(()=>{ if (profileUser && me0 && profileUser.id!==me0.id) api.recordProfileView(profileUser.id); },[profileUser?.id]);
   const me = me0 ? { ...me0, friends: friendIds, friendReqs: reqIds } : null;
   const isFriend = id => friendIds.includes(id);
-  const calls = useCalls(me0?.id, id=>friendIds.includes(id), id=>allUsers.find(u=>u.id===id), t);
+  const calls = useCalls(me0?.id, id=>friendIds.includes(id), id=>allUsers.find(u=>u.id===id) || groups.flatMap(g=>g.memberUsers).find(u=>u.id===id), id=>groups.find(g=>g.id===id), t);
   const hasPendingReq = id => friendships.some(f=>f.status==="pending"&&f.requester_id===me0?.id&&f.addressee_id===id);
   const sendFriendReq = id => api.sendFriendRequest(me0.id,id).then(refreshFriends).catch(fail);
   const acceptFriendReq = fromId => {
@@ -2756,6 +3154,11 @@ export default function App() {
     }
     if (kind==="post_like" || kind==="post_comment") { setFocusPostId(n.ref_id); setPage("gallery"); return; }
     if (kind==="story_like") { setPage("gallery"); return; }
+    if (kind==="group_message" || kind==="group_added") {
+      const g = groups.find(x=>x.id===n.ref_id);
+      if (g) openGroup(g); else { refreshGroups(); setPage("messages"); }
+      return;
+    }
     if (kind==="activity_cancelled") return;
     if (kind==="friend_request" || kind==="friend_accepted") { refreshFriends(); setPage("friends"); return; }
     let actId = n.ref_id;
@@ -2770,7 +3173,7 @@ export default function App() {
     setSelected(act); setDetailBack(page); setPage("detail");
   };
 
-  useEffect(()=>{ pageRef.current = page; },[page]);
+  useEffect(()=>{ pageRef.current = page; if (page==="messages" && me0) refreshGroups(); },[page]);
 
   // ── « est en train d'écrire / d'enregistrer » (temps réel, sans base de données) ──
   const [partnerStatus, setPartnerStatus] = useState(null);
@@ -2833,6 +3236,62 @@ export default function App() {
 
   // ── Liste des conversations (dernier message par ami) ──────────────────────
   const [lastDMs, setLastDMs] = useState({});
+  // ── Groupes de discussion ──
+  const [groups, setGroups] = useState([]);
+  const [lastGroup, setLastGroup] = useState({});
+  const [groupId, setGroupId] = useState(null);
+  const [groupMsgs, setGroupMsgs] = useState([]);
+  const [showNewGroup, setShowNewGroup] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const groupIdRef = useRef(null);
+  const [groupStatus, setGroupStatus] = useState(null);   // { name, status }
+  const gTypingRef = useRef(null);
+  const gStatusTimer = useRef(null);
+  useEffect(()=>{ groupIdRef.current = groupId; },[groupId]);
+  const shapeGroup = g => ({ ...g, memberUsers: (g.members||[]).map(m=>shapeUser(m.user)).filter(Boolean) });
+  const refreshGroups = useCallback(()=>{
+    api.listGroups().then(r=>setGroups(r.map(shapeGroup))).catch(console.error);
+    api.listRecentGroupMessages().then(r=>{ const m={}; r.forEach(x=>{ if(!m[x.group_id]) m[x.group_id]=x; }); setLastGroup(m); }).catch(console.error);
+  },[]);
+  const group = groups.find(g=>g.id===groupId) || null;
+  const loadGroupMsgs = id => api.listGroupMessages(id).then(r=>setGroupMsgs(r.map(shapeMsg))).catch(console.error);
+  const openGroup = (g) => {
+    setGroupId(g.id); setGroupMsgs([]); loadGroupMsgs(g.id); setPage("group");
+    api.markGroupNotifsRead(me0.id, g.id).then(refreshNotifs).catch(()=>{});
+  };
+  const createGroup = async (name, ids) => {
+    try { const g = await api.createGroup(me0.id, name, ids); refreshGroups(); setTimeout(()=>{ setGroupId(g.id); setGroupMsgs([]); setPage("group"); }, 400); return true; }
+    catch(e) { fail(e); return false; }
+  };
+  const sendGroupText = text => api.sendGroupMessage(groupId, me0.id, text).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
+  const sendGroupVoice = (url, dur, blob) => api.sendGroupVoice(groupId, me0.id, blob, dur).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
+  const sendGroupMedia = (kind, file) => api.sendGroupMedia(groupId, me0.id, kind, file).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
+  const sendGroupGif = url => api.sendGroupGif(groupId, me0.id, url).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
+  useEffect(()=>{
+    if (!me0 || !groupId || page!=="group") return;
+    const tc = api.supabase.channel(`gtyping-${groupId}`, { config: { broadcast: { self: false } } });
+    tc.on("broadcast", { event: "status" }, ({ payload }) => {
+      if (payload.from === me0.id) return;
+      clearTimeout(gStatusTimer.current);
+      if (payload.status === "idle") { setGroupStatus(null); return; }
+      setGroupStatus({ name: payload.name, status: payload.status });
+      gStatusTimer.current = setTimeout(()=>setGroupStatus(null), payload.status==="recording" ? 90000 : 5000);
+    }).subscribe();
+    gTypingRef.current = tc;
+    return ()=>{ clearTimeout(gStatusTimer.current); setGroupStatus(null); api.supabase.removeChannel(tc); gTypingRef.current = null; };
+  },[me0?.id, groupId, page==="group"]);
+  const sendGroupStatus = status => { gTypingRef.current?.send({ type:"broadcast", event:"status", payload:{ status, from: me0.id, name: me0.pseudo } }); };
+  useEffect(()=>{
+    if (!me0 || !groupId || page!=="group") return;
+    const ch = api.subscribeGroupMessages(groupId, m=>{
+      if (m.sender_id===me0.id) return;
+      const sender = groups.find(g=>g.id===groupId)?.memberUsers.find(u=>u.id===m.sender_id);
+      setGroupMsgs(prev=>prev.some(x=>x.id===m.id)?prev:[...prev, shapeMsg({...m, sender})]);
+      setLastGroup(p=>({...p,[groupId]:m}));
+      api.markGroupNotifsRead(me0.id, groupId).then(refreshNotifs).catch(()=>{});
+    });
+    return ()=>{ api.supabase.removeChannel(ch); };
+  },[me0?.id, groupId, page==="group"]);
   useEffect(()=>{
     if (page!=="messages" || !me0) return;
     api.listRecentDMs().then(rows=>{
@@ -2865,6 +3324,8 @@ export default function App() {
   const handleAccept = (id,userId) => api.acceptMember(id,userId).then(refreshActivities).catch(e=>fail(/complète/i.test(e.message)?new Error("La sortie est complète."):e));
   const handleReject = (id,userId) => api.rejectMember(id,userId).then(refreshActivities).catch(fail);
   const handleSendMessage = (id,text) => api.sendActivityMessage(id,me0.id,text).then(()=>loadActMessages(id)).catch(fail);
+  const handleSendMedia = (id,kind,file) => api.sendActivityMedia(id,me0.id,kind,file).then(()=>loadActMessages(id)).catch(fail);
+  const handleSendGif = (id,url) => api.sendActivityGif(id,me0.id,url).then(()=>loadActMessages(id)).catch(fail);
   const handleSendVoice = (id,blob,dur) => api.sendActivityVoice(id,me0.id,blob,dur).then(()=>loadActMessages(id)).catch(fail);
   const handleCreate = async (form, photo) => {
     try {
@@ -2955,7 +3416,7 @@ export default function App() {
   };
 
   // which pages show the bottom nav
-  const showNav = !["dm"].includes(page);
+  const showNav = !["dm","group"].includes(page);
   // pages that render inside the scrollable content area
   const BOTTOM_NAV_H = 64;
   const TOP_BAR_H = 56;
@@ -3050,7 +3511,7 @@ export default function App() {
           {/* DETAIL */}
           {page==="detail"&&selected&&(
             <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} t={t} />
+              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendMedia={handleSendMedia} onSendGif={handleSendGif} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} t={t} />
             </div>
           )}
 
@@ -3085,7 +3546,7 @@ export default function App() {
           {/* MESSAGES */}
           {page==="messages"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <MessagesPage friends={allUsers.filter(u=>friendIds.includes(u.id))} last={lastDMs} myId={me0.id} onOpenDM={openDM} onGoFriends={()=>setPage("friends")} t={t} />
+              <MessagesPage friends={allUsers.filter(u=>friendIds.includes(u.id))} last={lastDMs} myId={me0.id} onOpenDM={openDM} groups={groups} lastGroup={lastGroup} onOpenGroup={openGroup} onNewGroup={()=>setShowNewGroup(true)} onGoFriends={()=>setPage("friends")} t={t} />
             </div>
           )}
 
@@ -3127,6 +3588,23 @@ export default function App() {
             <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onOpenProfile={()=>setProfileUser(dmPartner)} onBack={()=>setPage("messages")} onCall={v=>calls.start(dmPartner,v)} t={t} />
           </div>
         )}
+
+        {page==="group"&&group&&(
+          <div style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
+            <DMChat currentUser={currentUser} otherUser={{id:group.id,name:group.name,pseudo:""}} group={group} messages={groupMsgs}
+              onSend={sendGroupText} onVoiceSend={sendGroupVoice} onSendMedia={sendGroupMedia} onSendGif={sendGroupGif} onStatus={sendGroupStatus} partnerStatus={groupStatus?.status||null} statusName={groupStatus?.name}
+              onOpenProfile={u=>u&&setProfileUser(u)} onOpenInfo={()=>setShowGroupInfo(true)} onCall={v=>calls.startGroup(group,v)} onBack={()=>setPage("messages")} t={t} />
+          </div>
+        )}
+        {showNewGroup && <NewGroupModal friends={allUsers.filter(u=>friendIds.includes(u.id))} onCreate={createGroup} onClose={()=>setShowNewGroup(false)} t={t} />}
+        {showGroupInfo && group && <GroupInfoModal group={group} me={me0} friends={allUsers.filter(u=>friendIds.includes(u.id))} onClose={()=>setShowGroupInfo(false)} onOpenProfile={u=>setProfileUser(u)}
+          onRename={async name=>{ try { await api.renameGroup(group.id, name); refreshGroups(); } catch(e) { fail(e); } }}
+          onAdd={async ids=>{ try { await api.addGroupMembers(group.id, ids); refreshGroups(); } catch(e) { fail(e); } }}
+          onRemove={async u=>{ try { await api.removeGroupMember(group.id, u.id); refreshGroups(); } catch(e) { fail(e); } }}
+          onLeave={async()=>{ try { await api.removeGroupMember(group.id, me0.id); setShowGroupInfo(false); setGroupId(null); setPage("messages"); refreshGroups(); } catch(e) { fail(e); } }}
+          onTransfer={async u=>{ try { await api.transferGroupAdmin(group.id, u.id); refreshGroups(); } catch(e) { fail(e); } }}
+          onDelete={async()=>{ try { await api.deleteGroup(group.id); setShowGroupInfo(false); setGroupId(null); setPage("messages"); refreshGroups(); } catch(e) { fail(e); } }}
+          t={t} />}
 
         {/* ── BOTTOM NAV BAR (Instagram style) ── */}
         {showNav&&(
