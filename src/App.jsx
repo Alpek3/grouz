@@ -2505,10 +2505,13 @@ export default function App() {
       </svg>
     )},
     { id:"gallery", icon: (active) => (
-      <svg width="26" height="26" viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth={active?0:2} strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="3"/>
-        <circle cx="8.5" cy="8.5" r="1.6" fill={active?"#0D0A12":"currentColor"} stroke="none"/>
-        <path d="M21 15l-5-5L5 21" fill="none" stroke={active?"#0D0A12":"currentColor"} strokeWidth="2"/>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="8" r="3.2"/>
+        <path d="M6.5 20v-1.5a4.5 4.5 0 014.5-4.5h2a4.5 4.5 0 014.5 4.5V20"/>
+        <circle cx="4.6" cy="10" r="2.2"/>
+        <path d="M1.5 18.5v-1a3 3 0 013-3"/>
+        <circle cx="19.4" cy="10" r="2.2"/>
+        <path d="M22.5 18.5v-1a3 3 0 00-3-3"/>
       </svg>
     )},
     { id:"profile", icon: (active) => (
