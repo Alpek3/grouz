@@ -398,10 +398,11 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
 // ════════════════════════════════════════════════════════════════════════════════
 // MY PROFILE EDITOR
 // ════════════════════════════════════════════════════════════════════════════════
-function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, friendsView, posts=[], onDeletePost, onOpenProfile, t}) {
+function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, friendsView, posts=[], onDeletePost, onOpenProfile, actions, t}) {
   const [mode, setMode] = useState("view");   // view = mon profil tel que les autres le voient · edit = modification
   const [tab, setTab] = useState(startTab==="friends"?"friends":"posts");
-  const [viewPost, setViewPost] = useState(null);
+  const [viewId, setViewId] = useState(null);
+  const viewPost = viewId ? posts.find(p=>p.id===viewId) : null;
   const myPosts = posts.filter(p=>p.user_id===currentUser.id);
   const shareProfile = () => {
     const text = `Retrouve-moi sur GrouZ : @${currentUser.pseudo}`;
@@ -471,13 +472,13 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, f
               ? <p style={{textAlign:"center",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,padding:"26px 0"}}>Pas encore de souvenir. Partage tes sorties dans l'onglet Souvenirs !</p>
               : <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
                   {myPosts.map(p=>(
-                    <div key={p.id} onClick={()=>setViewPost(p)} style={{position:"relative",aspectRatio:"1",background:t.bg3,borderRadius:10,overflow:"hidden",cursor:"pointer"}}>
+                    <div key={p.id} onClick={()=>setViewId(p.id)} style={{position:"relative",aspectRatio:"1",background:t.bg3,borderRadius:10,overflow:"hidden",cursor:"pointer"}}>
                       {p.media_type==="video" ? <video src={p.url+"#t=0.1"} preload="metadata" muted playsInline style={{width:"100%",height:"100%",objectFit:"cover",pointerEvents:"none"}}/> : <img src={p.url} alt="" loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}}/>}
                       {p.media_type==="video"&&<span style={{position:"absolute",right:6,top:6,background:"rgba(0,0,0,0.55)",color:"#fff",borderRadius:6,fontSize:11,padding:"1px 6px"}}>▶</span>}
                     </div>))}
                 </div>
           )}
-          {viewPost && <PostViewer post={viewPost} me={currentUser} onClose={()=>setViewPost(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} />}
+          {viewPost && <PostViewer post={viewPost} me={currentUser} actions={actions} onClose={()=>setViewId(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} />}
         </div>
       ) : (<>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:28}}>
@@ -1931,10 +1932,26 @@ const checkMedia = (f) => {
   return null;
 };
 
-function StoryViewer({ groups, startGroup, me, onClose, onDelete, t }) {
+const HeartIcon = ({ size=24, filled=false, color="currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={filled?"#FF2D55":"none"} stroke={filled?"#FF2D55":color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 00-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 000-7.8z"/></svg>
+);
+const CommentIcon = ({ size=24, color="currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+);
+const SendIcon = ({ size=24, color="currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+);
+
+function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) {
   const [gi, setGi] = useState(startGroup);
   const [si, setSi] = useState(0);
   const [prog, setProg] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [text, setText] = useState("");
+  const [sent, setSent] = useState(false);
+  const [likedMap, setLikedMap] = useState(() => { const m = {}; groups.forEach(g => g.items.forEach(s => { m[s.id] = !!s.likes?.some(l => l.user_id === me.id); })); return m; });
+  const elapsed = useRef(0);
+  const vref = useRef(null);
   const group = groups[gi]; const story = group?.items[si];
   const next = useCallback(() => {
     if (si + 1 < group.items.length) { setSi(si + 1); setProg(0); }
@@ -1942,20 +1959,30 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, t }) {
     else onClose();
   }, [si, gi, group, groups, onClose]);
   const prev = () => { if (si > 0) { setSi(si - 1); setProg(0); } else if (gi > 0) { setGi(gi - 1); setSi(0); setProg(0); } else setProg(0); };
-  useEffect(()=>{ if (story) writeSeen(story.id); },[story?.id]);
+  useEffect(()=>{ if (story) writeSeen(story.id); elapsed.current = 0; setText(""); setSent(false); },[story?.id]);
   useEffect(()=>{
-    if (!story || story.media_type === "video") return;
-    const start = Date.now();
-    const id = setInterval(()=>{ const p = (Date.now() - start) / 5000; if (p >= 1) { clearInterval(id); next(); } else setProg(p); }, 50);
+    if (!story || story.media_type === "video" || paused) return;
+    let last = Date.now();
+    const id = setInterval(()=>{ const n = Date.now(); elapsed.current += n - last; last = n; const p = elapsed.current / 5000; if (p >= 1) { clearInterval(id); next(); } else setProg(p); }, 50);
     return ()=>clearInterval(id);
-  },[story?.id, next]);
+  },[story?.id, next, paused]);
+  useEffect(()=>{ const v = vref.current; if (!v) return; if (paused) v.pause(); else v.play?.().catch(()=>{}); },[paused, story?.id]);
   if (!story) return null;
   const mine = story.user_id === me.id;
+  const liked = !!likedMap[story.id];
+  const likeCount = (story.likes?.length || 0);
+  const toggleLike = () => { setLikedMap(m => ({ ...m, [story.id]: !liked })); (liked ? actions.unlikeStory : actions.likeStory)(story); };
+  const reply = async () => {
+    const v = text.trim(); if (!v) return;
+    setText(""); setSent(true); setPaused(false);
+    await actions.replyStory(story, v);
+    setTimeout(() => setSent(false), 1800);
+  };
   return (
     <div style={{position:"fixed",inset:0,background:"#000",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{position:"relative",width:"100%",maxWidth:480,height:"100%",background:"#000"}}>
         {story.media_type === "video"
-          ? <video key={story.id} src={story.url} autoPlay playsInline onEnded={next} onTimeUpdate={e=>{ const v=e.currentTarget; if (v.duration) setProg(v.currentTime / v.duration); }} style={{width:"100%",height:"100%",objectFit:"contain"}} />
+          ? <video ref={vref} key={story.id} src={story.url} autoPlay playsInline onEnded={next} onTimeUpdate={e=>{ const v=e.currentTarget; if (v.duration) setProg(v.currentTime / v.duration); }} style={{width:"100%",height:"100%",objectFit:"contain"}} />
           : <img key={story.id} src={story.url} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} />}
         <div style={{position:"absolute",top:0,left:0,right:0,padding:"calc(10px + env(safe-area-inset-top, 0px)) 12px 0",background:"linear-gradient(rgba(0,0,0,0.55),transparent)",paddingBottom:24}}>
           <div style={{display:"flex",gap:4,marginBottom:10}}>
@@ -1968,8 +1995,22 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, t }) {
             <button onClick={onClose} style={{background:"none",border:"none",color:"#fff",fontSize:22,cursor:"pointer"}} aria-label="Fermer">✕</button>
           </div>
         </div>
-        <div onClick={prev} style={{position:"absolute",left:0,top:80,bottom:0,width:"33%"}}/>
-        <div onClick={next} style={{position:"absolute",right:0,top:80,bottom:0,width:"67%"}}/>
+        <div onClick={prev} style={{position:"absolute",left:0,top:90,bottom:100,width:"33%"}}/>
+        <div onClick={next} style={{position:"absolute",right:0,top:90,bottom:100,width:"67%"}}/>
+        <div style={{position:"absolute",left:0,right:0,bottom:0,padding:"30px 12px calc(14px + env(safe-area-inset-bottom, 0px))",background:"linear-gradient(transparent,rgba(0,0,0,0.65))"}}>
+          {mine ? (
+            <div style={{color:"#fff",fontFamily:"'DM Mono',monospace",fontSize:13,textAlign:"center",opacity:0.9}}>❤️ {likeCount} j'aime</div>
+          ) : (
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <input value={text} onChange={e=>setText(e.target.value.slice(0,300))} onFocus={()=>setPaused(true)} onBlur={()=>setPaused(false)} onKeyDown={e=>{ if (e.key==="Enter") reply(); }}
+                placeholder={sent ? "Envoyé ✓" : `Répondre à ${group.user.pseudo}…`}
+                style={{flex:1,padding:"12px 16px",borderRadius:24,border:"1px solid rgba(255,255,255,0.6)",background:"rgba(0,0,0,0.25)",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none"}} />
+              {text.trim()
+                ? <button onClick={reply} aria-label="Envoyer" style={{background:"none",border:"none",cursor:"pointer",display:"flex",padding:4}}><SendIcon size={26} color="#fff"/></button>
+                : <button onClick={toggleLike} aria-label="J'aime" style={{background:"none",border:"none",cursor:"pointer",display:"flex",padding:4}}><HeartIcon size={28} filled={liked} color="#fff"/></button>}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -2055,7 +2096,43 @@ function PostComposer({ me, activities, onClose, onSubmit, t }) {
   );
 }
 
-function PostViewer({ post, me, onClose, onOpenProfile, onDelete, t }) {
+function ShareModal({ post, friends, onSend, onClose, t }) {
+  const [sentTo, setSentTo] = useState({});
+  const nativeShare = () => {
+    const text = `Regarde ce souvenir de @${post.author?.pseudo} sur GrouZ`;
+    if (navigator.share) navigator.share({ title: "GrouZ", text, url: post.url }).catch(()=>{});
+    else { navigator.clipboard?.writeText(post.url).catch(()=>{}); alert("Lien copié !"); }
+  };
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:520,maxHeight:"70vh",overflowY:"auto",padding:"18px 18px calc(18px + env(safe-area-inset-bottom, 0px))",border:`1px solid ${t.border}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <h3 style={{margin:0,fontFamily:"'Fraunces',serif",color:t.text}}>Partager</h3>
+          <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+        {friends.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Ajoute des amis pour leur envoyer ce souvenir en message.</p>}
+        {friends.map(u=>(
+          <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0"}}>
+            <Avatar user={u} size={40} t={t}/>
+            <div style={{flex:1,color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14}}>{u.name}<div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>@{u.pseudo}</div></div>
+            <Btn small accent={!sentTo[u.id]} disabled={!!sentTo[u.id]} onClick={async()=>{ setSentTo(s=>({...s,[u.id]:1})); await onSend(u, post); }} t={t}>{sentTo[u.id]?"Envoyé ✓":"Envoyer"}</Btn>
+          </div>
+        ))}
+        <button onClick={nativeShare} style={{marginTop:10,width:"100%",padding:"12px",borderRadius:12,border:`1px solid ${t.border}`,background:"transparent",color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,cursor:"pointer"}}>Autres applications…</button>
+      </div>
+    </div>
+  );
+}
+
+function PostViewer({ post, me, onClose, onOpenProfile, onDelete, actions, t }) {
+  const [showC, setShowC] = useState(false);
+  const [comments, setComments] = useState(null);
+  const [txt, setTxt] = useState("");
+  const liked = !!post.likes?.some(l=>l.user_id===me.id);
+  const loadC = () => actions.loadComments(post.id).then(r=>setComments(r.map(c=>({...c,author:shapeUser(c.author)})))).catch(()=>setComments([]));
+  useEffect(()=>{ if (showC) loadC(); },[showC]);
+  const sendC = async () => { const v = txt.trim(); if (!v) return; setTxt(""); await actions.addComment(post, v); loadC(); };
+  const ab = {background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:6,color:t.text,padding:4,fontFamily:"'DM Mono',monospace",fontSize:13};
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:260,display:"flex",alignItems:"center",justifyContent:"center",padding:14}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,borderRadius:18,width:"100%",maxWidth:520,maxHeight:"94vh",overflowY:"auto",border:`1px solid ${t.border}`}}>
@@ -2067,11 +2144,33 @@ function PostViewer({ post, me, onClose, onOpenProfile, onDelete, t }) {
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
         </div>
         {post.media_type === "video"
-          ? <video src={post.url} controls playsInline style={{width:"100%",maxHeight:"62vh",background:"#000"}} />
-          : <img src={post.url} alt="" style={{width:"100%",maxHeight:"62vh",objectFit:"contain",background:"#000",display:"block"}} />}
-        <div style={{padding:"12px 14px 16px"}}>
+          ? <video src={post.url} controls playsInline style={{width:"100%",maxHeight:"54vh",background:"#000"}} />
+          : <img src={post.url} alt="" onDoubleClick={()=>{ if (!liked) actions.like(post); }} style={{width:"100%",maxHeight:"54vh",objectFit:"contain",background:"#000",display:"block"}} />}
+        <div style={{padding:"8px 14px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:6}}>
+            <button style={ab} onClick={()=>actions.like(post)} aria-label="J'aime"><HeartIcon filled={liked} color={t.text}/> {post.likes?.length||0}</button>
+            <button style={ab} onClick={()=>setShowC(v=>!v)} aria-label="Commentaires"><CommentIcon color={t.text}/> {post.comments?.length||0}</button>
+            <button style={ab} onClick={()=>actions.share(post)} aria-label="Partager"><SendIcon color={t.text}/></button>
+          </div>
           <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:t.accent,letterSpacing:"0.08em"}}>{CAT_ICONS[post.category]} {post.category?.toUpperCase()}{post.activity?.title ? ` · ${post.activity.title}` : ""}</div>
           {post.caption && <p style={{margin:"8px 0 0",color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,lineHeight:1.5}}>{post.caption}</p>}
+          {showC && (
+            <div style={{marginTop:12,borderTop:`1px solid ${t.border}`,paddingTop:10}}>
+              {comments===null && <p style={{color:t.text3,fontSize:13}}>Chargement…</p>}
+              {comments && comments.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Aucun commentaire. Sois le premier !</p>}
+              {comments && comments.map(c=>(
+                <div key={c.id} style={{display:"flex",gap:10,padding:"6px 0"}}>
+                  <div onClick={()=>{ onClose(); onOpenProfile(c.author); }} style={{cursor:"pointer"}}><Avatar user={c.author} size={28} t={t}/></div>
+                  <div style={{flex:1,fontFamily:"'DM Sans',sans-serif",fontSize:13,color:t.text,lineHeight:1.4}}><b>{c.author?.pseudo}</b> {c.text}<div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10}}>{agoLabel(c.created_at)}</div></div>
+                  {(c.user_id===me.id || post.user_id===me.id) && <button onClick={async()=>{ await actions.deleteComment(post, c); loadC(); }} aria-label="Supprimer" style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontSize:14}}>🗑</button>}
+                </div>
+              ))}
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <input value={txt} onChange={e=>setTxt(e.target.value.slice(0,300))} onKeyDown={e=>{ if (e.key==="Enter") sendC(); }} placeholder="Ajouter un commentaire…" style={{flex:1,padding:"10px 14px",borderRadius:20,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none"}} />
+                <Btn accent small disabled={!txt.trim()} onClick={sendC} t={t}>Publier</Btn>
+              </div>
+            </div>
+          )}
           {post.user_id === me.id && <button onClick={()=>{ if (window.confirm("Supprimer ce souvenir ?")) { onDelete(post); onClose(); } }} style={{marginTop:12,padding:"8px 12px",borderRadius:10,background:"transparent",border:`1px solid ${t.accent}66`,color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>🗑 Supprimer</button>}
         </div>
       </div>
@@ -2079,20 +2178,25 @@ function PostViewer({ post, me, onClose, onOpenProfile, onDelete, t }) {
   );
 }
 
-function GalleryPage({ me, posts, stories, activities, onOpenProfile, onAddPost, onDeletePost, onAddStory, onDeleteStory, t }) {
+function GalleryPage({ me, posts, stories, activities, friendIds, actions, focusPostId, onFocusDone, onOpenProfile, onAddPost, onDeletePost, onAddStory, onDeleteStory, t }) {
+  const [scope, setScope] = useState("all");   // "friends" | "all"
   const [cat, setCat] = useState("Tous");
   const [composer, setComposer] = useState(false);
-  const [viewPost, setViewPost] = useState(null);
+  const [viewId, setViewId] = useState(null);
   const [storyView, setStoryView] = useState(null);
-  const counts = {}; posts.forEach(p=>{ counts[p.category] = (counts[p.category]||0) + 1; });
+  useEffect(()=>{ if (focusPostId && posts.some(p=>p.id===focusPostId)) { setViewId(focusPostId); onFocusDone?.(); } },[focusPostId, posts]);
+  const viewPost = viewId ? posts.find(p=>p.id===viewId) : null;
+  const scoped = scope==="friends" ? posts.filter(p=>p.user_id===me.id || friendIds.includes(p.user_id)) : posts;
+  const counts = {}; scoped.forEach(p=>{ counts[p.category] = (counts[p.category]||0) + 1; });
   const cats = CATEGORIES.filter(c=>c!=="Tous" && counts[c]);
   const shown = cat === "Tous" ? cats : [cat];
   const Thumb = ({p}) => (
-    <div onClick={()=>setViewPost(p)} style={{position:"relative",aspectRatio:"1",background:t.bg3,borderRadius:10,overflow:"hidden",cursor:"pointer"}}>
+    <div onClick={()=>setViewId(p.id)} style={{position:"relative",aspectRatio:"1",background:t.bg3,borderRadius:10,overflow:"hidden",cursor:"pointer"}}>
       {p.media_type === "video"
         ? <video src={p.url + "#t=0.1"} preload="metadata" muted playsInline style={{width:"100%",height:"100%",objectFit:"cover",pointerEvents:"none"}} />
         : <img src={p.url} alt="" loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}} />}
       {p.media_type === "video" && <span style={{position:"absolute",right:6,top:6,background:"rgba(0,0,0,0.55)",color:"#fff",borderRadius:6,fontSize:11,padding:"1px 6px"}}>▶</span>}
+      {(p.likes?.length>0) && <span style={{position:"absolute",left:6,bottom:6,background:"rgba(0,0,0,0.55)",color:"#fff",borderRadius:6,fontSize:11,padding:"1px 6px"}}>❤ {p.likes.length}</span>}
     </div>
   );
   return (
@@ -2102,26 +2206,31 @@ function GalleryPage({ me, posts, stories, activities, onOpenProfile, onAddPost,
         <Btn accent small onClick={()=>setComposer(true)} t={t}>＋ Partager</Btn>
       </div>
       <StoriesBar me={me} stories={stories} onAddFile={async f=>{ const e=checkMedia(f); if(e){ alert(e); return; } await onAddStory(f); }} onOpen={(i,groups)=>setStoryView({ i, groups })} t={t} />
-      <div style={{display:"flex",gap:6,overflowX:"auto",padding:"6px 0 14px"}}>
+      <div style={{display:"flex",borderBottom:`1px solid ${t.border}`,margin:"4px 0 12px"}}>
+        {[["all","🌍 Tout le monde"],["friends","👥 Mes amis"]].map(([id,l])=>(
+          <button key={id} onClick={()=>setScope(id)} style={{flex:1,padding:"10px",background:"none",border:"none",borderBottom:`2px solid ${scope===id?t.accent:"transparent"}`,color:scope===id?t.accent:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer"}}>{l}</button>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:6,overflowX:"auto",padding:"2px 0 14px"}}>
         {CATEGORIES.map(c=>(
           <button key={c} onClick={()=>setCat(c)} style={{flexShrink:0,padding:"6px 12px",borderRadius:20,border:"1px solid",borderColor:cat===c?t.accent:t.border,background:cat===c?t.accentBg:"transparent",color:cat===c?t.accent:t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>
             {CAT_ICONS[c]} {c}{c!=="Tous"&&counts[c]?` (${counts[c]})`:""}
           </button>
         ))}
       </div>
-      {posts.length === 0 && <div style={{textAlign:"center",padding:"48px 10px",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13}}>Aucun souvenir pour l'instant. Partage les photos et vidéos de tes sorties !</div>}
-      {posts.length > 0 && cat !== "Tous" && !counts[cat] && <div style={{textAlign:"center",padding:"36px 10px",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13}}>Rien dans cette catégorie pour l'instant.</div>}
+      {scoped.length === 0 && <div style={{textAlign:"center",padding:"48px 10px",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13}}>{scope==="friends" ? "Tes amis n'ont encore rien partagé." : "Aucun souvenir pour l'instant. Partage les photos et vidéos de tes sorties !"}</div>}
+      {scoped.length > 0 && cat !== "Tous" && !counts[cat] && <div style={{textAlign:"center",padding:"36px 10px",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13}}>Rien dans cette catégorie pour l'instant.</div>}
       {shown.filter(c=>counts[c]).map(c=>(
         <div key={c} style={{marginBottom:22}}>
           <div style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:t.accent,letterSpacing:"0.08em",marginBottom:8}}>{CAT_ICONS[c]} {c.toUpperCase()} · {counts[c]}</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
-            {posts.filter(p=>p.category===c).map(p=><Thumb key={p.id} p={p}/>)}
+            {scoped.filter(p=>p.category===c).map(p=><Thumb key={p.id} p={p}/>)}
           </div>
         </div>
       ))}
       {composer && <PostComposer me={me} activities={activities} onClose={()=>setComposer(false)} onSubmit={onAddPost} t={t} />}
-      {viewPost && <PostViewer post={viewPost} me={me} onClose={()=>setViewPost(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} />}
-      {storyView && <StoryViewer groups={storyView.groups} startGroup={storyView.i} me={me} onClose={()=>setStoryView(null)} onDelete={onDeleteStory} t={t} />}
+      {viewPost && <PostViewer post={viewPost} me={me} actions={actions} onClose={()=>setViewId(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} />}
+      {storyView && <StoryViewer groups={storyView.groups} startGroup={storyView.i} me={me} actions={actions} onClose={()=>setStoryView(null)} onDelete={onDeleteStory} t={t} />}
     </div>
   );
 }
@@ -2149,7 +2258,16 @@ function CallIcon({ name, size=28 }) {
   return null;
 }
 
+let _audioCtx = null;
+const getAudioCtx = () => { try { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; } catch { return null; } };
+const unlockAudio = () => {            // à appeler lors d'un geste de l'utilisateur : débloque le son (navigateurs / iPhone)
+  const c = getAudioCtx(); if (!c) return;
+  c.resume?.();
+  try { const b = c.createBuffer(1, 1, 22050), src = c.createBufferSource(); src.buffer = b; src.connect(c.destination); src.start(0); } catch {}
+};
+
 function useCalls(meId, isFriend, findUser, t) {
+  const [min, setMin] = useState(false);   // appel réduit : on peut naviguer dans l'app
   const [call, setCall] = useState(null);      // { peer, video, status, incoming, callId }
   const [remote, setRemote] = useState(null);
   const [local, setLocal] = useState(null);
@@ -2175,13 +2293,14 @@ function useCalls(meId, isFriend, findUser, t) {
   }, [meId]);
 
   // ── sonnerie
-  const stopRing = () => { const r = R.current.ring; if (r) { clearInterval(r.id); try { r.ctx.close(); } catch {} R.current.ring = null; } try { navigator.vibrate?.(0); } catch {} };
+  const stopRing = () => { const r = R.current.ring; if (r) { clearInterval(r.id); try { r.master.gain.value = 0; r.master.disconnect(); } catch {} R.current.ring = null; } try { navigator.vibrate?.(0); } catch {} };
   // kind "in" : sonnerie rigolote (petite mélodie qui rebondit) · kind "out" : bip d'attente de l'appelant
   const startRing = (kind = "in") => {
     stopRing();
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = getAudioCtx(); if (!ctx) return;
       ctx.resume?.();
+      const master = ctx.createGain(); master.gain.value = 1; master.connect(ctx.destination);
       const tone = (f, t0, d, type = "triangle", vol = 0.16, f2 = null) => {
         const o = ctx.createOscillator(), g = ctx.createGain();
         o.type = type; o.frequency.setValueAtTime(f, ctx.currentTime + t0);
@@ -2189,7 +2308,7 @@ function useCalls(meId, isFriend, findUser, t) {
         g.gain.setValueAtTime(0.0001, ctx.currentTime + t0);
         g.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + t0 + 0.02);
         g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t0 + d);
-        o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t0); o.stop(ctx.currentTime + t0 + d + 0.02);
+        o.connect(g); g.connect(master); o.start(ctx.currentTime + t0); o.stop(ctx.currentTime + t0 + d + 0.02);
       };
       let play, period;
       if (kind === "out") {                       // bi-biip, puis silence
@@ -2206,7 +2325,7 @@ function useCalls(meId, isFriend, findUser, t) {
         try { navigator.vibrate?.([250, 120, 250, 120, 400]); } catch {}
       }
       play();
-      R.current.ring = { ctx, id: setInterval(() => { play(); if (kind === "in") { try { navigator.vibrate?.([250, 120, 250, 120, 400]); } catch {} } }, period) };
+      R.current.ring = { master, id: setInterval(() => { play(); if (kind === "in") { try { navigator.vibrate?.([250, 120, 250, 120, 400]); } catch {} } }, period) };
     } catch {}
   };
 
@@ -2217,7 +2336,7 @@ function useCalls(meId, isFriend, findUser, t) {
     try { r.pc?.close(); } catch {}
     r.local?.getTracks().forEach(x => x.stop());
     Object.assign(r, { pc: null, local: null, callId: null, peerId: null, ice: [] });
-    setCall(null); setRemote(null); setLocal(null); setMuted(false); setCamOff(false); setSecs(0);
+    setCall(null); setMin(false); setRemote(null); setLocal(null); setMuted(false); setCamOff(false); setSecs(0);
   }, []);
 
   const getMedia = async (video) => {
@@ -2272,6 +2391,7 @@ function useCalls(meId, isFriend, findUser, t) {
     cleanup();
   };
 
+  const ignore = () => { stopRing(); setMin(true); };   // met l'appel de côté sans raccrocher
   const toggleMute = () => { const tr = R.current.local?.getAudioTracks(); tr?.forEach(x => x.enabled = !x.enabled); setMuted(m => !m); };
   const toggleCam = () => { const tr = R.current.local?.getVideoTracks(); tr?.forEach(x => x.enabled = !x.enabled); setCamOff(v => !v); };
 
@@ -2321,6 +2441,11 @@ function useCalls(meId, isFriend, findUser, t) {
   }, [meId]);
 
   useEffect(() => () => cleanup(), [meId]);
+  useEffect(() => {
+    const u = () => unlockAudio();
+    ["pointerdown", "touchend", "keydown", "click"].forEach(e => window.addEventListener(e, u, { passive: true }));
+    return () => ["pointerdown", "touchend", "keydown", "click"].forEach(e => window.removeEventListener(e, u));
+  }, []);
 
   // chronomètre
   useEffect(() => {
@@ -2331,8 +2456,8 @@ function useCalls(meId, isFriend, findUser, t) {
 
   // ── interface
   const rv = useRef(null), lv = useRef(null);
-  useEffect(() => { if (rv.current) rv.current.srcObject = remote; }, [remote, call?.status]);
-  useEffect(() => { if (lv.current) lv.current.srcObject = local; }, [local, call?.status]);
+  useEffect(() => { if (rv.current) rv.current.srcObject = remote; }, [remote, call?.status, min]);
+  useEffect(() => { if (lv.current) lv.current.srcObject = local; }, [local, call?.status, min]);
 
   let ui = null;
   if (call) {
@@ -2344,9 +2469,13 @@ function useCalls(meId, isFriend, findUser, t) {
     const lbl = (txt) => <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, marginTop: 8, opacity: 0.85, textAlign: "center" }}>{txt}</div>;
     const item = (btn, txt) => <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>{btn}{lbl(txt)}</div>;
     const GLASS = "rgba(255,255,255,0.22)", GLASS_ON = "#fff";
-    ui = (
+    const full = (
       <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "#0D0A12", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", color: "#fff", padding: "calc(40px + env(safe-area-inset-top, 0px)) 20px calc(36px + env(safe-area-inset-bottom, 0px))" }}>
         <video ref={rv} autoPlay playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: showVideo ? 1 : 0, background: "#000" }} />
+        <button onClick={call.status === "ringing" ? ignore : () => setMin(true)} style={{ position: "absolute", left: 14, top: "calc(14px + env(safe-area-inset-top, 0px))", zIndex: 2, display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: "none", background: "rgba(255,255,255,0.2)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", color: "#fff", fontFamily: "'DM Sans',sans-serif", fontSize: 13, cursor: "pointer" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          {call.status === "ringing" ? "Ignorer" : "Réduire"}
+        </button>
         <div style={{ position: "relative", textAlign: "center", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>
           {!showVideo && <div style={{ display: "inline-block", marginBottom: 16 }}><Avatar user={call.peer} size={120} t={t} /></div>}
           <div style={{ fontFamily: "'Fraunces',serif", fontSize: 26 }}>{call.peer?.name}</div>
@@ -2367,6 +2496,29 @@ function useCalls(meId, isFriend, findUser, t) {
         </div>
       </div>
     );
+    const sb = (bg) => ({ width: 40, height: 40, borderRadius: "50%", border: "none", background: bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, flexShrink: 0 });
+    const banner = (
+      <>
+        <video ref={rv} autoPlay playsInline style={{ position: "fixed", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
+        <div style={{ position: "fixed", left: 10, right: 10, top: "calc(8px + env(safe-area-inset-top, 0px))", zIndex: 500, maxWidth: 480, margin: "0 auto", background: "rgba(24,18,32,0.96)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 18, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10, color: "#fff", boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
+          <div onClick={() => setMin(false)} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, cursor: "pointer" }}>
+            <Avatar user={call.peer} size={40} t={t} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{call.peer?.name}</div>
+              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, opacity: 0.8 }}>{label}</div>
+            </div>
+          </div>
+          {call.status === "ringing" ? (<>
+            <button onClick={hangup} style={sb("#FF3B30")} aria-label="Refuser"><CallIcon name="hangup" size={20} /></button>
+            <button onClick={() => { setMin(false); accept(); }} style={sb("#34C759")} aria-label="Répondre"><CallIcon name={call.video ? "acceptVideo" : "accept"} size={20} /></button>
+          </>) : (<>
+            <button onClick={() => setMin(false)} style={{ ...sb("rgba(255,255,255,0.18)"), width: "auto", padding: "0 14px", borderRadius: 20, fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "#fff" }}>Ouvrir</button>
+            <button onClick={hangup} style={sb("#FF3B30")} aria-label="Raccrocher"><CallIcon name="hangup" size={20} /></button>
+          </>)}
+        </div>
+      </>
+    );
+    ui = min ? banner : full;
   }
   return { start, ui, busy: !!call };
 }
@@ -2469,6 +2621,23 @@ export default function App() {
   const [stories, setStories] = useState([]);
   const refreshPosts = useCallback(()=>api.listPosts().then(r=>setPosts(r.map(p=>({...p,author:shapeUser(p.author)})))).catch(console.error),[]);
   const refreshStories = useCallback(()=>api.listStories().then(r=>setStories(r.map(x=>({...x,author:shapeUser(x.author)})))).catch(console.error),[]);
+  const [sharePost, setSharePost] = useState(null);
+  const [focusPostId, setFocusPostId] = useState(null);
+  const postActions = {
+    like: async (p) => {
+      const liked = p.likes?.some(l=>l.user_id===me0.id);
+      setPosts(ps=>ps.map(x=>x.id!==p.id?x:{...x, likes: liked ? x.likes.filter(l=>l.user_id!==me0.id) : [...(x.likes||[]), {user_id:me0.id}]}));
+      try { await (liked ? api.unlikePost(p.id, me0.id) : api.likePost(p.id, me0.id)); } catch(e) { fail(e); refreshPosts(); }
+    },
+    loadComments: (id) => api.listComments(id),
+    addComment: async (p, text) => { try { await api.addComment(p.id, me0.id, text); refreshPosts(); } catch(e) { fail(e); } },
+    deleteComment: async (p, c) => { try { await api.deleteComment(c.id); refreshPosts(); } catch(e) { fail(e); } },
+    share: (p) => setSharePost(p),
+    likeStory: (st) => api.likeStory(st.id, me0.id).catch(console.error),
+    unlikeStory: (st) => api.unlikeStory(st.id, me0.id).catch(console.error),
+    replyStory: (st, text) => api.sendDM(me0.id, st.user_id, "↩️ Réponse à ta story : " + text).catch(fail),
+  };
+  const sendPostToFriend = (u, p) => api.sendDM(me0.id, u.id, `📷 Souvenir de @${p.author?.pseudo}${p.caption?" : "+p.caption:""}\n${p.url}`).catch(fail);
   const handleAddPost = async (d) => { try { await api.createPost(me0.id, d); await refreshPosts(); return true; } catch(e) { fail(e); return false; } };
   const handleDeletePost = async (p) => { try { await api.deletePost(p); refreshPosts(); } catch(e) { fail(e); } };
   const handleAddStory = async (f) => { try { await api.createStory(me0.id, f); await refreshStories(); } catch(e) { fail(e); } };
@@ -2585,6 +2754,8 @@ export default function App() {
       if (u) openDM(u); else setPage("messages");
       return;
     }
+    if (kind==="post_like" || kind==="post_comment") { setFocusPostId(n.ref_id); setPage("gallery"); return; }
+    if (kind==="story_like") { setPage("gallery"); return; }
     if (kind==="activity_cancelled") return;
     if (kind==="friend_request" || kind==="friend_accepted") { refreshFriends(); setPage("friends"); return; }
     let actId = n.ref_id;
@@ -2922,14 +3093,14 @@ export default function App() {
           {page==="gallery"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
               <GalleryPage me={me} posts={posts.filter(p=>!blockedIds.includes(p.user_id))} stories={stories.filter(x=>!blockedIds.includes(x.user_id))} activities={activities}
-                onOpenProfile={setProfileUser} onAddPost={handleAddPost} onDeletePost={handleDeletePost} onAddStory={handleAddStory} onDeleteStory={handleDeleteStory} t={t} />
+                friendIds={friendIds} actions={postActions} focusPostId={focusPostId} onFocusDone={()=>setFocusPostId(null)} onOpenProfile={setProfileUser} onAddPost={handleAddPost} onDeletePost={handleDeletePost} onAddStory={handleAddStory} onDeleteStory={handleDeleteStory} t={t} />
             </div>
           )}
 
           {/* AMIS : dans le profil */}
           {page==="friends"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <MyProfilePage currentUser={me} startTab="friends" onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser}
+              <MyProfilePage currentUser={me} startTab="friends" onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser} actions={postActions}
                 friendsView={<FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onOpenDM={openDM} embedded t={t} />} t={t} />
             </div>
           )}
@@ -2937,7 +3108,7 @@ export default function App() {
           {/* MY PROFILE */}
           {page==="profile"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <MyProfilePage currentUser={me} onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser}
+              <MyProfilePage currentUser={me} onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser} actions={postActions}
                 friendsView={<FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onOpenDM={openDM} embedded t={t} />} t={t} />
             </div>
           )}
@@ -2998,6 +3169,7 @@ export default function App() {
           geoStatus={geoStatus} hasPos={!!userPos} sharing={sharing} onToggleShare={toggleSharing} onAskLocation={requestLocation}
           onAdd={u=>sendFriendReq(u.id)} onOpenProfile={u=>setProfileUser(u)} onClose={()=>setShowNearby(false)} />}
 
+        {sharePost && <ShareModal post={sharePost} friends={allUsers.filter(u=>friendIds.includes(u.id))} onSend={sendPostToFriend} onClose={()=>setSharePost(null)} t={t} />}
         {calls.ui}
         {/* ── PROFILE MODAL ── */}
         {profileUser&&(

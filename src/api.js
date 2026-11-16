@@ -247,7 +247,7 @@ const kindOf = (file) => (file.type || "").startsWith("video") ? "video" : "imag
 const pubUrl = (bucket, path) => supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 
 export const listPosts = () =>
-  supabase.from("posts").select("*, author:profiles!user_id(*), activity:activities!activity_id(id,title)")
+  supabase.from("posts").select("*, author:profiles!user_id(*), activity:activities!activity_id(id,title), likes:post_likes(user_id), comments:post_comments(id)")
     .order("created_at", { ascending: false }).limit(300)
     .then(ok).then(rows => rows.map(p => ({ ...p, url: pubUrl("posts", p.media_path) })));
 
@@ -265,7 +265,7 @@ export async function deletePost(post) {
 
 // ── STORIES (24 h) ──────────────────────────────────────────────
 export const listStories = () =>
-  supabase.from("stories").select("*, author:profiles!user_id(*)")
+  supabase.from("stories").select("*, author:profiles!user_id(*), likes:story_likes(user_id)")
     .gt("created_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString())
     .order("created_at", { ascending: true })
     .then(ok).then(rows => rows.map(s => ({ ...s, url: pubUrl("stories", s.media_path) })));
@@ -290,3 +290,14 @@ export async function deleteStory(story) {
   ok(await supabase.from("stories").delete().eq("id", story.id));
   try { await supabase.storage.from("stories").remove([story.media_path]); } catch {}
 }
+
+// ── LIKES / COMMENTAIRES ────────────────────────────────────────
+export const likePost = (postId, userId) => supabase.from("post_likes").insert({ post_id: postId, user_id: userId }).then(ok);
+export const unlikePost = (postId, userId) => supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", userId).then(ok);
+export const listComments = (postId) =>
+  supabase.from("post_comments").select("*, author:profiles!user_id(*)").eq("post_id", postId).order("created_at").then(ok);
+export const addComment = (postId, userId, text) =>
+  supabase.from("post_comments").insert({ post_id: postId, user_id: userId, text }).then(ok);
+export const deleteComment = (id) => supabase.from("post_comments").delete().eq("id", id).then(ok);
+export const likeStory = (storyId, userId) => supabase.from("story_likes").insert({ story_id: storyId, user_id: userId }).then(ok);
+export const unlikeStory = (storyId, userId) => supabase.from("story_likes").delete().eq("story_id", storyId).eq("user_id", userId).then(ok);
