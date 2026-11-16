@@ -347,9 +347,10 @@ function DeleteAccountModal({ onConfirm, onClose, t }) {
   );
 }
 
-function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onReport, onBlock, isFriend, hasPendingReq, t}) {
+function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onReport, onBlock, isFriend, hasPendingReq, userActs=[], onOpenActivity, t}) {
   const isMe = user.id===currentUser.id;
   const [menu, setMenu] = useState(false);
+  const [showActs, setShowActs] = useState(false);
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose} {...swipeDown(onClose)}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:380,padding:28,position:"relative"}}>
@@ -381,6 +382,20 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
             </div>
           ))}
         </div>
+        {userActs.length>0&&(
+          <div style={{marginBottom:16}}>
+            <button onClick={()=>setShowActs(v=>!v)} style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1px solid ${t.border}`,background:t.bg3,color:t.text,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span>🗓 {userActs.length} sortie{userActs.length>1?"s":""} à venir</span><span style={{color:t.text3}}>{showActs?"▲":"▼"}</span>
+            </button>
+            {showActs&&<div style={{marginTop:8,maxHeight:200,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
+              {userActs.map(a=>{ const left=a.maxPeople-(a.accepted?.length||0); return (
+                <div key={a.id} onClick={()=>onOpenActivity(a)} style={{cursor:"pointer",background:t.bg2,border:`1px solid ${t.border}`,borderRadius:12,padding:"10px 12px"}}>
+                  <div style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:600}}>{CAT_ICONS[a.category]} {a.title}</div>
+                  <div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,marginTop:3}}>{new Date(a.date).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})} · {a.time} · {left>0?`${left} place${left>1?"s":""} libre${left>1?"s":""}`:"complet"}</div>
+                </div>); })}
+            </div>}
+          </div>
+        )}
         {!isMe&&(
           <div style={{display:"flex",gap:10}}>
             {isFriend ? (
@@ -456,8 +471,8 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, f
             <SocialLinks user={currentUser} t={t} />
           </div>
           <div style={{display:"flex",justifyContent:"center",gap:34,marginBottom:18}}>
-            {[[myPosts.length,"Souvenirs"],[currentUser.friends?.length||0,"Amis"]].map(([n,l])=>(
-              <div key={l} style={{textAlign:"center"}}><div style={{fontFamily:"'DM Mono',monospace",fontSize:20,fontWeight:700,color:t.text}}>{n}</div><div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:t.text3,letterSpacing:"0.06em"}}>{l.toUpperCase()}</div></div>
+            {[[myPosts.length,"Souvenirs","posts"],[currentUser.friends?.length||0,"Amis","friends"]].map(([n,l,tb])=>(
+              <div key={l} onClick={()=>setTab(tb)} role="button" style={{textAlign:"center",cursor:"pointer",outline:tab===tb?"none":"none",borderBottom:`2px solid ${tab===tb?t.accent:"transparent"}`,paddingBottom:3}}><div style={{fontFamily:"'DM Mono',monospace",fontSize:20,fontWeight:700,color:t.text}}>{n}</div><div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:t.text3,letterSpacing:"0.06em"}}>{l.toUpperCase()}</div></div>
             ))}
           </div>
           <div style={{display:"flex",gap:10,marginBottom:22}}>
@@ -754,7 +769,7 @@ function VoiceMessageBubble({ msg, isMe, t }) {
 //  • maintenir le micro = enregistrer, relâcher = envoyer
 //  • glisser vers la gauche = annuler
 //  • glisser vers le haut = verrouiller (mains libres), puis ➤ pour envoyer ou 🗑 pour annuler
-function ChatInputBar({ onSend, onVoiceSend, onStatus, onPickFile, onGif, t, placeholder="Écrire…", padH=16, padV=12 }) {
+function ChatInputBar({ onSend, onVoiceSend, onStatus, onPickFile, onGif, onPoll, replyTo, replyLabel, onCancelReply, t, placeholder="Écrire…", padH=16, padV=12 }) {
   const [msg, setMsg] = useState("");
   const voice = useVoiceRecorder();
   const [mode, setMode] = useState("idle"); // idle | holding | locked
@@ -769,7 +784,7 @@ function ChatInputBar({ onSend, onVoiceSend, onStatus, onPickFile, onGif, t, pla
   useEffect(() => { if (!onStatus || mode === "idle") return; const i = setInterval(() => onStatus("recording"), 30000); return () => clearInterval(i); }, [mode]);
   const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 
-  const send = () => { if (msg.trim()) { onSend(msg.trim()); setMsg(""); lastTypingRef.current = 0; onStatus && onStatus("idle"); } };
+  const send = () => { if (msg.trim()) { onSend(msg.trim(), replyTo?.id); onCancelReply && onCancelReply(); setMsg(""); lastTypingRef.current = 0; onStatus && onStatus("idle"); } };
   const reset = () => { setMode("idle"); setDrag({ x: 0, y: 0 }); onStatus && onStatus("idle"); };
   const flashHint = () => { setHint(true); setTimeout(() => setHint(false), 1800); };
 
@@ -832,6 +847,15 @@ function ChatInputBar({ onSend, onVoiceSend, onStatus, onPickFile, onGif, t, pla
 
   return (
     <div style={{ padding: `${padV}px ${padH}px calc(${padV}px + env(safe-area-inset-bottom, 0px))`, borderTop: `1px solid ${t.border}`, background: t.bg2, display: "flex", gap: 10, alignItems: "center", position: "relative", userSelect: "none", WebkitUserSelect: "none" }}>
+      {replyTo && (
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", background: t.bg2, borderTop: `1px solid ${t.border}`, borderLeft: `3px solid ${t.accent}` }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: t.accent, fontFamily: "'DM Mono',monospace" }}>Réponse à {replyLabel}</div>
+            <div style={{ fontSize: 13, color: t.text2, fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{replyTo.poll_id ? "📊 Sondage" : replyTo.type === "voice" ? "🎤 Message vocal" : replyTo.type && replyTo.type !== "text" ? "📷 Média" : replyTo.text}</div>
+          </div>
+          <button onClick={onCancelReply} aria-label="Annuler la réponse" style={{ background: "none", border: "none", color: t.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
+        </div>
+      )}
       {hint && (
         <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: "calc(100% + 8px)", background: t.bg3, border: `1px solid ${t.border}`, color: t.text2, fontFamily: "'DM Mono',monospace", fontSize: 11, padding: "7px 12px", borderRadius: 10, whiteSpace: "nowrap", zIndex: 5 }}>
           Maintiens le micro pour enregistrer
@@ -848,6 +872,7 @@ function ChatInputBar({ onSend, onVoiceSend, onStatus, onPickFile, onGif, t, pla
         <div style={{ position: "absolute", left: padH, bottom: "calc(100% + 8px)", zIndex: 8, background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 14, overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.4)" }}>
           <button onClick={() => fileRef.current?.click()} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14, cursor: "pointer" }}>📷 Photo ou vidéo</button>
           {onGif && <button onClick={() => { setMenuOpen(false); onGif(); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14, cursor: "pointer" }}>🎞 GIF</button>}
+          {onPoll && <button onClick={() => { setMenuOpen(false); onPoll(); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14, cursor: "pointer" }}>📊 Sondage</button>}
         </div>
       )}
       {onPickFile && <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: "none" }}
@@ -1049,7 +1074,90 @@ function useReactions(scope, messages, meId) {
   return { map, react };
 }
 
-function MessageSheet({ msg, isMe, canModerate, myEmoji, onReact, onUnsend, onClose, t }) {
+// ── Texte avec @mentions mises en valeur ──
+function renderText(text, isMe, t) {
+  if (!text) return null;
+  return text.split(/(@[\p{L}\p{N}_.]{2,30})/u).map((p, i) => /^@/.test(p) ? <b key={i} style={{ color: isMe ? "#fff" : t.accent, textDecoration: "underline" }}>{p}</b> : p);
+}
+
+// ── Citation d'un message auquel on répond ──
+function ReplyQuote({ msg, all, resolveUser, isMe, t }) {
+  if (!msg.reply_to) return null;
+  const o = all.find(x => x.id === msg.reply_to);
+  const who = o ? (resolveUser(o.senderId || o.sender?.id || o.sender_id)?.pseudo || "…") : "";
+  const label = !o ? "Message supprimé" : o.poll_id ? "📊 Sondage" : o.type === "voice" ? "🎤 Message vocal" : o.type === "image" ? "📷 Photo" : o.type === "video" ? "🎬 Vidéo" : o.type === "gif" ? "GIF" : (o.text || "");
+  return (
+    <div style={{ maxWidth: "100%", margin: "0 0 -6px", padding: "6px 12px 10px", borderRadius: 14, background: t.bg3, border: `1px solid ${t.border}`, borderLeft: `3px solid ${t.accent}`, opacity: 0.85 }}>
+      {who && <div style={{ fontSize: 10, color: t.accent, fontFamily: "'DM Mono',monospace" }}>↩ {who}</div>}
+      <div style={{ fontSize: 12, color: t.text2, fontFamily: "'DM Sans',sans-serif", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{label}</div>
+    </div>
+  );
+}
+
+// ── Bandeau du message épinglé ──
+function PinnedBanner({ messages, resolveUser, onUnpin, t }) {
+  const p = messages.filter(m => m.pinned_at).sort((a, b) => new Date(b.pinned_at) - new Date(a.pinned_at))[0];
+  if (!p) return null;
+  const label = p.poll_id ? "📊 Sondage" : p.type === "voice" ? "🎤 Message vocal" : p.type === "image" ? "📷 Photo" : p.type === "video" ? "🎬 Vidéo" : p.type === "gif" ? "GIF" : p.text;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", background: t.accentBg, borderBottom: `1px solid ${t.border}` }}>
+      <span>📌</span>
+      <div style={{ flex: 1, minWidth: 0, fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <b style={{ color: t.accent, fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{resolveUser(p.senderId || p.sender?.id || p.sender_id)?.pseudo} </b>{label}
+      </div>
+      <button onClick={() => onUnpin(p)} aria-label="Désépingler" style={{ background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 16 }}>✕</button>
+    </div>
+  );
+}
+
+// ── Sondage ──
+function PollBubble({ pollId, meId, isMe, t }) {
+  const [poll, setPoll] = useState(null);
+  const load = useCallback(() => api.getPoll(pollId).then(setPoll).catch(() => {}), [pollId]);
+  useEffect(() => { load(); const i = setInterval(() => { if (document.visibilityState === "visible") load(); }, 6000); return () => clearInterval(i); }, [load]);
+  if (!poll) return <div style={{ padding: "10px 14px", color: t.text3, fontSize: 13 }}>📊 Chargement du sondage…</div>;
+  const total = poll.votes.length;
+  const mine = poll.votes.find(v => v.user_id === meId)?.option_idx;
+  const vote = async (i) => {
+    setPoll(p => ({ ...p, votes: [...p.votes.filter(v => v.user_id !== meId), ...(mine === i ? [] : [{ user_id: meId, option_idx: i }])] }));
+    try { await (mine === i ? api.unvotePoll(pollId, meId) : api.votePoll(pollId, meId, i)); } catch { load(); }
+  };
+  return (
+    <div style={{ width: 250, maxWidth: "100%", background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 16, padding: 14 }}>
+      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: t.accent, marginBottom: 4 }}>📊 SONDAGE</div>
+      <div style={{ fontFamily: "'Fraunces',serif", fontSize: 15, color: t.text, marginBottom: 10 }}>{poll.question}</div>
+      {poll.options.map((o, i) => {
+        const n = poll.votes.filter(v => v.option_idx === i).length; const pct = total ? Math.round(n * 100 / total) : 0;
+        return (
+          <button key={i} onClick={() => vote(i)} style={{ position: "relative", display: "block", width: "100%", textAlign: "left", marginBottom: 6, padding: "9px 12px", borderRadius: 10, overflow: "hidden", cursor: "pointer", background: t.bg3, border: `1.5px solid ${mine === i ? t.accent : t.border}`, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 13 }}>
+            <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${pct}%`, background: t.accentBg, transition: "width .3s" }} />
+            <span style={{ position: "relative", display: "flex", justifyContent: "space-between", gap: 8 }}><span>{mine === i ? "✓ " : ""}{o}</span><span style={{ color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{n}</span></span>
+          </button>);
+      })}
+      <div style={{ fontSize: 10, color: t.text3, fontFamily: "'DM Mono',monospace" }}>{total} vote{total > 1 ? "s" : ""} · touche pour voter ou changer</div>
+    </div>
+  );
+}
+
+function PollCreateModal({ onCreate, onClose, t }) {
+  const [q, setQ] = useState(""); const [opts, setOpts] = useState(["", ""]); const [busy, setBusy] = useState(false);
+  const clean = opts.map(o => o.trim()).filter(Boolean);
+  const ok = q.trim() && clean.length >= 2;
+  const inp = { width: "100%", boxSizing: "border-box", padding: "11px 14px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.bg3, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14, marginBottom: 8 };
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 360, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: t.bg2, borderRadius: "22px 22px 0 0", padding: "18px 18px calc(18px + env(safe-area-inset-bottom, 0px))" }}>
+        <h3 style={{ margin: "0 0 12px", fontFamily: "'Fraunces',serif", color: t.text }}>📊 Nouveau sondage</h3>
+        <input value={q} maxLength={200} onChange={e => setQ(e.target.value)} placeholder="Ta question (ex : on mange où ?)" style={inp} />
+        {opts.map((o, i) => <input key={i} value={o} maxLength={60} onChange={e => setOpts(p => p.map((x, j) => j === i ? e.target.value : x))} placeholder={`Option ${i + 1}`} style={inp} />)}
+        {opts.length < 6 && <button onClick={() => setOpts(p => [...p, ""])} style={{ background: "none", border: "none", color: t.accent, cursor: "pointer", fontFamily: "'DM Mono',monospace", fontSize: 12, marginBottom: 10 }}>＋ Ajouter une option</button>}
+        <Btn accent disabled={!ok || busy} onClick={async () => { setBusy(true); try { await onCreate(q.trim(), clean); onClose(); } finally { setBusy(false); } }} t={t} style={{ width: "100%" }}>Publier le sondage</Btn>
+      </div>
+    </div>
+  );
+}
+
+function MessageSheet({ msg, isMe, canModerate, myEmoji, onReact, onUnsend, onReply, onPin, onClose, t }) {
   const [more, setMore] = useState(false);
   const act = { display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 6px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 15, cursor: "pointer", textAlign: "left" };
   const pick = (e) => { onReact(msg, e); onClose(); };
@@ -1065,6 +1173,8 @@ function MessageSheet({ msg, isMe, canModerate, myEmoji, onReact, onUnsend, onCl
           <button onClick={() => setMore(m => !m)} aria-label="Plus d'emojis" style={{ width: 40, height: 40, borderRadius: "50%", border: "none", cursor: "pointer", background: t.bg2, color: t.text2, fontSize: 20 }}>{more ? "–" : "＋"}</button>
         </div>
         {more && <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 2, marginBottom: 8 }}>{MORE_EMOJIS.map(emojiBtn)}</div>}
+        {onReply && <button style={act} onClick={() => { onReply(msg); onClose(); }}>↩️ Répondre</button>}
+        {onPin && <button style={act} onClick={() => { onPin(msg); onClose(); }}>📌 {msg.pinned_at ? "Retirer l'épingle" : "Épingler"}</button>}
         {msg.text && <button style={act} onClick={() => { navigator.clipboard?.writeText(msg.text).catch(() => {}); onClose(); }}>📋 Copier</button>}
         {isMe && <button style={{ ...act, color: "#FF3B30" }} onClick={() => { if (window.confirm("Annuler l'envoi ? Ce message disparaîtra pour tout le monde.")) { onUnsend(msg); onClose(); } }}>↩️ Annuler l'envoi</button>}
         {!isMe && canModerate && <button style={{ ...act, color: "#FF3B30" }} onClick={() => { if (window.confirm("Supprimer ce message pour tout le monde ?")) { onUnsend(msg); onClose(); } }}>🗑 Supprimer le message</button>}
@@ -1090,7 +1200,7 @@ function ReactionList({ reactions, myId, resolveUser, onRemove, onClose, t }) {
 }
 
 // Entoure une bulle de message : appui long / clic droit = menu, double toucher = ❤️, pastille de réactions
-function MsgWrap({ msg, isMe, canModerate, reactions = [], myId, onReact, onUnsend, resolveUser, t, children }) {
+function MsgWrap({ msg, isMe, canModerate, reactions = [], myId, onReact, onUnsend, onReply, onPin, resolveUser, t, children }) {
   const [sheet, setSheet] = useState(false);
   const [list, setList] = useState(false);
   const [hover, setHover] = useState(false);
@@ -1117,13 +1227,15 @@ function MsgWrap({ msg, isMe, canModerate, reactions = [], myId, onReact, onUnse
           {top.map(([e]) => <span key={e}>{e}</span>)}{reactions.length > 1 && <span style={{ fontSize: 11 }}>{reactions.length}</span>}
         </button>
       )}
-      {sheet && <MessageSheet msg={msg} isMe={isMe} canModerate={canModerate} myEmoji={mine?.emoji} onReact={onReact} onUnsend={onUnsend} onClose={() => setSheet(false)} t={t} />}
+      {sheet && <MessageSheet msg={msg} isMe={isMe} canModerate={canModerate} myEmoji={mine?.emoji} onReact={onReact} onUnsend={onUnsend} onReply={onReply} onPin={onPin} onClose={() => setSheet(false)} t={t} />}
       {list && <ReactionList reactions={reactions} myId={myId} resolveUser={resolveUser} onRemove={() => onReact(msg, mine?.emoji)} onClose={() => setList(false)} t={t} />}
     </div>
   );
 }
 
-function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onOpenProfile, onBack, onCall, group, onOpenInfo, statusName, onUnsend, t}) {
+function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMedia, onSendGif, onStatus, partnerStatus, onOpenProfile, onBack, onCall, group, onOpenInfo, statusName, onUnsend, onPin, onCreatePoll, t}) {
+  const [replyTo, setReplyTo] = useState(null);
+  const [pollOpen, setPollOpen] = useState(false);
   const reactions = useReactions(group ? "group" : "dm", messages, currentUser.id);
   const resolveUser = id => id===currentUser.id ? currentUser : group ? group.memberUsers.find(u=>u.id===id) : otherUser;
   const bottomRef = useRef();
@@ -1174,6 +1286,7 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
           </button>
         </div>}
       </div>
+      <PinnedBanner messages={messages} resolveUser={resolveUser} onUnpin={onPin} t={t} />
       <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
         {messages.length===0&&<p style={{color:t.text3,textAlign:"center",fontFamily:"'DM Mono',monospace",fontSize:12,padding:"40px 0"}}>Commencez la conversation !</p>}
         {messages.map((m,i)=>{
@@ -1185,14 +1298,17 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
               {!isMe&&<div onClick={group?()=>onOpenProfile(sender):undefined} style={{cursor:group?"pointer":"default",display:"flex"}}><Avatar user={sender} size={28} t={t} /></div>}
               <div style={{maxWidth:"72%",display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start"}}>
                 {group && !isMe && <span style={{fontSize:11,color:t.accent,fontFamily:"'DM Mono',monospace",margin:"0 0 3px 4px"}}>{sender?.pseudo}</span>}
-                <MsgWrap msg={m} isMe={isMe} myId={currentUser.id} reactions={reactions.map[m.id]||[]} onReact={reactions.react} onUnsend={onUnsend} resolveUser={resolveUser} t={t}>
-                {m.type==="voice" ? (
+                <ReplyQuote msg={m} all={messages} resolveUser={resolveUser} isMe={isMe} t={t} />
+                <MsgWrap msg={m} isMe={isMe} myId={currentUser.id} reactions={reactions.map[m.id]||[]} onReact={reactions.react} onUnsend={onUnsend} onReply={setReplyTo} onPin={onPin} resolveUser={resolveUser} t={t}>
+                {m.poll_id ? (
+                  <PollBubble pollId={m.poll_id} meId={currentUser.id} isMe={isMe} t={t} />
+                ) : m.type==="voice" ? (
                   <VoiceMessageBubble msg={m} isMe={isMe} t={t} />
                 ) : isMedia ? (
                   <MediaBubble msg={m} isMe={isMe} t={t} onOpen={setViewer} />
                 ) : (
                   <div style={{background:isMe?t.accent:t.bg3,borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",color:isMe?"#fff":t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,border:isMe?"none":`1px solid ${t.border}`}}>
-                    {m.text}
+                    {renderText(m.text,isMe,t)}
                   </div>
                 )}
                 </MsgWrap>
@@ -1204,11 +1320,12 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
         {statusText && <p style={{fontStyle:"italic",fontSize:11,color:t.text3,fontFamily:"'DM Sans',sans-serif",margin:"0 0 6px 36px"}}>{group ? statusName : otherUser.name.split(" ")[0]} {statusText}</p>}
         <div ref={bottomRef}/>
       </div>
-      <ChatInputBar onSend={onSend} onVoiceSend={onVoiceSend} onStatus={onStatus} onPickFile={pickFile}
+      <ChatInputBar onSend={onSend} replyTo={replyTo} replyLabel={replyTo?(resolveUser(replyTo.senderId)?.pseudo||""):""} onCancelReply={()=>setReplyTo(null)} onPoll={group&&onCreatePoll?()=>setPollOpen(true):null} onVoiceSend={onVoiceSend} onStatus={onStatus} onPickFile={pickFile}
         onGif={gifsEnabled ? ()=>setGifOpen(true) : null} t={t} placeholder="Écrire un message…" padH={16} />
       {pending && <MediaPreviewModal pending={pending} sending={sending} onSend={confirmSend} onCancel={closePending} t={t} />}
       {gifOpen && <GifPicker userId={currentUser.id} t={t} onClose={()=>setGifOpen(false)} onPick={url=>{ setGifOpen(false); onSendGif(url); }} />}
       {viewer && <MediaViewer item={viewer} onClose={()=>setViewer(null)} />}
+      {pollOpen && <PollCreateModal onCreate={onCreatePoll} onClose={()=>setPollOpen(false)} t={t} />}
     </div>
   );
 }
@@ -1244,7 +1361,9 @@ function NotifPanel({notifs, onMarkRead, onOpen, onClose, t}) {
 // ════════════════════════════════════════════════════════════════════════════════
 // ACTIVITY DETAIL
 // ════════════════════════════════════════════════════════════════════════════════
-function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMessage,onSendVoice,onSendMedia,onSendGif,onUnsend,onJoin,onOpenProfile,onDelete,isFav,onToggleFav,t}) {
+function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMessage,onSendVoice,onSendMedia,onSendGif,onUnsend,onJoin,onOpenProfile,onDelete,isFav,onToggleFav,onPin,onCreatePoll,t}) {
+  const [replyTo,setReplyTo]=useState(null);
+  const [pollOpen,setPollOpen]=useState(false);
   const bottomRef=useRef();
   const [copied,setCopied]=useState(false);
   const [onWait,setOnWait]=useState(false);
@@ -1340,6 +1459,7 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
       </div>
       {isMember?(
         <>
+          <PinnedBanner messages={activity.messages||[]} resolveUser={resolveUser} onUnpin={(m)=>onPin(activity.id,m)} t={t} />
           <div style={{flex:1,overflowY:"auto",padding:"0 24px",minHeight:0}}>
             <div style={{borderTop:`1px solid ${t.border}`,paddingTop:16,marginBottom:8}}>
               <p style={{margin:"0 0 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em"}}>💬 GROUPE</p>
@@ -1350,13 +1470,16 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
                     {!isMe&&<div onClick={()=>onOpenProfile(m.sender)} style={{cursor:"pointer"}}><Avatar user={m.sender} size={30} t={t}/></div>}
                     <div style={{maxWidth:"72%"}}>
                       {!isMe&&<p style={{margin:"0 0 3px",fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace"}}>{m.sender?.name}</p>}
-                      <MsgWrap msg={m} isMe={isMe} canModerate={isCreator} myId={currentUser.id} reactions={reactions.map[m.id]||[]} onReact={reactions.react} onUnsend={(mm)=>onUnsend(activity.id,mm)} resolveUser={resolveUser} t={t}>
-                      {m.type==="voice" ? (
+                      <ReplyQuote msg={{...m,senderId:m.sender?.id}} all={activity.messages} resolveUser={resolveUser} isMe={isMe} t={t} />
+                      <MsgWrap msg={m} isMe={isMe} canModerate={isCreator} myId={currentUser.id} reactions={reactions.map[m.id]||[]} onReact={reactions.react} onUnsend={(mm)=>onUnsend(activity.id,mm)} onReply={setReplyTo} onPin={(mm)=>onPin(activity.id,mm)} resolveUser={resolveUser} t={t}>
+                      {m.poll_id ? (
+                        <PollBubble pollId={m.poll_id} meId={currentUser.id} isMe={isMe} t={t} />
+                      ) : m.type==="voice" ? (
                         <VoiceMessageBubble msg={m} isMe={isMe} t={t} />
                       ) : (m.type==="image"||m.type==="video"||m.type==="gif") ? (
                         <MediaBubble msg={m} isMe={isMe} t={t} onOpen={setViewer} />
                       ) : (
-                        <div style={{background:isMe?t.accent:t.bg3,borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",color:isMe?"#fff":t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,border:isMe?"none":`1px solid ${t.border}`}}>{m.text}</div>
+                        <div style={{background:isMe?t.accent:t.bg3,borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",color:isMe?"#fff":t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,border:isMe?"none":`1px solid ${t.border}`}}>{renderText(m.text,isMe,t)}</div>
                       )}
                       </MsgWrap>
                       <p style={{margin:"3px 0 0",fontSize:10,color:t.text3,fontFamily:"'DM Mono',monospace",textAlign:isMe?"right":"left"}}>{m.time}</p>
@@ -1368,7 +1491,8 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
             </div>
           </div>
           <ChatInputBar
-            onSend={(text)=>onSendMessage(activity.id,text)}
+            onSend={(text,rid)=>onSendMessage(activity.id,text,rid)}
+            replyTo={replyTo} replyLabel={replyTo?(resolveUser(replyTo.sender?.id)?.pseudo||""):""} onCancelReply={()=>setReplyTo(null)} onPoll={()=>setPollOpen(true)}
             onVoiceSend={(url,dur,blob)=>onSendVoice(activity.id,blob,dur)}
             t={t}
             placeholder="Écrire au groupe…"
@@ -1377,6 +1501,7 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
             onGif={gifsEnabled ? ()=>setGifOpen(true) : null}
           />
           {pending && <MediaPreviewModal pending={pending} sending={sending} onSend={confirmSend} onCancel={closePending} t={t} />}
+          {pollOpen && <PollCreateModal onCreate={(q,o)=>onCreatePoll(activity.id,q,o)} onClose={()=>setPollOpen(false)} t={t} />}
           {gifOpen && <GifPicker userId={currentUser.id} t={t} onClose={()=>setGifOpen(false)} onPick={url=>{ setGifOpen(false); onSendGif(activity.id,url); }} />}
           {viewer && <MediaViewer item={viewer} onClose={()=>setViewer(null)} />}
         </>
@@ -3212,7 +3337,7 @@ export default function App() {
     setDmPartner(user); setDmMessages([]); loadDMs(user.id); setPage("dm");
     api.markMessageNotifsRead(me0.id, user.id).then(refreshNotifs).catch(()=>{});
   };
-  const sendDM = text => api.sendDM(me0.id, dmPartner.id, text).then(()=>loadDMs(dmPartner.id)).catch(fail);
+  const sendDM = (text, rid) => api.sendDM(me0.id, dmPartner.id, text, rid).then(()=>loadDMs(dmPartner.id)).catch(fail);
   const sendVoiceDM = (url, dur, blob) => api.sendDMVoice(me0.id, dmPartner.id, blob, dur).then(()=>loadDMs(dmPartner.id)).catch(fail);
 
   // ── Vues ───────────────────────────────────────────────────────────────────
@@ -3447,7 +3572,7 @@ export default function App() {
     try { const g = await api.createGroup(me0.id, name, ids); refreshGroups(); setTimeout(()=>{ setGroupId(g.id); setGroupMsgs([]); setPage("group"); }, 400); return true; }
     catch(e) { fail(e); return false; }
   };
-  const sendGroupText = text => api.sendGroupMessage(groupId, me0.id, text).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
+  const sendGroupText = (text, rid) => api.sendGroupMessage(groupId, me0.id, text, rid).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
   const sendGroupVoice = (url, dur, blob) => api.sendGroupVoice(groupId, me0.id, blob, dur).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
   const sendGroupMedia = (kind, file) => api.sendGroupMedia(groupId, me0.id, kind, file).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
   const sendGroupGif = url => api.sendGroupGif(groupId, me0.id, url).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
@@ -3517,7 +3642,9 @@ export default function App() {
   const handleJoin = id => api.requestJoin(id, me0.id).then(refreshActivities).catch(fail);
   const handleAccept = (id,userId) => api.acceptMember(id,userId).then(refreshActivities).catch(e=>fail(/complète/i.test(e.message)?new Error("La sortie est complète."):e));
   const handleReject = (id,userId) => api.rejectMember(id,userId).then(refreshActivities).catch(fail);
-  const handleSendMessage = (id,text) => api.sendActivityMessage(id,me0.id,text).then(()=>loadActMessages(id)).catch(fail);
+  const handleSendMessage = (id,text,rid) => api.sendActivityMessage(id,me0.id,text,rid).then(()=>loadActMessages(id)).catch(fail);
+  const handlePinAct = (id,m) => api.pinMessage("activity",m.id,!m.pinned_at).then(()=>loadActMessages(id)).catch(fail);
+  const handlePollAct = async (id,q,o) => { try { await api.createPoll("activity",id,me0.id,q,o); await loadActMessages(id); } catch(e) { fail(e); } };
   const handleUnsendAct = (id,m) => api.unsendMessage("activity",m).then(()=>loadActMessages(id)).catch(fail);
   const handleSendMedia = (id,kind,file) => api.sendActivityMedia(id,me0.id,kind,file).then(()=>loadActMessages(id)).catch(fail);
   const handleSendGif = (id,url) => api.sendActivityGif(id,me0.id,url).then(()=>loadActMessages(id)).catch(fail);
@@ -3717,7 +3844,7 @@ export default function App() {
           {/* DETAIL */}
           {page==="detail"&&selected&&(
             <div {...swipeBack(()=>setPage(detailBack),true)} style={{display:"flex",flexDirection:"column",height:"100%"}}>
-              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendMedia={handleSendMedia} onSendGif={handleSendGif} onUnsend={handleUnsendAct} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} isFav={favs.includes(selected.id)} onToggleFav={()=>toggleFav(selected.id)} t={t} />
+              <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendMedia={handleSendMedia} onSendGif={handleSendGif} onUnsend={handleUnsendAct} onPin={handlePinAct} onCreatePoll={handlePollAct} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} isFav={favs.includes(selected.id)} onToggleFav={()=>toggleFav(selected.id)} t={t} />
             </div>
           )}
 
@@ -3791,7 +3918,7 @@ export default function App() {
         {/* DM — replaces everything */}
         {page==="dm"&&dmPartner&&(
           <div {...swipeBack(()=>setPage("messages"),true)} style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
-            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onOpenProfile={()=>setProfileUser(dmPartner)} onBack={()=>setPage("messages")} onCall={v=>calls.start(dmPartner,v)} onUnsend={m=>api.unsendMessage("dm",m).then(()=>loadDMs(dmPartner.id)).catch(fail)} t={t} />
+            <DMChat currentUser={currentUser} otherUser={dmPartner} messages={dmMessages} onSend={sendDM} onVoiceSend={sendVoiceDM} onSendMedia={sendMediaDM} onSendGif={sendGifDM} onStatus={sendStatus} partnerStatus={partnerStatus} onOpenProfile={()=>setProfileUser(dmPartner)} onBack={()=>setPage("messages")} onCall={v=>calls.start(dmPartner,v)} onPin={m=>api.pinMessage("dm",m.id,!m.pinned_at).then(()=>loadDMs(dmPartner.id)).catch(fail)} onUnsend={m=>api.unsendMessage("dm",m).then(()=>loadDMs(dmPartner.id)).catch(fail)} t={t} />
           </div>
         )}
 
@@ -3799,7 +3926,7 @@ export default function App() {
           <div {...swipeBack(()=>setPage("messages"),true)} style={{position:"fixed",inset:0,background:t.bg,zIndex:80,display:"flex",flexDirection:"column"}}>
             <DMChat currentUser={currentUser} otherUser={{id:group.id,name:group.name,pseudo:""}} group={group} messages={groupMsgs}
               onSend={sendGroupText} onVoiceSend={sendGroupVoice} onSendMedia={sendGroupMedia} onSendGif={sendGroupGif} onStatus={sendGroupStatus} partnerStatus={groupStatus?.status||null} statusName={groupStatus?.name}
-              onOpenProfile={u=>u&&setProfileUser(u)} onOpenInfo={()=>setShowGroupInfo(true)} onCall={v=>calls.startGroup(group,v)} onUnsend={m=>api.unsendMessage("group",m).then(()=>{ loadGroupMsgs(group.id); refreshGroups(); }).catch(fail)} onBack={()=>setPage("messages")} t={t} />
+              onOpenProfile={u=>u&&setProfileUser(u)} onOpenInfo={()=>setShowGroupInfo(true)} onCall={v=>calls.startGroup(group,v)} onPin={m=>api.pinMessage("group",m.id,!m.pinned_at).then(()=>loadGroupMsgs(group.id)).catch(fail)} onCreatePoll={async(q,o)=>{ try { await api.createPoll("group",group.id,me0.id,q,o); loadGroupMsgs(group.id); refreshGroups(); } catch(e) { fail(e); } }} onUnsend={m=>api.unsendMessage("group",m).then(()=>{ loadGroupMsgs(group.id); refreshGroups(); }).catch(fail)} onBack={()=>setPage("messages")} t={t} />
           </div>
         )}
         {showNewGroup && <NewGroupModal friends={allUsers.filter(u=>friendIds.includes(u.id))} onCreate={createGroup} onClose={()=>setShowNewGroup(false)} t={t} />}
@@ -3867,6 +3994,8 @@ export default function App() {
             onBlock={()=>blockUser(profileUser)}
             isFriend={isFriend(profileUser.id)}
             hasPendingReq={hasPendingReq(profileUser.id)}
+            userActs={activities.filter(a=>a.creator?.id===profileUser.id)}
+            onOpenActivity={a=>{ setProfileUser(null); setSelected(a); setDetailBack(page==='detail'?'home':page); setPage('detail'); }}
             t={t}
           />
         )}

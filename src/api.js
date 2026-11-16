@@ -95,8 +95,8 @@ export const listActivityMessages = (activityId) =>
   supabase.from("activity_messages").select("*, sender:profiles(*)")
     .eq("activity_id", activityId).order("created_at").then(ok);
 
-export const sendActivityMessage = (activityId, userId, text) =>
-  supabase.from("activity_messages").insert({ activity_id: activityId, sender_id: userId, text }).then(ok);
+export const sendActivityMessage = (activityId, userId, text, replyTo = null) =>
+  supabase.from("activity_messages").insert({ activity_id: activityId, sender_id: userId, text, reply_to: replyTo }).then(ok);
 
 export async function sendActivityVoice(activityId, userId, blob, duration) {
   const audio_path = await uploadVoice(userId, blob);
@@ -131,8 +131,8 @@ export const listDMs = (me, other) =>
 export const listRecentDMs = () =>
   supabase.from("direct_messages").select("*").order("created_at", { ascending: false }).limit(300).then(ok);
 
-export const sendDM = (me, other, text) =>
-  supabase.from("direct_messages").insert({ sender_id: me, receiver_id: other, text }).then(ok);
+export const sendDM = (me, other, text, replyTo = null) =>
+  supabase.from("direct_messages").insert({ sender_id: me, receiver_id: other, text, reply_to: replyTo }).then(ok);
 
 export async function sendDMVoice(me, other, blob, duration) {
   const audio_path = await uploadVoice(me, blob);
@@ -328,8 +328,8 @@ export const listGroupMessages = (groupId) =>
   supabase.from("group_messages").select("*, sender:profiles!sender_id(*)").eq("group_id", groupId).order("created_at").limit(500).then(ok);
 export const listRecentGroupMessages = () =>
   supabase.from("group_messages").select("*").order("created_at", { ascending: false }).limit(300).then(ok);
-export const sendGroupMessage = (groupId, me, text) =>
-  supabase.from("group_messages").insert({ group_id: groupId, sender_id: me, text }).then(ok);
+export const sendGroupMessage = (groupId, me, text, replyTo = null) =>
+  supabase.from("group_messages").insert({ group_id: groupId, sender_id: me, text, reply_to: replyTo }).then(ok);
 export async function sendGroupVoice(groupId, me, blob, duration) {
   const audio_path = await uploadVoice(me, blob);
   return supabase.from("group_messages").insert({ group_id: groupId, sender_id: me, type: "voice", audio_path, duration }).then(ok);
@@ -383,3 +383,20 @@ export const myWaitlistState = (activityId, userId) => supabase.from("activity_w
 export const joinWaitlist = (activityId, userId) => supabase.from("activity_waitlist").insert({ activity_id: activityId, user_id: userId }).then(ok);
 export const leaveWaitlist = (activityId, userId) => supabase.from("activity_waitlist").delete().eq("activity_id", activityId).eq("user_id", userId).then(ok);
 export const setAvailableUntil = (userId, iso) => supabase.from("profiles").update({ available_until: iso }).eq("id", userId).select().single().then(ok);
+
+// ── Épinglage + sondages ──
+export const pinMessage = (scope, id, pin) => supabase.rpc("pin_message", { sc: scope, mid: id, pin }).then(ok);
+export async function createPoll(scope, convId, userId, question, options) {
+  const poll = ok(await supabase.from("polls").insert({ scope, conv_id: convId, creator_id: userId, question, options }).select().single());
+  const row = scope === "group" ? { group_id: convId, sender_id: userId, text: "📊 " + question, poll_id: poll.id }
+                                : { activity_id: convId, sender_id: userId, text: "📊 " + question, poll_id: poll.id };
+  ok(await supabase.from(scope === "group" ? "group_messages" : "activity_messages").insert(row));
+  return poll;
+}
+export const getPoll = async (id) => {
+  const poll = ok(await supabase.from("polls").select("*").eq("id", id).single());
+  const votes = ok(await supabase.from("poll_votes").select("user_id, option_idx").eq("poll_id", id));
+  return { ...poll, votes };
+};
+export const votePoll = (pollId, userId, idx) => supabase.from("poll_votes").upsert({ poll_id: pollId, user_id: userId, option_idx: idx }, { onConflict: "poll_id,user_id" }).then(ok);
+export const unvotePoll = (pollId, userId) => supabase.from("poll_votes").delete().eq("poll_id", pollId).eq("user_id", userId).then(ok);
