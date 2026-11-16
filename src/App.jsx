@@ -495,10 +495,12 @@ function SettingsPage({onOpenPremium, currentUser, darkMode, onToggleDark, onLog
           <code style={{flex:1,background:t.bg3,border:`1px solid ${t.border}`,borderRadius:8,padding:"9px 12px",color:t.text,fontSize:12,fontFamily:"'DM Mono',monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{inviteLink}</code>
           <Btn onClick={copyLink} accent={copied} t={t} small>{copied?"✓ Copié !":"Copier"}</Btn>
         </div>
-        <div style={{display:"flex",gap:8,marginTop:12}}>
-          {[["WhatsApp 📲",`https://wa.me/?text=${msgEnc}`],["Email 📧",`mailto:?subject=${encodeURIComponent("Rejoins-moi sur GrouZ")}&body=${msgEnc}`],["SMS 💬",`sms:?&body=${msgEnc}`]].map(([s,href])=>(
-            <a key={s} href={href} target="_blank" rel="noreferrer" style={{flex:1,textDecoration:"none"}}><Btn t={t} small style={{width:"100%"}}>{s}</Btn></a>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:12}}>
+          {[["WhatsApp 📲",`https://wa.me/?text=${msgEnc}`],["Facebook 👍",`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}`],["Snapchat 👻",`https://www.snapchat.com/scan?attachmentUrl=${encodeURIComponent(inviteLink)}`],["Email 📧",`mailto:?subject=${encodeURIComponent("Rejoins-moi sur GrouZ")}&body=${msgEnc}`],["SMS 💬",`sms:?&body=${msgEnc}`]].map(([s,href])=>(
+            <a key={s} href={href} target="_blank" rel="noreferrer" style={{flex:"1 1 30%",textDecoration:"none"}}><Btn t={t} small style={{width:"100%"}}>{s}</Btn></a>
           ))}
+          <div style={{flex:"1 1 30%"}}><Btn t={t} small style={{width:"100%"}} onClick={()=>{ navigator.clipboard?.writeText(inviteLink).catch(()=>{}); alert("Lien copié ! Colle-le dans ta story, ton message ou ta bio Instagram."); window.open("https://www.instagram.com/","_blank"); }}>Instagram 📸</Btn></div>
+          {navigator.share && <div style={{flex:"1 1 30%"}}><Btn t={t} small style={{width:"100%"}} onClick={()=>navigator.share({title:"GrouZ",text:"Rejoins-moi sur GrouZ pour organiser des sorties",url:inviteLink}).catch(()=>{})}>Plus… ↗</Btn></div>}
         </div>
       </div>
 
