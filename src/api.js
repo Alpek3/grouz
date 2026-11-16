@@ -62,7 +62,7 @@ export const createActivity = (userId, f) =>
   supabase.from("activities").insert({
     creator_id: userId, title: f.title, category: f.category, date: f.date, time: f.time,
     location: f.location, lat: f.lat ?? null, lng: f.lng ?? null,
-    max_people: f.maxPeople, description: f.description,
+    max_people: f.maxPeople, description: f.description, photo_url: f.photo_url ?? null,
   }).select().single().then(ok); // le trigger ajoute le créateur + notifie ses amis
 
 export const deleteActivity = (id) =>
@@ -193,8 +193,11 @@ export const mediaUrl = async (path) =>
   ok(await supabase.storage.from("media").createSignedUrl(path, 3600)).signedUrl;
 
 // ── MOT DE PASSE ────────────────────────────────────────────────
+// Adresse publique du site (dans l'application mobile, window.location.origin n'est pas une vraie adresse web)
+export const PUBLIC_URL = import.meta.env.VITE_PUBLIC_URL || "https://grouz.fr";
+
 export const requestPasswordReset = (email) =>
-  supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin }).then(ok);
+  supabase.auth.resetPasswordForEmail(email, { redirectTo: PUBLIC_URL }).then(ok);
 
 export const updatePassword = (password) =>
   supabase.auth.updateUser({ password }).then(ok);
@@ -214,7 +217,7 @@ export const reportUser = (me, other, reason, details = "", context = "profile",
 
 // ── SUPPRESSION DU COMPTE ───────────────────────────────────────
 export async function deleteMyAccount(userId) {
-  for (const bucket of ["avatars", "voices", "media"]) {   // d'abord les fichiers
+  for (const bucket of ["avatars", "voices", "media", "activity-photos"]) {   // d'abord les fichiers
     try {
       const { data } = await supabase.storage.from(bucket).list(userId, { limit: 1000 });
       if (data?.length) await supabase.storage.from(bucket).remove(data.map(f => `${userId}/${f.name}`));
@@ -223,3 +226,17 @@ export async function deleteMyAccount(userId) {
   ok(await supabase.rpc("delete_my_account"));            // puis le compte et toutes les données
   try { await supabase.auth.signOut(); } catch {}
 }
+
+// ── PREMIUM ─────────────────────────────────────────────────────
+export const myActivitiesToday = () => supabase.rpc("my_activities_today").then(ok);
+
+export async function uploadActivityPhoto(userId, file) {
+  const path = `${userId}/${Date.now()}.${(file.name?.split(".").pop() || "jpg").toLowerCase()}`;
+  ok(await supabase.storage.from("activity-photos").upload(path, file, { contentType: file.type || undefined }));
+  return supabase.storage.from("activity-photos").getPublicUrl(path).data.publicUrl;
+}
+
+export const recordProfileView = (profileId) =>
+  supabase.rpc("record_profile_view", { p: profileId }).then(({ error }) => { if (error) console.warn(error); });
+
+export const myProfileViewers = () => supabase.rpc("my_profile_viewers").then(ok);
