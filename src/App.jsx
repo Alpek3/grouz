@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import * as api from "./api";
+import * as billing from "./billing";
 import { gifsEnabled, gifProvider, searchGifs } from "./gifs";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -64,8 +65,45 @@ function buildTheme(dark) {
 }
 
 // ─── AVATAR ───────────────────────────────────────────────────────────────────
+// ── PUBLICITÉS ──────────────────────────────────────────────────
+// Annonces maison pour l'instant. Plus tard : remplacer par AdMob (mobile) / AdSense (web) dans <AdBanner/>.
+const HOUSE_ADS = [
+  { id:"inv", icon:"💌", title:"Invite tes amis sur GrouZ", text:"Plus on est de monde, plus il y a de sorties !", cta:"Inviter", action:"invite" },
+  { id:"prem", icon:"★", title:"Passe à GrouZ Premium", text:"Zéro pub, photos de sorties, et qui a vu ton profil.", cta:"Découvrir", action:"premium" },
+];
+function AdBanner({ index=0, onAction, t }) {
+  const [closed,setClosed]=useState(false);
+  if (closed) return null;
+  const ad = HOUSE_ADS[index % HOUSE_ADS.length];
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:12,background:t.bg3,border:`1px solid ${t.border}`,position:"relative"}}>
+      <span style={{fontSize:20,width:30,textAlign:"center"}}>{ad.icon}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:t.text3,letterSpacing:"0.1em"}}>PUB</div>
+        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:t.text,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ad.title}</div>
+        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:t.text3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ad.text}</div>
+      </div>
+      <button onClick={()=>onAction(ad.action)} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${t.accent}`,background:"transparent",color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:11,cursor:"pointer",flexShrink:0}}>{ad.cta}</button>
+      <button onClick={()=>setClosed(true)} aria-label="Fermer la publicité" style={{background:"none",border:"none",color:t.text3,fontSize:16,cursor:"pointer",padding:"0 2px",flexShrink:0}}>✕</button>
+    </div>
+  );
+}
+
+function useMemoPhoto(file) {
+  const [u,setU]=useState(null);
+  useEffect(()=>{ if(!file){setU(null);return;} const x=URL.createObjectURL(file); setU(x); return ()=>URL.revokeObjectURL(x); },[file]);
+  return u;
+}
+function PremiumBadge({ size=16 }) {
+  return <span title="Membre GrouZ Premium" style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:size,height:size,borderRadius:"50%",background:"linear-gradient(135deg,#F5D76E,#D4AF37 55%,#A67C00)",color:"#fff",fontSize:size*0.62,lineHeight:1,flexShrink:0,boxShadow:"0 0 0 1.5px rgba(0,0,0,0.25)"}}>★</span>;
+}
 function Avatar({ user, size=36, theme }) {
   if (!user) return null;
+  const core = <AvatarCore user={user} size={size} />;
+  if (!user.is_premium || size<26) return core;
+  return <span style={{position:"relative",display:"inline-flex",flexShrink:0}}>{core}<span style={{position:"absolute",right:-2,bottom:-2}}><PremiumBadge size={Math.max(12,Math.round(size*0.34))}/></span></span>;
+}
+function AvatarCore({ user, size=36 }) {
   if (user.avatar) return <img src={user.avatar} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0}} alt="" />;
   const color = user.avatarColor || AVATAR_COLORS[user.id?.charCodeAt(1)%AVATAR_COLORS.length] || "#E8008A";
   return (
@@ -199,7 +237,7 @@ function AuthScreen({onAuth,t}) {
             {tab==="register" && (
               <label style={{display:"flex",gap:10,alignItems:"flex-start",width:"100%",cursor:"pointer"}}>
                 <input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)} style={{width:18,height:18,marginTop:1,accentColor:"#E8008A",flexShrink:0}} />
-                <span style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:12,lineHeight:1.5}}>J'ai 15 ans ou plus et j'accepte les <a href="/conditions.html" target="_blank" rel="noreferrer" style={{color:t.accent}}>conditions d'utilisation</a> et la <a href="/confidentialite.html" target="_blank" rel="noreferrer" style={{color:t.accent}}>politique de confidentialité</a>.</span>
+                <span style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:12,lineHeight:1.5}}>J'ai 15 ans ou plus et j'accepte les <a href={api.PUBLIC_URL+"/conditions.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>conditions d'utilisation</a> et la <a href={api.PUBLIC_URL+"/confidentialite.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>politique de confidentialité</a>.</span>
               </label>
             )}
           </div>
@@ -328,7 +366,7 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
         </div>
         <div style={{textAlign:"center",marginBottom:20}}>
           <Avatar user={user} size={72} t={t} />
-          <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"10px 0 4px"}}>{user.name}</h2>
+          <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"10px 0 4px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{user.name}{user.is_premium&&<PremiumBadge size={20}/>}</h2>
           <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:13,margin:"0 0 8px"}}>@{user.pseudo}</p>
           {user.bio&&<p style={{color:t.text2,fontSize:14,lineHeight:1.5,fontFamily:"'DM Sans',sans-serif"}}>{user.bio}</p>}
         </div>
@@ -416,9 +454,9 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, t}) {
 // ════════════════════════════════════════════════════════════════════════════════
 // SETTINGS PAGE
 // ════════════════════════════════════════════════════════════════════════════════
-function SettingsPage({currentUser, darkMode, onToggleDark, onLogout, onBack, onChangePassword, onOpenBlocked, onDeleteAccount, blockedCount, t}) {
+function SettingsPage({onOpenPremium, currentUser, darkMode, onToggleDark, onLogout, onBack, onChangePassword, onOpenBlocked, onDeleteAccount, blockedCount, t}) {
   const [copied, setCopied] = useState(false);
-  const inviteLink = window.location.origin;   // s'adapte tout seul au futur nom de domaine
+  const inviteLink = api.PUBLIC_URL;
   const msgEnc = encodeURIComponent(`Rejoins-moi sur GrouZ pour organiser des sorties : ${inviteLink}`);
   const copyLink = () => { navigator.clipboard?.writeText(inviteLink).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
@@ -464,11 +502,14 @@ function SettingsPage({currentUser, darkMode, onToggleDark, onLogout, onBack, on
         </div>
       </div>
 
+      <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"20px 0 10px"}}>PREMIUM</p>
+      <Row icon="⭐" label={currentUser?.is_premium?"GrouZ Premium — actif · Qui a vu mon profil":"Découvrir GrouZ Premium"} onClick={onOpenPremium} right={<span style={{color:t.text3}}>›</span>} />
+
       <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"20px 0 10px"}}>COMPTE</p>
       <Row icon="🔒" label="Changer le mot de passe" onClick={onChangePassword} right={<span style={{color:t.text3}}>›</span>} />
       <Row icon="🚫" label={`Utilisateurs bloqués${blockedCount?` (${blockedCount})`:""}`} onClick={onOpenBlocked} right={<span style={{color:t.text3}}>›</span>} />
-      <Row icon="🛡" label="Politique de confidentialité" onClick={()=>window.open("/confidentialite.html","_blank")} right={<span style={{color:t.text3}}>›</span>} />
-      <Row icon="📄" label="Conditions d'utilisation" onClick={()=>window.open("/conditions.html","_blank")} right={<span style={{color:t.text3}}>›</span>} />
+      <Row icon="🛡" label="Politique de confidentialité" onClick={()=>window.open(api.PUBLIC_URL+"/confidentialite.html","_blank")} right={<span style={{color:t.text3}}>›</span>} />
+      <Row icon="📄" label="Conditions d'utilisation" onClick={()=>window.open(api.PUBLIC_URL+"/conditions.html","_blank")} right={<span style={{color:t.text3}}>›</span>} />
       <div style={{marginTop:8}}>
         <Row icon="🗑" label="Supprimer mon compte" onClick={onDeleteAccount} right={<span style={{color:t.accent}}>›</span>} />
         <Row icon="🚪" label="Se déconnecter" onClick={onLogout} right={<span style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12}}>→</span>} />
@@ -1005,6 +1046,7 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
       <div style={{padding:"20px 24px 0",overflowY:"auto",flex:isMember?undefined:1}}>
         <button onClick={onBack} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:13,padding:0,marginBottom:16}}>← Retour</button>
         <div style={{background:t.bg2,borderRadius:16,border:`1px solid ${t.border}`,padding:20,marginBottom:16}}>
+          {activity.photo_url&&<img src={activity.photo_url} alt="" style={{width:"100%",maxHeight:240,objectFit:"cover",borderRadius:14,marginBottom:14,display:"block"}}/>}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
             <div>
               <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:t.accent,letterSpacing:"0.1em"}}>{CAT_ICONS[activity.category]} {activity.category?.toUpperCase()}</span>
@@ -1021,7 +1063,7 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
           <p style={{margin:"0 0 12px",fontSize:14,color:t.text2,lineHeight:1.6,fontFamily:"'DM Sans',sans-serif"}}>{activity.description}</p>
           <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>onOpenProfile(activity.creator)}>
             <Avatar user={activity.creator} size={28} t={t} />
-            <span style={{fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace"}}>Par <span style={{color:t.text}}>{activity.creator?.name}</span></span>
+            <span style={{fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace"}}>Par <span style={{color:t.text}}>{activity.creator?.name}</span></span>{activity.creator?.is_premium&&<PremiumBadge size={14}/>}
           </div>
           {isCreator && onDelete && (
             <button onClick={()=>{ if (window.confirm(`Supprimer la sortie "${activity.title}" ?\n\nLes participants seront prévenus et le groupe de discussion sera supprimé. Cette action est définitive.`)) onDelete(activity.id); }}
@@ -1157,10 +1199,70 @@ function PlaceInput({ value, onText, onPick, onOffline, hasCoords, t }) {
   );
 }
 
-function CreateModal({onClose,onSave,currentUser,t}) {
+function PremiumModal({currentUser,onClose,onOpenProfile,onRefresh,t}) {
+  const prem=!!currentUser?.is_premium;
+  const [viewers,setViewers]=useState(null);
+  const [err,setErr]=useState("");
+  const [pkg,setPkg]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const native=billing.isNative();
+  useEffect(()=>{ if(!prem && native) billing.getPremiumPackage().then(setPkg).catch(()=>{}); },[prem]);
+  const waitPremium=async()=>{ for(let i=0;i<8;i++){ const p=await onRefresh(); if(p?.is_premium) return true; await new Promise(r=>setTimeout(r,1500)); } return false; };
+  const buy=async()=>{ setBusy(true); setErr(""); try{ const okk=await billing.buyPremium(pkg); if(okk){ await waitPremium(); } }catch(e){ setErr(e?.message||"Achat impossible"); } setBusy(false); };
+  const restore=async()=>{ setBusy(true); setErr(""); try{ const okk=await billing.restorePurchases(); if(okk) await waitPremium(); else setErr("Aucun abonnement à restaurer."); }catch(e){ setErr(e?.message||"Erreur"); } setBusy(false); };
+  useEffect(()=>{ if(prem) api.myProfileViewers().then(setViewers).catch(e=>setErr(e.message||"Erreur")); },[prem]);
+  const perks=["✍️ Jusqu'à 10 sorties créées par jour (1 en gratuit)","📸 Une photo sur chacune de tes sorties","★ Un badge doré à côté de ton profil","👀 Voir qui a visité ton profil","🚫 Aucune publicité"];
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:210,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid #D4AF3788`,borderRadius:20,width:"100%",maxWidth:460,maxHeight:"88vh",overflowY:"auto",padding:28}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:24,color:t.text,display:"flex",alignItems:"center",gap:10}}><PremiumBadge size={24}/> GrouZ Premium</h2>
+          <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
+          {perks.map(p=><div key={p} style={{background:t.bg3,borderRadius:10,padding:"10px 14px",fontFamily:"'DM Sans',sans-serif",fontSize:14,color:t.text}}>{p}</div>)}
+        </div>
+        {!prem && !native && <div style={{textAlign:"center",padding:"14px",borderRadius:12,border:"1px dashed #D4AF37",color:"#D4AF37",fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.5}}>L'abonnement se souscrit depuis l'application GrouZ (Android / iPhone). Ton compte est le même partout.</div>}
+        {!prem && native && (
+          <div>
+            <button disabled={busy||!pkg} onClick={buy} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#F5D76E,#D4AF37 55%,#A67C00)",color:"#241a00",fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:14,cursor:"pointer",opacity:busy||!pkg?0.6:1}}>
+              {busy?"…":pkg?`S'abonner — ${pkg.price} / mois`:"Chargement de l'offre…"}
+            </button>
+            <button disabled={busy} onClick={restore} style={{width:"100%",marginTop:8,padding:"10px",background:"none",border:"none",color:t.text2,fontFamily:"'DM Sans',sans-serif",fontSize:13,cursor:"pointer",textDecoration:"underline"}}>Restaurer mes achats</button>
+            <p style={{fontSize:11,color:t.text3,lineHeight:1.5,fontFamily:"'DM Sans',sans-serif",margin:"8px 0 0"}}>Abonnement mensuel à renouvellement automatique, facturé via ton compte {window.Capacitor?.getPlatform?.()==="ios"?"Apple":"Google Play"}. Résiliable à tout moment dans les réglages de ton compte du store, au moins 24 h avant la fin de la période. <a href={api.PUBLIC_URL+"/conditions.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>Conditions</a> · <a href={api.PUBLIC_URL+"/confidentialite.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>Confidentialité</a></p>
+          </div>
+        )}
+        {err && !prem && <p style={{color:t.accent,fontSize:13}}>{err}</p>}
+        {prem && native && <a href={billing.manageSubscriptionUrl()} target="_blank" rel="noreferrer" style={{display:"block",textAlign:"center",color:t.text2,fontSize:13,margin:"0 0 14px",fontFamily:"'DM Sans',sans-serif"}}>Gérer mon abonnement</a>}
+        {prem && (
+          <>
+            <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"4px 0 10px"}}>QUI A VU MON PROFIL</p>
+            {err && <p style={{color:t.accent,fontSize:13}}>{err}</p>}
+            {viewers===null && !err && <p style={{color:t.text3,fontSize:13}}>Chargement…</p>}
+            {viewers && viewers.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Personne n'a encore consulté ton profil.</p>}
+            {viewers && viewers.map(v=>{ const u={...v,avatar:v.avatar_url,avatarColor:colorFor(v.id)}; return (
+              <div key={v.id} onClick={()=>onOpenProfile(u)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 4px",cursor:"pointer",borderBottom:`1px solid ${t.border}`}}>
+                <Avatar user={u} size={40} t={t}/>
+                <div style={{flex:1}}><div style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14}}>{v.name}</div><div style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12}}>@{v.pseudo}</div></div>
+                <span style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>{new Date(v.viewed_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}</span>
+              </div>);})}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CreateModal({onClose,onSave,currentUser,usedToday,t}) {
+  const prem=!!currentUser?.is_premium;
+  const limit=prem?10:1;
+  const blocked=usedToday!=null && usedToday>=limit;
+  const [photo,setPhoto]=useState(null);
+  const photoPrev=useMemoPhoto(photo);
+  const photoRef=useRef(null);
   const [form,setForm]=useState({title:"",category:"Nature",date:"",time:"",location:"",lat:null,lng:null,noGeo:false,maxPeople:6,description:""});
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  const valid=form.title&&form.date&&form.time&&form.location&&form.description&&(form.lat!=null||form.noGeo);
+  const valid=!blocked&&form.title&&form.date&&form.time&&form.location&&form.description&&(form.lat!=null||form.noGeo);
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",padding:32}}>
@@ -1169,6 +1271,24 @@ function CreateModal({onClose,onSave,currentUser,t}) {
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {blocked && <div style={{padding:"12px 14px",borderRadius:12,background:"#E8008A18",border:"1px solid #E8008A66",color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.5}}>
+            {prem?`Tu as atteint la limite de ${limit} sorties créées aujourd'hui.`:"Tu as déjà créé ta sortie du jour (1 par jour en version gratuite)."} Supprime-en une pour en recréer, ou repasse demain.{!prem&&" Avec GrouZ Premium, crée jusqu'à 10 sorties par jour ★"}
+          </div>}
+          <div>
+            <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Photo de la sortie {prem?"":"(Premium ★)"}</label>
+            <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{ setPhoto(e.target.files?.[0]||null); e.target.value=""; }} />
+            {photoPrev ? (
+              <div style={{position:"relative",marginTop:8}}>
+                <img src={photoPrev} alt="" style={{width:"100%",maxHeight:180,objectFit:"cover",borderRadius:12}}/>
+                <button onClick={()=>setPhoto(null)} style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer"}}>✕</button>
+              </div>
+            ) : (
+              <button onClick={()=>prem?photoRef.current?.click():alert("Ajouter une photo à ta sortie est réservé aux membres GrouZ Premium ★")}
+                style={{marginTop:8,width:"100%",padding:"14px",borderRadius:12,border:`1px dashed ${prem?t.accent:"#D4AF37"}`,background:"transparent",color:prem?t.accent:"#D4AF37",fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>
+                {prem?"📸 Ajouter une photo":"🔒 Photo — réservé Premium ★"}
+              </button>
+            )}
+          </div>
           <Field label="Titre" value={form.title} onChange={v=>set("title",v)} placeholder="Ex: Pique-nique au Parc Monceau" t={t} />
           <div>
             <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Catégorie</label>
@@ -1193,7 +1313,7 @@ function CreateModal({onClose,onSave,currentUser,t}) {
             <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Description</label>
             <textarea value={form.description} onChange={e=>set("description",e.target.value)} rows={3} placeholder="Décris l'activité…" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
           </div>
-          <Btn accent={valid} disabled={!valid} onClick={()=>valid&&onSave(form)} t={t} style={{padding:"14px",width:"100%"}}>CRÉER LA SORTIE →</Btn>
+          <Btn accent={valid} disabled={!valid} onClick={()=>valid&&onSave(form,photo)} t={t} style={{padding:"14px",width:"100%"}}>CRÉER LA SORTIE →</Btn>
         </div>
       </div>
     </div>
@@ -1220,6 +1340,7 @@ function ActivityCard({activity,currentUser,onClick,km,t}) {
         {spotsLeft<=2&&spotsLeft>0&&<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#D4AF37",background:"#D4AF3722",padding:"2px 8px",borderRadius:6,border:"1px solid #D4AF3744"}}>🔥 {spotsLeft} place{spotsLeft>1?"s":""}</span>}
         {spotsLeft===0&&<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#E8008A",background:"#E8008A18",padding:"2px 8px",borderRadius:6}}>COMPLET</span>}
       </div>
+      {activity.photo_url&&<img src={activity.photo_url} alt="" loading="lazy" style={{width:"calc(100% + 40px)",margin:"-20px -20px 14px",height:140,objectFit:"cover",display:"block"}}/>}
       <h3 style={{margin:"0 0 8px",fontFamily:"'Fraunces',serif",fontSize:17,color:t.text,lineHeight:1.3}}>{activity.title}</h3>
       <div style={{fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace",marginBottom:14,display:"flex",flexDirection:"column",gap:3}}>
         <span>📅 {formatDate(activity.date)} · {activity.time}</span>
@@ -1672,6 +1793,8 @@ export default function App() {
     setLoadErr(null);
     api.getProfile(uid).then(p=>setMe0(shapeUser(p))).catch(e=>setLoadErr(e.message));
   },[uid]);
+  const refreshMe = useCallback(async()=>{ if(!uid) return null; const p=await api.getProfile(uid); setMe0(shapeUser(p)); return p; },[uid]);
+  useEffect(()=>{ if(uid) billing.initBilling(uid); },[uid]);
   const currentUser = me0;
   const handleLogout = () => api.signOut();
 
@@ -1731,8 +1854,11 @@ export default function App() {
 
   // ── Amis ───────────────────────────────────────────────────────────────────
   const [profileUser, setProfileUser] = useState(null);
+  const [showPremium, setShowPremium] = useState(false);
+  const [usedToday, setUsedToday] = useState(null);
   const friendIds = me0 ? friendships.filter(f=>f.status==="accepted").map(f=>f.requester_id===me0.id?f.addressee_id:f.requester_id) : [];
   const reqIds = me0 ? friendships.filter(f=>f.status==="pending"&&f.addressee_id===me0.id).map(f=>f.requester_id) : [];
+  useEffect(()=>{ if (profileUser && me0 && profileUser.id!==me0.id) api.recordProfileView(profileUser.id); },[profileUser?.id]);
   const me = me0 ? { ...me0, friends: friendIds, friendReqs: reqIds } : null;
   const isFriend = id => friendIds.includes(id);
   const hasPendingReq = id => friendships.some(f=>f.status==="pending"&&f.requester_id===me0?.id&&f.addressee_id===id);
@@ -1950,12 +2076,18 @@ export default function App() {
   const handleReject = (id,userId) => api.rejectMember(id,userId).then(refreshActivities).catch(fail);
   const handleSendMessage = (id,text) => api.sendActivityMessage(id,me0.id,text).then(()=>loadActMessages(id)).catch(fail);
   const handleSendVoice = (id,blob,dur) => api.sendActivityVoice(id,me0.id,blob,dur).then(()=>loadActMessages(id)).catch(fail);
-  const handleCreate = async (form) => {
+  const handleCreate = async (form, photo) => {
     try {
       const [lat,lng] = form.lat != null ? [form.lat, form.lng] : guessLatLng({ ...form, id: String(Date.now()) });
-      await api.createActivity(me0.id, { ...form, maxPeople:+form.maxPeople, lat, lng });
+      const photo_url = (photo && me0.is_premium) ? await api.uploadActivityPhoto(me0.id, photo) : null;
+      await api.createActivity(me0.id, { ...form, maxPeople:+form.maxPeople, lat, lng, photo_url });
       setShowCreate(false); refreshActivities();
-    } catch(e) { fail(e); }
+    } catch(e) {
+      const m = e?.message || "";
+      if (m.includes("DAILY_LIMIT")) { alert(me0.is_premium ? "Limite de 10 sorties par jour atteinte." : "Tu as déjà créé ta sortie du jour. Supprime-la pour en recréer une, ou passe Premium ★"); api.myActivitiesToday().then(setUsedToday).catch(()=>{}); }
+      else if (m.includes("PREMIUM_PHOTO")) alert("La photo de sortie est réservée aux membres Premium ★");
+      else fail(e);
+    }
   };
 
   // ── Écrans d'attente / connexion ───────────────────────────────────────────
@@ -2026,7 +2158,7 @@ export default function App() {
   ];
 
   const handleNavClick = (id) => {
-    if (id==="create") { setShowCreate(true); return; }
+    if (id==="create") { api.myActivitiesToday().then(setUsedToday).catch(()=>setUsedToday(null)); setShowCreate(true); return; }
     if (id==="notifs") { setShowNotifs(v=>!v); return; }
     setPage(id);
     setShowNotifs(false);
@@ -2114,7 +2246,12 @@ export default function App() {
               {feed.length===0
                 ? <div style={{textAlign:"center",padding:"56px 0",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:14}}>Aucune sortie. Soyez le premier !</div>
                 : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-                    {feed.map(({a,km})=><ActivityCard key={a.id} km={km} activity={a} currentUser={currentUser} onClick={()=>{setSelected(a);setDetailBack("home");setPage("detail");}} t={t} />)}
+                    {feed.map(({a,km},i)=>(
+                      <React.Fragment key={a.id}>
+                        <ActivityCard km={km} activity={a} currentUser={currentUser} onClick={()=>{setSelected(a);setDetailBack("home");setPage("detail");}} t={t} />
+                        {!currentUser?.is_premium && (i+1)%5===0 && <div style={{gridColumn:"1 / -1"}}><AdBanner index={Math.floor(i/5)} t={t} onAction={act=>act==="premium"?setShowPremium(true):setPage("settings")} /></div>}
+                      </React.Fragment>
+                    ))}
                   </div>
               }
             </div>
@@ -2179,7 +2316,7 @@ export default function App() {
           {/* SETTINGS */}
           {page==="settings"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <SettingsPage currentUser={me} darkMode={darkMode} onToggleDark={toggleDark} onLogout={handleLogout} onBack={()=>setPage("profile")} onChangePassword={()=>setShowPassword(true)} onOpenBlocked={()=>setShowBlocked(true)} onDeleteAccount={()=>setShowDelete(true)} blockedCount={blockedIds.length} t={t} />
+              <SettingsPage onOpenPremium={()=>setShowPremium(true)} currentUser={me} darkMode={darkMode} onToggleDark={toggleDark} onLogout={handleLogout} onBack={()=>setPage("profile")} onChangePassword={()=>setShowPassword(true)} onOpenBlocked={()=>setShowBlocked(true)} onDeleteAccount={()=>setShowDelete(true)} blockedCount={blockedIds.length} t={t} />
             </div>
           )}
         </div>
@@ -2249,12 +2386,13 @@ export default function App() {
         )}
 
         {reportTarget && <ReportModal user={reportTarget} t={t} onClose={()=>setReportTarget(null)} onSend={sendReport} />}
+        {showPremium && <PremiumModal currentUser={me0} onRefresh={refreshMe} onClose={()=>setShowPremium(false)} onOpenProfile={u=>{ setShowPremium(false); setProfileUser(shapeUser(u)); }} t={t} />}
         {showBlocked && <BlockedListModal users={allUsers.filter(u=>blockedIds.includes(u.id))} onUnblock={unblockUser} onClose={()=>setShowBlocked(false)} t={t} />}
         {showPassword && <PasswordForm t={t} onCancel={()=>setShowPassword(false)} onDone={()=>{ setShowPassword(false); alert("Mot de passe modifié ✅"); }} />}
         {showDelete && <DeleteAccountModal t={t} onClose={()=>setShowDelete(false)} onConfirm={deleteAccount} />}
 
         {/* CREATE MODAL */}
-        {showCreate&&<CreateModal onClose={()=>setShowCreate(false)} onSave={handleCreate} currentUser={currentUser} t={t} />}
+        {showCreate&&<CreateModal onClose={()=>setShowCreate(false)} onSave={handleCreate} currentUser={currentUser} usedToday={usedToday} t={t} />}
         </div>{/* end inner z-index wrapper */}
       </div>
     </>
