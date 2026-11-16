@@ -1211,7 +1211,7 @@ function PremiumModal({currentUser,onClose,onOpenProfile,onRefresh,t}) {
   const buy=async()=>{ setBusy(true); setErr(""); try{ const okk=await billing.buyPremium(pkg); if(okk){ await waitPremium(); } }catch(e){ setErr(e?.message||"Achat impossible"); } setBusy(false); };
   const restore=async()=>{ setBusy(true); setErr(""); try{ const okk=await billing.restorePurchases(); if(okk) await waitPremium(); else setErr("Aucun abonnement à restaurer."); }catch(e){ setErr(e?.message||"Erreur"); } setBusy(false); };
   useEffect(()=>{ if(prem) api.myProfileViewers().then(setViewers).catch(e=>setErr(e.message||"Erreur")); },[prem]);
-  const perks=["✍️ Jusqu'à 10 sorties créées par jour (1 en gratuit)","📸 Une photo sur chacune de tes sorties","★ Un badge doré à côté de ton profil","👀 Voir qui a visité ton profil","🚫 Aucune publicité"];
+  const perks=["✍️ Jusqu'à 5 sorties créées par jour (1 en gratuit)","📸 Une photo sur chacune de tes sorties","★ Un badge doré à côté de ton profil","👀 Voir qui a visité ton profil (30 derniers jours)","🚫 Aucune publicité"];
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:210,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid #D4AF3788`,borderRadius:20,width:"100%",maxWidth:460,maxHeight:"88vh",overflowY:"auto",padding:28}}>
@@ -1255,7 +1255,7 @@ function PremiumModal({currentUser,onClose,onOpenProfile,onRefresh,t}) {
 
 function CreateModal({onClose,onSave,currentUser,usedToday,t}) {
   const prem=!!currentUser?.is_premium;
-  const limit=prem?10:1;
+  const limit=prem?5:1;
   const blocked=usedToday!=null && usedToday>=limit;
   const [photo,setPhoto]=useState(null);
   const photoPrev=useMemoPhoto(photo);
@@ -1272,7 +1272,7 @@ function CreateModal({onClose,onSave,currentUser,usedToday,t}) {
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           {blocked && <div style={{padding:"12px 14px",borderRadius:12,background:"#E8008A18",border:"1px solid #E8008A66",color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.5}}>
-            {prem?`Tu as atteint la limite de ${limit} sorties créées aujourd'hui.`:"Tu as déjà créé ta sortie du jour (1 par jour en version gratuite)."} Supprime-en une pour en recréer, ou repasse demain.{!prem&&" Avec GrouZ Premium, crée jusqu'à 10 sorties par jour ★"}
+            {prem?`Tu as atteint la limite de ${limit} sorties créées aujourd'hui.`:"Tu as déjà créé ta sortie du jour (1 par jour en version gratuite)."} Supprime-en une pour en recréer, ou repasse demain.{!prem&&" Avec GrouZ Premium, crée jusqu'à 5 sorties par jour ★"}
           </div>}
           <div>
             <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Photo de la sortie {prem?"":"(Premium ★)"}</label>
@@ -2084,7 +2084,7 @@ export default function App() {
       setShowCreate(false); refreshActivities();
     } catch(e) {
       const m = e?.message || "";
-      if (m.includes("DAILY_LIMIT")) { alert(me0.is_premium ? "Limite de 10 sorties par jour atteinte." : "Tu as déjà créé ta sortie du jour. Supprime-la pour en recréer une, ou passe Premium ★"); api.myActivitiesToday().then(setUsedToday).catch(()=>{}); }
+      if (m.includes("DAILY_LIMIT")) { alert(me0.is_premium ? "Limite de 5 sorties par jour atteinte." : "Tu as déjà créé ta sortie du jour. Supprime-la pour en recréer une, ou passe Premium ★"); api.myActivitiesToday().then(setUsedToday).catch(()=>{}); }
       else if (m.includes("PREMIUM_PHOTO")) alert("La photo de sortie est réservée aux membres Premium ★");
       else fail(e);
     }
@@ -2249,7 +2249,7 @@ export default function App() {
                     {feed.map(({a,km},i)=>(
                       <React.Fragment key={a.id}>
                         <ActivityCard km={km} activity={a} currentUser={currentUser} onClick={()=>{setSelected(a);setDetailBack("home");setPage("detail");}} t={t} />
-                        {!currentUser?.is_premium && (i+1)%5===0 && <div style={{gridColumn:"1 / -1"}}><AdBanner index={Math.floor(i/5)} t={t} onAction={act=>act==="premium"?setShowPremium(true):setPage("settings")} /></div>}
+                        {!currentUser?.is_premium && ((i+1)%3===0 || (feed.length<3 && i===feed.length-1)) && <div style={{gridColumn:"1 / -1"}}><AdBanner index={Math.floor(i/3)} t={t} onAction={act=>act==="premium"?setShowPremium(true):setPage("settings")} /></div>}
                       </React.Fragment>
                     ))}
                   </div>
