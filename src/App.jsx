@@ -1098,11 +1098,12 @@ function ReplyQuote({ msg, all, resolveUser, isMe, t }) {
 function PinnedBanner({ messages, resolveUser, onUnpin, t }) {
   const p = messages.filter(m => m.pinned_at).sort((a, b) => new Date(b.pinned_at) - new Date(a.pinned_at))[0];
   if (!p) return null;
+  const go = () => { const el = document.getElementById("msg-" + p.id); if (!el) return; el.scrollIntoView({ behavior: "smooth", block: "center" }); el.style.transition = "background .4s"; el.style.background = t.accentBg; setTimeout(() => { el.style.background = "transparent"; }, 1600); };
   const label = p.poll_id ? "📊 Sondage" : p.type === "voice" ? "🎤 Message vocal" : p.type === "image" ? "📷 Photo" : p.type === "video" ? "🎬 Vidéo" : p.type === "gif" ? "GIF" : p.text;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", background: t.accentBg, borderBottom: `1px solid ${t.border}` }}>
-      <span>📌</span>
-      <div style={{ flex: 1, minWidth: 0, fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <span onClick={go} style={{ cursor: "pointer" }}>📌</span>
+      <div onClick={go} style={{ cursor: "pointer", flex: 1, minWidth: 0, fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         <b style={{ color: t.accent, fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{resolveUser(p.senderId || p.sender?.id || p.sender_id)?.pseudo} </b>{label}
       </div>
       <button onClick={() => onUnpin(p)} aria-label="Désépingler" style={{ background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 16 }}>✕</button>
@@ -1294,7 +1295,7 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
           const isMedia = m.type==="image" || m.type==="video" || m.type==="gif";
           const sender = group ? (m.sender || group.memberUsers.find(u=>u.id===m.senderId)) : otherUser;
           return (
-            <div key={m.id||i} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:8,marginBottom:14,alignItems:"flex-end"}}>
+            <div key={m.id||i} id={"msg-"+m.id} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:8,marginBottom:14,alignItems:"flex-end",borderRadius:14}}>
               {!isMe&&<div onClick={group?()=>onOpenProfile(sender):undefined} style={{cursor:group?"pointer":"default",display:"flex"}}><Avatar user={sender} size={28} t={t} /></div>}
               <div style={{maxWidth:"72%",display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start"}}>
                 {group && !isMe && <span style={{fontSize:11,color:t.accent,fontFamily:"'DM Mono',monospace",margin:"0 0 3px 4px"}}>{sender?.pseudo}</span>}
@@ -1466,7 +1467,7 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
               {activity.messages?.map(m=>{
                 const isMe=m.sender?.id===currentUser.id;
                 return (
-                  <div key={m.id} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:10,marginBottom:16,alignItems:"flex-end"}}>
+                  <div key={m.id} id={"msg-"+m.id} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:10,marginBottom:16,alignItems:"flex-end",borderRadius:14}}>
                     {!isMe&&<div onClick={()=>onOpenProfile(m.sender)} style={{cursor:"pointer"}}><Avatar user={m.sender} size={30} t={t}/></div>}
                     <div style={{maxWidth:"72%"}}>
                       {!isMe&&<p style={{margin:"0 0 3px",fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace"}}>{m.sender?.name}</p>}
