@@ -36,7 +36,7 @@ workflows:
       app_store_connect: GrouZ        # nom de la clé API App Store Connect enregistrée dans Codemagic
     environment:
       groups:
-        - grouz_env                   # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (et VITE_KLIPY_KEY)
+        - grouz_env                   # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_KLIPY_KEY, VITE_RC_ANDROID_KEY, VITE_RC_IOS_KEY
       ios_signing:
         distribution_type: app_store
         bundle_identifier: fr.grouz.app
@@ -46,7 +46,7 @@ workflows:
       - name: Installer le site web
         script: npm install
       - name: Installer Capacitor (sans modifier le site)
-        script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/ios@8 @capacitor/assets
+        script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/ios@8 @capacitor/assets @revenuecat/purchases-capacitor
       - name: Construire le site web
         script: npm run build
       - name: Créer le projet iPhone
@@ -86,7 +86,7 @@ workflows:
       - name: Installer le site web
         script: npm install
       - name: Installer Capacitor (sans modifier le site)
-        script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8 @capacitor/assets
+        script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8 @capacitor/assets @revenuecat/purchases-capacitor
       - name: Construire le site web
         script: npm run build
       - name: Créer le projet Android
