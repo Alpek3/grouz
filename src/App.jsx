@@ -398,8 +398,16 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
 // ════════════════════════════════════════════════════════════════════════════════
 // MY PROFILE EDITOR
 // ════════════════════════════════════════════════════════════════════════════════
-function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, friendsView, t}) {
-  const [tab, setTab] = useState(startTab||"profile");
+function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, friendsView, posts=[], onDeletePost, onOpenProfile, t}) {
+  const [mode, setMode] = useState("view");   // view = mon profil tel que les autres le voient · edit = modification
+  const [tab, setTab] = useState(startTab==="friends"?"friends":"posts");
+  const [viewPost, setViewPost] = useState(null);
+  const myPosts = posts.filter(p=>p.user_id===currentUser.id);
+  const shareProfile = () => {
+    const text = `Retrouve-moi sur GrouZ : @${currentUser.pseudo}`;
+    if (navigator.share) navigator.share({ title:"GrouZ", text, url: api.PUBLIC_URL }).catch(()=>{});
+    else { navigator.clipboard?.writeText(`${text} ${api.PUBLIC_URL}`).catch(()=>{}); alert("Lien copié !"); }
+  };
   const [cropFile, setCropFile] = useState(null);
   const [form, setForm] = useState({name:currentUser.name,pseudo:currentUser.pseudo,bio:currentUser.bio||"",age:currentUser.age,gender:currentUser.gender,instagram:currentUser.instagram||"",tiktok:currentUser.tiktok||""});
   const [preview, setPreview] = useState(currentUser.avatar);
@@ -419,24 +427,59 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, f
     if (ig === undefined) { alert("Lien Instagram invalide. Écris ton @pseudo ou colle l'adresse de ton profil."); return; }
     if (tk === undefined) { alert("Lien TikTok invalide. Écris ton @pseudo ou colle l'adresse de ton profil."); return; }
     onUpdate({...form, age:+form.age, instagram:ig, tiktok:tk, avatarFile:photoFile});
-    setSaved(true); setTimeout(()=>setSaved(false),2000);
+    setSaved(true); setTimeout(()=>{ setSaved(false); setMode("view"); },900);
   };
 
   return (
     <div style={{padding:"20px 24px",maxWidth:600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:0}}>Mon profil</h2>
+        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:0,display:"flex",alignItems:"center",gap:10}}>
+          {mode==="edit" && <button onClick={()=>setMode("view")} aria-label="Retour" style={{background:"none",border:"none",color:t.text2,cursor:"pointer",padding:0,display:"flex"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>}
+          {mode==="edit" ? "Modifier le profil" : "@"+currentUser.pseudo}
+        </h2>
         <button onClick={onGoSettings} style={{background:"none",border:"none",cursor:"pointer",color:t.text2,padding:4,display:"flex",alignItems:"center"}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
       </div>
-      <div style={{display:"flex",gap:8,marginBottom:20}}>
-        {[["profile","Profil"],["friends",`Amis${currentUser.friendReqs?.length?` (${currentUser.friendReqs.length})`:""}`]].map(([id,l])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px",borderRadius:12,border:"1px solid",borderColor:tab===id?t.accent:t.border,background:tab===id?t.accentBg:"transparent",color:tab===id?t.accent:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer"}}>{l}</button>
-        ))}
-      </div>
       {cropFile && <CropModal file={cropFile} t={t} onCancel={()=>setCropFile(null)} onDone={(f,url)=>{ setPhotoFile(f); setPreview(url); setCropFile(null); }} />}
-      {tab==="friends" ? friendsView : (<>
+      {mode==="view" ? (
+        <div>
+          <div style={{textAlign:"center",marginBottom:18}}>
+            <div style={{display:"inline-block"}}><Avatar user={currentUser} size={96} t={t} /></div>
+            <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"10px 0 4px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{currentUser.name}{currentUser.is_premium&&<PremiumBadge size={20}/>}</h2>
+            <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,margin:"0 0 8px"}}>{currentUser.age} ans · {currentUser.gender}</p>
+            {currentUser.bio ? <p style={{color:t.text2,fontSize:14,lineHeight:1.5,fontFamily:"'DM Sans',sans-serif",margin:"0 auto",maxWidth:420}}>{currentUser.bio}</p>
+              : <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif",margin:0}}>Ajoute une bio pour te présenter 👋</p>}
+            <SocialLinks user={currentUser} t={t} />
+          </div>
+          <div style={{display:"flex",justifyContent:"center",gap:34,marginBottom:18}}>
+            {[[myPosts.length,"Souvenirs"],[currentUser.friends?.length||0,"Amis"]].map(([n,l])=>(
+              <div key={l} style={{textAlign:"center"}}><div style={{fontFamily:"'DM Mono',monospace",fontSize:20,fontWeight:700,color:t.text}}>{n}</div><div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:t.text3,letterSpacing:"0.06em"}}>{l.toUpperCase()}</div></div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:10,marginBottom:22}}>
+            <Btn onClick={()=>setMode("edit")} t={t} style={{flex:1,padding:"11px"}}>Modifier le profil</Btn>
+            <Btn onClick={shareProfile} t={t} style={{flex:1,padding:"11px"}}>Partager le profil</Btn>
+          </div>
+          <div style={{display:"flex",borderBottom:`1px solid ${t.border}`,marginBottom:16}}>
+            {[["posts","▦ Souvenirs"],["friends",`👥 Amis${currentUser.friendReqs?.length?` (${currentUser.friendReqs.length})`:""}`]].map(([id,l])=>(
+              <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px",background:"none",border:"none",borderBottom:`2px solid ${tab===id?t.accent:"transparent"}`,color:tab===id?t.accent:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer"}}>{l}</button>
+            ))}
+          </div>
+          {tab==="friends" ? friendsView : (
+            myPosts.length===0
+              ? <p style={{textAlign:"center",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,padding:"26px 0"}}>Pas encore de souvenir. Partage tes sorties dans l'onglet Souvenirs !</p>
+              : <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                  {myPosts.map(p=>(
+                    <div key={p.id} onClick={()=>setViewPost(p)} style={{position:"relative",aspectRatio:"1",background:t.bg3,borderRadius:10,overflow:"hidden",cursor:"pointer"}}>
+                      {p.media_type==="video" ? <video src={p.url+"#t=0.1"} preload="metadata" muted playsInline style={{width:"100%",height:"100%",objectFit:"cover",pointerEvents:"none"}}/> : <img src={p.url} alt="" loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}}/>}
+                      {p.media_type==="video"&&<span style={{position:"absolute",right:6,top:6,background:"rgba(0,0,0,0.55)",color:"#fff",borderRadius:6,fontSize:11,padding:"1px 6px"}}>▶</span>}
+                    </div>))}
+                </div>
+          )}
+          {viewPost && <PostViewer post={viewPost} me={currentUser} onClose={()=>setViewPost(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} />}
+        </div>
+      ) : (<>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:28}}>
         <div style={{position:"relative",cursor:"pointer"}} onClick={()=>fileRef.current?.click()}>
           {preview ? <img src={preview} style={{width:90,height:90,borderRadius:"50%",objectFit:"cover",border:`3px solid ${t.accent}`}} alt="" />
@@ -2201,7 +2244,7 @@ export default function App() {
   // ── Vues ───────────────────────────────────────────────────────────────────
   const pageRef = useRef("home");
   const [page, setPage] = useState("home"); // home | detail | profile | friends | settings | dm | map | notifs
-  useEffect(()=>{ if (me0 && page==="gallery") { refreshPosts(); refreshStories(); } },[page, me0?.id]);
+  useEffect(()=>{ if (me0 && (page==="gallery"||page==="profile"||page==="friends")) { refreshPosts(); refreshStories(); } },[page, me0?.id]);
   const [selectedId, setSelectedId] = useState(null);
   const [detailBack, setDetailBack] = useState("home");
   const mapViewRef = useRef(null);
@@ -2629,7 +2672,7 @@ export default function App() {
           {/* AMIS : dans le profil */}
           {page==="friends"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <MyProfilePage currentUser={me} startTab="friends" onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")}
+              <MyProfilePage currentUser={me} startTab="friends" onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser}
                 friendsView={<FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onOpenDM={openDM} embedded t={t} />} t={t} />
             </div>
           )}
@@ -2637,7 +2680,7 @@ export default function App() {
           {/* MY PROFILE */}
           {page==="profile"&&(
             <div style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <MyProfilePage currentUser={me} onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")}
+              <MyProfilePage currentUser={me} onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser}
                 friendsView={<FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onOpenDM={openDM} embedded t={t} />} t={t} />
             </div>
           )}
