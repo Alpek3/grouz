@@ -2135,6 +2135,20 @@ const getIceServers = () => {
 };
 const RING_TIMEOUT = 45000;
 
+// Icônes des appels (style Instagram)
+const PHONE_PATH = "M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z";
+function CallIcon({ name, size=28 }) {
+  const p = { width:size, height:size, viewBox:"0 0 24 24", fill:"none", stroke:"#fff", strokeWidth:2, strokeLinecap:"round", strokeLinejoin:"round" };
+  if (name==="accept") return <svg {...p} fill="#fff" stroke="none"><path d={PHONE_PATH}/></svg>;
+  if (name==="acceptVideo") return <svg {...p} fill="#fff" stroke="#fff" strokeWidth={1}><path d="M16 7.5a2 2 0 00-2-2H4a2 2 0 00-2 2v9a2 2 0 002 2h10a2 2 0 002-2v-2.6l5 3.6a.7.7 0 001.1-.6V6.6a.7.7 0 00-1.1-.6l-5 3.6z"/></svg>;
+  if (name==="hangup") return <svg {...p} fill="#fff" stroke="none" style={{transform:"rotate(135deg)"}}><path d={PHONE_PATH}/></svg>;
+  if (name==="mic") return <svg {...p}><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v4M8 22h8"/></svg>;
+  if (name==="micOff") return <svg {...p}><path d="M9 9v2a3 3 0 005.1 2.1M15 9.3V5a3 3 0 00-5.9-.8"/><path d="M5 11a7 7 0 0011.3 5.5M19 11a7 7 0 01-.5 2.6M12 18v4M8 22h8"/><line x1="2" y1="2" x2="22" y2="22"/></svg>;
+  if (name==="cam") return <svg {...p}><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>;
+  if (name==="camOff") return <svg {...p}><path d="M16 16v1a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2h2m5.7 0H14a2 2 0 012 2v3.3l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
+  return null;
+}
+
 function useCalls(meId, isFriend, findUser, t) {
   const [call, setCall] = useState(null);      // { peer, video, status, incoming, callId }
   const [remote, setRemote] = useState(null);
@@ -2162,12 +2176,37 @@ function useCalls(meId, isFriend, findUser, t) {
 
   // ── sonnerie
   const stopRing = () => { const r = R.current.ring; if (r) { clearInterval(r.id); try { r.ctx.close(); } catch {} R.current.ring = null; } try { navigator.vibrate?.(0); } catch {} };
-  const startRing = () => {
+  // kind "in" : sonnerie rigolote (petite mélodie qui rebondit) · kind "out" : bip d'attente de l'appelant
+  const startRing = (kind = "in") => {
     stopRing();
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const beep = () => { [0, 0.25].forEach(d => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 520; g.gain.value = 0.08; o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + d); o.stop(ctx.currentTime + d + 0.18); }); try { navigator.vibrate?.([300, 150, 300]); } catch {} };
-      beep(); R.current.ring = { ctx, id: setInterval(beep, 2000) };
+      ctx.resume?.();
+      const tone = (f, t0, d, type = "triangle", vol = 0.16, f2 = null) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f, ctx.currentTime + t0);
+        if (f2) o.frequency.exponentialRampToValueAtTime(f2, ctx.currentTime + t0 + d);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime + t0);
+        g.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t0 + d);
+        o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t0); o.stop(ctx.currentTime + t0 + d + 0.02);
+      };
+      let play, period;
+      if (kind === "out") {                       // bi-biip, puis silence
+        period = 3000;
+        play = () => { tone(440, 0, 0.32, "sine", 0.22); tone(440, 0.45, 0.32, "sine", 0.22); };
+      } else {                                    // montée joyeuse + "boing" final
+        period = 2800;
+        play = () => {
+          [[523,0],[659,0.14],[784,0.28],[659,0.42],[784,0.56],[1047,0.70]].forEach(([f,t0]) => tone(f, t0, 0.16, "triangle", 0.18));
+          tone(1319, 0.92, 0.12, "square", 0.07);
+          tone(300, 1.1, 0.35, "sine", 0.22, 900);  // boing
+          tone(900, 1.5, 0.25, "sine", 0.14, 400);
+        };
+        try { navigator.vibrate?.([250, 120, 250, 120, 400]); } catch {}
+      }
+      play();
+      R.current.ring = { ctx, id: setInterval(() => { play(); if (kind === "in") { try { navigator.vibrate?.([250, 120, 250, 120, 400]); } catch {} } }, period) };
     } catch {}
   };
 
@@ -2211,6 +2250,7 @@ function useCalls(meId, isFriend, findUser, t) {
     r.callId = (crypto.randomUUID?.() || String(Date.now())); r.peerId = peer.id;
     setCall({ peer, video, status: "calling", incoming: false, callId: r.callId });
     send(peer.id, { type: "invite", callId: r.callId, video });
+    startRing("out");
     r.timers.push(setTimeout(() => { if (callRef.current?.status === "calling") { send(peer.id, { type: "cancel", callId: r.callId }); alert("Pas de réponse."); cleanup(); } }, RING_TIMEOUT));
   };
 
@@ -2244,7 +2284,7 @@ function useCalls(meId, isFriend, findUser, t) {
       const peer = findUser(p.from); if (!peer) return;
       r.callId = p.callId; r.peerId = p.from;
       setCall({ peer, video: !!p.video, status: "ringing", incoming: true, callId: p.callId });
-      startRing();
+      startRing("in");
       r.timers.push(setTimeout(() => { if (callRef.current?.status === "ringing") cleanup(); }, RING_TIMEOUT));
       return;
     }
@@ -2255,7 +2295,7 @@ function useCalls(meId, isFriend, findUser, t) {
       cleanup(); return;
     }
     if (p.type === "accept" && !c.incoming) {
-      r.timers.forEach(clearTimeout); r.timers = [];
+      r.timers.forEach(clearTimeout); r.timers = []; stopRing();
       setCall({ ...c, status: "connecting" });
       const pc = makePc(c.peer.id);
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
@@ -2300,7 +2340,10 @@ function useCalls(meId, isFriend, findUser, t) {
     const label = call.status === "ringing" ? (call.video ? "Appel vidéo entrant…" : "Appel entrant…")
       : call.status === "calling" ? "Appel en cours…" : call.status === "connecting" ? "Connexion…" : `${mm}:${ss}`;
     const showVideo = call.video && remote && call.status === "active";
-    const rb = (bg) => ({ width: 62, height: 62, borderRadius: "50%", border: "none", background: bg, color: "#fff", fontSize: 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" });
+    const rb = (bg) => ({ width: 64, height: 64, borderRadius: "50%", border: "none", background: bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)", padding: 0 });
+    const lbl = (txt) => <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, marginTop: 8, opacity: 0.85, textAlign: "center" }}>{txt}</div>;
+    const item = (btn, txt) => <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>{btn}{lbl(txt)}</div>;
+    const GLASS = "rgba(255,255,255,0.22)", GLASS_ON = "#fff";
     ui = (
       <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "#0D0A12", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", color: "#fff", padding: "calc(40px + env(safe-area-inset-top, 0px)) 20px calc(36px + env(safe-area-inset-bottom, 0px))" }}>
         <video ref={rv} autoPlay playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: showVideo ? 1 : 0, background: "#000" }} />
@@ -2312,14 +2355,14 @@ function useCalls(meId, isFriend, findUser, t) {
         {call.video && local && call.status !== "ringing" && (
           <video ref={lv} autoPlay playsInline muted style={{ position: "absolute", right: 16, top: "calc(16px + env(safe-area-inset-top, 0px))", width: 96, height: 140, objectFit: "cover", borderRadius: 14, border: "2px solid rgba(255,255,255,0.5)", background: "#000", transform: "scaleX(-1)", opacity: camOff ? 0.2 : 1 }} />
         )}
-        <div style={{ position: "relative", display: "flex", gap: 22, alignItems: "center" }}>
+        <div style={{ position: "relative", display: "flex", gap: 26, alignItems: "flex-start", justifyContent: "center" }}>
           {call.status === "ringing" ? (<>
-            <button onClick={hangup} style={rb("#E5334B")} aria-label="Refuser">✕</button>
-            <button onClick={accept} style={rb("#2BB673")} aria-label="Répondre">{call.video ? "🎥" : "📞"}</button>
+            {item(<button onClick={hangup} style={rb("#FF3B30")} aria-label="Refuser"><CallIcon name="hangup" /></button>, "Refuser")}
+            {item(<button onClick={accept} style={rb("#34C759")} aria-label="Répondre"><CallIcon name={call.video ? "acceptVideo" : "accept"} /></button>, "Répondre")}
           </>) : (<>
-            <button onClick={toggleMute} style={rb(muted ? "#555" : "rgba(255,255,255,0.18)")} aria-label="Micro">{muted ? "🔇" : "🎤"}</button>
-            {call.video && <button onClick={toggleCam} style={rb(camOff ? "#555" : "rgba(255,255,255,0.18)")} aria-label="Caméra">{camOff ? "🚫" : "📷"}</button>}
-            <button onClick={hangup} style={rb("#E5334B")} aria-label="Raccrocher">📵</button>
+            {call.video && item(<button onClick={toggleCam} style={rb(camOff ? GLASS_ON : GLASS)} aria-label="Caméra">{camOff ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 16v1a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2h2m5.7 0H14a2 2 0 012 2v3.3l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/></svg> : <CallIcon name="cam" />}</button>, camOff ? "Caméra off" : "Caméra")}
+            {item(<button onClick={toggleMute} style={rb(muted ? GLASS_ON : GLASS)} aria-label="Micro">{muted ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9v2a3 3 0 005.1 2.1M15 9.3V5a3 3 0 00-5.9-.8"/><path d="M5 11a7 7 0 0011.3 5.5M19 11a7 7 0 01-.5 2.6M12 18v4M8 22h8"/><line x1="2" y1="2" x2="22" y2="22"/></svg> : <CallIcon name="mic" />}</button>, muted ? "Micro off" : "Micro")}
+            {item(<button onClick={hangup} style={rb("#FF3B30")} aria-label="Raccrocher"><CallIcon name="hangup" /></button>, "Raccrocher")}
           </>)}
         </div>
       </div>
