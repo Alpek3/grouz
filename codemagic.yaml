@@ -46,13 +46,15 @@ workflows:
       - name: Installer le site web
         script: npm install
       - name: Installer Capacitor (sans modifier le site)
-        script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/ios@8 @capacitor/assets @revenuecat/purchases-capacitor
+        script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/ios@8 @capacitor/assets @revenuecat/purchases-capacitor @capacitor-firebase/messaging@8 firebase
       - name: Construire le site web
         script: npm run build
       - name: Créer le projet iPhone
         script: |
           npx cap add ios
           npx @capacitor/assets generate --ios
+          # Notifications push : fichier Firebase (variable secrète GOOGLE_SERVICE_INFO_PLIST_B64, voir PUSH.md)
+          if [ -n "$GOOGLE_SERVICE_INFO_PLIST_B64" ]; then echo "$GOOGLE_SERVICE_INFO_PLIST_B64" | base64 --decode > ios/App/App/GoogleService-Info.plist; fi
           node scripts/configure-native.mjs
           npx cap sync ios
       - name: Préparer la signature
@@ -86,13 +88,15 @@ workflows:
       - name: Installer le site web
         script: npm install
       - name: Installer Capacitor (sans modifier le site)
-        script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8 @capacitor/assets @revenuecat/purchases-capacitor
+        script: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8 @capacitor/assets @revenuecat/purchases-capacitor @capacitor-firebase/messaging@8 firebase
       - name: Construire le site web
         script: npm run build
       - name: Créer le projet Android
         script: |
           npx cap add android
           npx @capacitor/assets generate --android
+          # Notifications push : fichier Firebase (variable secrète GOOGLE_SERVICES_JSON_B64, voir PUSH.md)
+          if [ -n "$GOOGLE_SERVICES_JSON_B64" ]; then echo "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > android/app/google-services.json; fi
           node scripts/configure-native.mjs
           npx cap sync android
       - name: Construire l'application (.aab)
