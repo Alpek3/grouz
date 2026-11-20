@@ -21,6 +21,7 @@ if (fs.existsSync(manifestPath)) {
     "android.permission.RECORD_AUDIO",
     "android.permission.MODIFY_AUDIO_SETTINGS",
     "android.permission.CAMERA",
+    "android.permission.POST_NOTIFICATIONS",
   ];
   let add = "";
   for (const p of perms) if (!xml.includes(p)) add += `    <uses-permission android:name="${p}" />\n`;
@@ -67,8 +68,8 @@ if (fs.existsSync(plistPath)) {
   let plist = fs.readFileSync(plistPath, "utf8");
   const keys = {
     NSLocationWhenInUseUsageDescription: "GrouZ utilise ta position pour centrer la carte sur toi et te proposer des sorties et des personnes près de chez toi.",
-    NSMicrophoneUsageDescription: "GrouZ utilise le micro pour enregistrer tes messages vocaux.",
-    NSCameraUsageDescription: "GrouZ utilise l'appareil photo pour te permettre d'envoyer des photos et des vidéos dans tes messages.",
+    NSMicrophoneUsageDescription: "GrouZ utilise le micro pour tes messages vocaux et tes appels.",
+    NSCameraUsageDescription: "GrouZ utilise l'appareil photo pour tes photos, vidéos et appels vidéo.",
     NSPhotoLibraryUsageDescription: "GrouZ accède à tes photos pour que tu puisses choisir ta photo de profil et envoyer des photos et des vidéos.",
   };
   let add = "";
@@ -89,5 +90,36 @@ if (fs.existsSync(pbxPath) && build) {
   pbx = pbx.replace(/CURRENT_PROJECT_VERSION = [^;]+;/g, `CURRENT_PROJECT_VERSION = ${build};`);
   fs.writeFileSync(pbxPath, pbx);
   log(`iOS build = ${build}`);
+}
+// Notifications push iOS : mode d'arrière-plan, droit « aps-environment », initialisation Firebase
+if (fs.existsSync(plistPath)) {
+  let plist = fs.readFileSync(plistPath, "utf8");
+  if (!plist.includes("<key>UIBackgroundModes</key>")) {
+    plist = plist.replace(/<\/dict>\s*<\/plist>\s*$/, "\t<key>UIBackgroundModes</key>\n\t<array>\n\t\t<string>remote-notification</string>\n\t</array>\n</dict>\n</plist>\n");
+    fs.writeFileSync(plistPath, plist);
+    log("Info.plist : notifications en arrière-plan activées");
+  }
+}
+const entPath = path.join(root, "ios/App/App/App.entitlements");
+if (fs.existsSync(path.join(root, "ios/App"))) {
+  fs.writeFileSync(entPath, `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n\t<key>aps-environment</key>\n\t<string>production</string>\n</dict>\n</plist>\n`);
+  if (fs.existsSync(pbxPath)) {
+    let pbx = fs.readFileSync(pbxPath, "utf8");
+    if (!pbx.includes("CODE_SIGN_ENTITLEMENTS")) {
+      pbx = pbx.replace(/PRODUCT_BUNDLE_IDENTIFIER = fr\.grouz\.app;/g, "CODE_SIGN_ENTITLEMENTS = App/App.entitlements;\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = fr.grouz.app;");
+      fs.writeFileSync(pbxPath, pbx);
+      log("iOS : droit Push Notifications ajouté");
+    }
+  }
+  const adPath = path.join(root, "ios/App/App/AppDelegate.swift");
+  if (fs.existsSync(adPath)) {
+    let ad = fs.readFileSync(adPath, "utf8");
+    if (!ad.includes("FirebaseCore")) {
+      ad = ad.replace("import UIKit", "import UIKit\n#if canImport(FirebaseCore)\nimport FirebaseCore\n#endif");
+      ad = ad.replace(/(didFinishLaunchingWithOptions[^{]*\{)/, "$1\n        #if canImport(FirebaseCore)\n        if FirebaseApp.app() == nil { FirebaseApp.configure() }\n        #endif");
+      fs.writeFileSync(adPath, ad);
+      log("AppDelegate : initialisation Firebase ajoutée");
+    }
+  }
 }
 console.log("✅ Configuration native terminée");
