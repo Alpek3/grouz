@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import * as api from "./api";
 import * as billing from "./billing";
+import * as push from "./push";
 import { gifsEnabled, gifProvider, searchGifs } from "./gifs";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -3226,9 +3227,9 @@ export default function App() {
     api.getProfile(uid).then(p=>setMe0(shapeUser(p))).catch(e=>setLoadErr(e.message));
   },[uid]);
   const refreshMe = useCallback(async()=>{ if(!uid) return null; const p=await api.getProfile(uid); setMe0(shapeUser(p)); return p; },[uid]);
-  useEffect(()=>{ if(uid) billing.initBilling(uid); },[uid]);
+  useEffect(()=>{ if(uid) { billing.initBilling(uid); push.initPush(uid); } },[uid]);
   const currentUser = me0;
-  const handleLogout = () => api.signOut();
+  const handleLogout = async () => { await push.removePushToken(); return api.signOut(); };
 
   // ── Données partagées ──────────────────────────────────────────────────────
   const [allUsers, setAllUsers] = useState([]);
@@ -3452,6 +3453,9 @@ export default function App() {
   };
 
   // ── Toucher une notification = aller à l'endroit concerné ──────────────────
+  const openNotifRef = useRef(null);
+  openNotifRef.current = (n) => openNotif(n);
+  useEffect(()=>{ const h = e => openNotifRef.current?.({ ...e.detail, read:true, text:"" }); window.addEventListener("grouz:push", h); return ()=>window.removeEventListener("grouz:push", h); },[]);
   const openNotif = (n) => {
     setShowNotifs(false);
     if (!n.read) api.markNotifRead(n.id).then(refreshNotifs).catch(()=>{});
@@ -3771,9 +3775,11 @@ export default function App() {
 
       <div style={{background:t.bg,position:"fixed",inset:0,display:"flex",flexDirection:"column",color:t.text,fontFamily:"'DM Sans',sans-serif",transition:"background 0.2s,color 0.2s",overflow:"hidden"}}>
         {/* Ambient background orbs */}
-        <div style={{position:"fixed",top:"-15%",left:"-10%",width:280,height:280,borderRadius:"50%",background:"#E8008A",opacity:0.06,filter:"blur(70px)",pointerEvents:"none",zIndex:0}}/>
-        <div style={{position:"fixed",bottom:"-10%",right:"-10%",width:320,height:320,borderRadius:"50%",background:"#AAEE00",opacity:0.05,filter:"blur(70px)",pointerEvents:"none",zIndex:0}}/>
-        <div style={{position:"fixed",top:"45%",left:"60%",width:180,height:180,borderRadius:"50%",background:"#7B00C8",opacity:0.04,filter:"blur(50px)",pointerEvents:"none",zIndex:0}}/>
+        <div style={{position:"fixed",inset:0,overflow:"hidden",pointerEvents:"none",zIndex:0}}>
+        <div style={{position:"absolute",top:"-15%",left:"-10%",width:280,height:280,borderRadius:"50%",background:"#E8008A",opacity:0.06,filter:"blur(70px)",pointerEvents:"none",zIndex:0}}/>
+        <div style={{position:"absolute",bottom:"-10%",right:"-10%",width:320,height:320,borderRadius:"50%",background:"#AAEE00",opacity:0.05,filter:"blur(70px)",pointerEvents:"none",zIndex:0}}/>
+        <div style={{position:"absolute",top:"45%",left:"60%",width:180,height:180,borderRadius:"50%",background:"#7B00C8",opacity:0.04,filter:"blur(50px)",pointerEvents:"none",zIndex:0}}/>
+        </div>
         <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
 
         {/* ── TOP BAR (logo + DM icon) ── */}
