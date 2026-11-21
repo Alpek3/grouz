@@ -1,9 +1,10 @@
 // GrouZ — notifications push (Firebase Cloud Messaging), uniquement dans l'application native.
 // Plugin natif : @capacitor-firebase/messaging (installé par Codemagic).
 import { supabase } from "./api";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 
-const cap = () => (typeof window !== "undefined" ? window.Capacitor : null);
-export const isNative = () => !!cap()?.isNativePlatform?.();
+const cap = () => Capacitor;
+export const isNative = () => !!Capacitor.isNativePlatform?.();
 let FM = null, currentToken = null, listening = false;
 
 const DEBUG = true; // TEMPORAIRE : affiche l'étape/erreur à l'écran
@@ -13,7 +14,7 @@ export async function initPush(userId) {
   if (!isNative()) return false;
   try {
     dbg("démarrage");
-    FM = FM || cap().registerPlugin("FirebaseMessaging");
+    FM = FM || registerPlugin("FirebaseMessaging");
     const perm = await FM.requestPermissions();
     dbg("autorisation = " + perm.receive);
     if (perm.receive !== "granted") return false;

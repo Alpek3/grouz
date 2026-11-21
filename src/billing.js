@@ -1,7 +1,8 @@
 // GrouZ — abonnements via RevenueCat (Google Play Billing + Apple In-App Purchase)
 // Fonctionne uniquement dans l'application native (Android / iOS). Sur le web : pas d'achat.
 // Variables : VITE_RC_ANDROID_KEY (clé publique Android "goog_...") et VITE_RC_IOS_KEY (clé iOS "appl_...")
-const cap = () => (typeof window !== "undefined" ? window.Capacitor : null);
+import { Capacitor, registerPlugin } from "@capacitor/core";
+const cap = () => Capacitor;
 export const isNative = () => !!cap()?.isNativePlatform?.();
 const platform = () => cap()?.getPlatform?.();
 
@@ -15,7 +16,7 @@ export async function initBilling(userId) {
   const apiKey = platform() === "ios" ? import.meta.env.VITE_RC_IOS_KEY : import.meta.env.VITE_RC_ANDROID_KEY;
   if (!apiKey) return false;
   try {
-    Purchases = cap().registerPlugin("Purchases");           // plugin natif @revenuecat/purchases-capacitor
+    Purchases = registerPlugin("Purchases");           // plugin natif @revenuecat/purchases-capacitor
     await Purchases.configure({ apiKey, appUserID: userId }); // l'identifiant RevenueCat = l'identifiant Supabase
     ready = true;
     return true;
