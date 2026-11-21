@@ -371,7 +371,7 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
         <div style={{textAlign:"center",marginBottom:20}}>
           <Avatar user={user} size={72} t={t} />
           <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"10px 0 4px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{user.name}{user.is_premium&&<PremiumBadge size={20}/>}</h2>
-          <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:13,margin:"0 0 8px"}}>@{user.pseudo}{isAvailableTonight(user)&&<span style={{marginLeft:8,color:"#2DBE60",fontSize:11}}>🟢 Dispo ce soir</span>}</p>
+          <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:13,margin:"0 0 8px"}}>@{user.pseudo}{isAvailableTonight(user)&&<span style={{marginLeft:8,color:"#2DBE60",fontSize:11}}>🟢 Dispo</span>}</p>
           {user.bio&&<p style={{color:t.text2,fontSize:14,lineHeight:1.5,fontFamily:"'DM Sans',sans-serif"}}>{user.bio}</p>}
           <SocialLinks user={user} t={t} />
         </div>
@@ -634,7 +634,7 @@ function FriendsPage({currentUser, allUsers, onOpenProfile, onAcceptFriend, onBa
           <div onClick={()=>onOpenProfile(u)} style={{cursor:"pointer"}}><Avatar user={u} size={44} t={t} /></div>
           <div style={{flex:1,cursor:"pointer"}} onClick={()=>onOpenProfile(u)}>
             <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0}}>{u.name}</p>
-            <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>@{u.pseudo} · {u.age} ans · {u.gender}{isAvailableTonight(u)&&<span style={{color:"#2DBE60"}}> · 🟢 Dispo ce soir</span>}</p>
+            <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>@{u.pseudo} · {u.age} ans · {u.gender}{isAvailableTonight(u)&&<span style={{color:"#2DBE60"}}> · 🟢 Dispo</span>}</p>
           </div>
           <Btn onClick={()=>onOpenDM(u)} accent t={t} small>💬</Btn>
         </div>
@@ -2896,6 +2896,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     r.callId = (crypto.randomUUID?.() || String(Date.now())); r.peerId = peer.id;
     setCall({ peer, video, status: "calling", incoming: false, callId: r.callId });
     send(peer.id, { type: "invite", callId: r.callId, video });
+    api.supabase.rpc("notify_call", { p_to: peer.id, p_video: !!video }).then(()=>{},()=>{});   // notification push si son app est fermée
     startRing("out");
     r.timers.push(setTimeout(() => { if (callRef.current?.status === "calling") { send(peer.id, { type: "cancel", callId: r.callId }); alert("Pas de réponse."); cleanup(); } }, RING_TIMEOUT));
   };
@@ -3017,6 +3018,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     const gc = { callId: (crypto.randomUUID?.() || String(Date.now())), group, video, status: "calling", incoming: false };
     setGcall(gc);
     gSend(gc, { type: "ginvite", groupId: group.id, video });
+    api.supabase.rpc("notify_group_call", { p_group: group.id, p_video: !!video }).then(()=>{},()=>{});
     startRing("out");
     r.timers.push(setTimeout(() => {
       if (gcallRef.current && Object.keys(R.current.gpcs).length === 0) { gSend(gc, { type: "gcancel" }); alert("Personne n'a rejoint l'appel."); cleanup(); }

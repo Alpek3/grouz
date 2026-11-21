@@ -7,7 +7,7 @@ const cap = () => Capacitor;
 export const isNative = () => !!Capacitor.isNativePlatform?.();
 let FM = null, currentToken = null, listening = false;
 
-const DEBUG = true; // TEMPORAIRE : affiche l'étape/erreur à l'écran
+const DEBUG = false;
 const dbg = (m) => { if (DEBUG) { try { alert("Push : " + m); } catch {} } };
 
 export async function initPush(userId) {
