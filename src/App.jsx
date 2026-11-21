@@ -349,7 +349,7 @@ function DeleteAccountModal({ onConfirm, onClose, t }) {
   );
 }
 
-function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onReport, onBlock, isFriend, hasPendingReq, userActs=[], onOpenActivity, t}) {
+function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onReport, onBlock, isFriend, hasPendingReq, userActs=[], onOpenActivity, stories=[], storyActions, t}) {
   const isMe = user.id===currentUser.id;
   const [menu, setMenu] = useState(false);
   const [showActs, setShowActs] = useState(false);
@@ -370,7 +370,7 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
           )}
         </div>
         <div style={{textAlign:"center",marginBottom:20}}>
-          <Avatar user={user} size={72} t={t} />
+          <StoryAvatar user={user} size={72} stories={stories} me={currentUser} actions={storyActions} t={t} />
           <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text,margin:"10px 0 4px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{user.name}{user.is_premium&&<PremiumBadge size={20}/>}</h2>
           <p style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,margin:"0 0 8px"}}>@{user.pseudo}{isAvailableTonight(user)&&<span style={{marginLeft:8,color:"#2DBE60",fontSize:11}}>🟢 Dispo</span>}</p>
           {user.bio&&<p style={{color:t.text2,fontSize:14,lineHeight:1.5,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>{user.bio}</p>}
@@ -417,7 +417,7 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
 // ════════════════════════════════════════════════════════════════════════════════
 // MY PROFILE EDITOR
 // ════════════════════════════════════════════════════════════════════════════════
-function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, friendsView, posts=[], onDeletePost, onOpenProfile, actions, t}) {
+function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, friendsView, posts=[], onDeletePost, onOpenProfile, actions, stories=[], onDeleteStory, t}) {
   const [mode, setMode] = useState("view");   // view = mon profil tel que les autres le voient · edit = modification
   const [tab, setTab] = useState(startTab==="friends"?"friends":"posts");
   const [viewId, setViewId] = useState(null);
@@ -465,7 +465,7 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, f
       {mode==="view" ? (
         <div>
           <div style={{textAlign:"center",marginBottom:18}}>
-            <div style={{display:"inline-block"}}><Avatar user={currentUser} size={96} t={t} /></div>
+            <div style={{display:"inline-block"}}><StoryAvatar user={currentUser} size={96} stories={stories} me={currentUser} actions={actions} onDelete={onDeleteStory} t={t} /></div>
             <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text,margin:"10px 0 4px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{currentUser.name}{currentUser.is_premium&&<PremiumBadge size={20}/>}</h2>
             <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,margin:"0 0 8px"}}>{currentUser.age} ans · {currentUser.gender}</p>
             {currentUser.bio ? <p style={{color:t.text2,fontSize:14,lineHeight:1.5,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",margin:"0 auto",maxWidth:420}}>{currentUser.bio}</p>
@@ -2232,35 +2232,70 @@ function GroupInfoModal({ group, me, friends, onClose, onRename, onChangePhoto, 
   );
 }
 
+// Messages non lus : on retient, sur cet appareil, la date de dernière lecture de chaque conversation
+const convSeenKey = (uid) => "grouz_conv_seen_" + uid;
+const readConvSeen = (uid) => {
+  try {
+    const m = JSON.parse(localStorage.getItem(convSeenKey(uid)) || "{}");
+    if (!m.__init) { m.__init = new Date().toISOString(); localStorage.setItem(convSeenKey(uid), JSON.stringify(m)); }
+    return m;
+  } catch { return { __init: new Date().toISOString() }; }
+};
+const markConvRead = (uid, key) => { try { const m = readConvSeen(uid); m[key] = new Date().toISOString(); localStorage.setItem(convSeenKey(uid), JSON.stringify(m)); } catch {} };
+
 function MessagesPage({ friends, last, myId, onOpenDM, onGoFriends, groups=[], lastGroup={}, onOpenGroup, onNewGroup, t }) {
-  const items = [
+  const [q, setQ] = useState("");
+  const seen = readConvSeen(myId);
+  const shortAgo = (iso) => {
+    const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+    return m < 1 ? "maintenant" : m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m/60)} h` : m < 10080 ? `${Math.floor(m/1440)} j` : `${Math.floor(m/10080)} sem`;
+  };
+  const all = [
     ...friends.map(u=>({ kind:"dm", key:"u"+u.id, user:u, m:last[u.id] })),
     ...groups.map(g=>({ kind:"group", key:"g"+g.id, group:g, m:lastGroup[g.id] })),
   ].sort((a,b)=>(b.m?.created_at||b.group?.created_at||"").localeCompare(a.m?.created_at||a.group?.created_at||""));
+  const needle = q.trim().toLowerCase();
+  const items = needle ? all.filter(it => (it.kind==="group" ? it.group.name : (it.user.name + " " + (it.user.pseudo||""))).toLowerCase().includes(needle)) : all;
   return (
-    <div style={{padding:"20px 24px",maxWidth:600,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"0 0 20px"}}>
-        <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:26,color:t.text,margin:0}}>Messages</h2>
-        {friends.length>=2 && <Btn accent small onClick={onNewGroup} t={t}>＋ Groupe</Btn>}
+    <div style={{maxWidth:600,margin:"0 auto",paddingBottom:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 16px 10px"}}>
+        <h2 style={{fontSize:22,fontWeight:700,color:t.text,margin:0}}>Messages</h2>
+        {friends.length>=2 && (
+          <button onClick={onNewGroup} aria-label="Nouveau groupe" style={{background:"none",border:"none",cursor:"pointer",padding:4,display:"flex"}}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={t.text} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+          </button>
+        )}
       </div>
-      {items.length===0 && (
-        <div style={{textAlign:"center",padding:"40px 12px",background:t.bg2,border:`1px dashed ${t.border}`,borderRadius:16}}>
-          <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,margin:"0 0 14px",lineHeight:1.5}}>Tu pourras discuter ici avec tes amis.<br/>Ajoute-en depuis leur profil pour commencer.</p>
+      <div style={{padding:"0 16px 10px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,background:t.input,borderRadius:12,padding:"9px 12px"}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.text3} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Rechercher" style={{flex:1,minWidth:0,background:"none",border:"none",outline:"none",color:t.text,fontSize:15,fontFamily:"inherit",padding:0}} />
+        </div>
+      </div>
+      {all.length===0 && (
+        <div style={{textAlign:"center",padding:"40px 24px"}}>
+          <p style={{color:t.text3,fontSize:14,margin:"0 0 14px",lineHeight:1.5}}>Tu pourras discuter ici avec tes amis.<br/>Ajoute-en depuis leur profil pour commencer.</p>
           <Btn accent onClick={onGoFriends} t={t}>Voir mes amis</Btn>
         </div>
       )}
+      {all.length>0 && items.length===0 && <p style={{color:t.text3,fontSize:14,textAlign:"center",padding:"24px 16px",margin:0}}>Aucun résultat</p>}
       {items.map(it=>{
         const m = it.m;
-        const who = m && m.sender_id===myId ? "Toi : " : (it.kind==="group" && m ? ((it.group.memberUsers.find(u=>u.id===m.sender_id)?.pseudo||"") + " : ") : "");
+        const mine = m && m.sender_id===myId;
+        const who = mine ? "Toi : " : (it.kind==="group" && m ? ((it.group.memberUsers.find(u=>u.id===m.sender_id)?.pseudo||"") + " : ") : "");
         const preview = !m ? (it.kind==="group" ? "Groupe créé" : "Commence la conversation") : who + dmPreview(m);
+        const unread = !!m && !mine && m.created_at > (seen[it.key] || seen.__init);
         return (
-          <div key={it.key} onClick={()=>it.kind==="group" ? onOpenGroup(it.group) : onOpenDM(it.user)} style={{display:"flex",alignItems:"center",gap:12,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 16px",marginBottom:8,cursor:"pointer"}}>
-            {it.kind==="group" ? <GroupAvatar group={it.group} size={46} t={t}/> : <Avatar user={it.user} size={46} t={t} />}
+          <div key={it.key} onClick={()=>it.kind==="group" ? onOpenGroup(it.group) : onOpenDM(it.user)} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 16px",cursor:"pointer"}}>
+            {it.kind==="group" ? <GroupAvatar group={it.group} size={56} t={t}/> : <Avatar user={it.user} size={56} t={t} />}
             <div style={{flex:1,minWidth:0}}>
-              <p style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontWeight:600,margin:0}}>{it.kind==="group" ? "👥 "+it.group.name : it.user.name}</p>
-              <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,margin:"2px 0 0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{preview}</p>
+              <p style={{color:t.text,fontSize:14,fontWeight:unread?700:400,margin:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.kind==="group" ? it.group.name : it.user.name}</p>
+              <p style={{color:unread?t.text:t.text3,fontWeight:unread?600:400,fontSize:14,margin:"2px 0 0",display:"flex",gap:4,minWidth:0}}>
+                <span style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}>{preview}</span>
+                {m && <span style={{flexShrink:0}}>· {shortAgo(m.created_at)}</span>}
+              </p>
             </div>
-            {m && <span style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10}}>{fmtTime(m.created_at)}</span>}
+            {unread && <span aria-label="Non lu" style={{width:10,height:10,borderRadius:"50%",background:"#E8008A",flexShrink:0,boxShadow:"0 0 8px rgba(232,0,138,0.6)"}} />}
           </div>
         );
       })}
@@ -2488,6 +2523,22 @@ function StoryEditor({ file, onCancel, onPublish, t }) {
         </div>
       )}
     </div>
+  );
+}
+
+// Avatar avec anneau de story : touche pour voir (ou gérer) la story, comme sur Instagram
+function StoryAvatar({ user, size, stories = [], me, actions, onDelete, t }) {
+  const [open, setOpen] = useState(false);
+  const mine = (stories || []).filter(x => x.user_id === user.id);
+  if (!mine.length || !actions) return <Avatar user={user} size={size} t={t} />;
+  const seen = readSeen(); const unseen = mine.some(x => !seen[x.id]);
+  return (
+    <>
+      <span onClick={() => setOpen(true)} style={{ display:"inline-flex", padding:3, borderRadius:"50%", background: unseen ? t.gradient : t.border, cursor:"pointer" }} aria-label="Voir la story">
+        <span style={{ background:t.bg, borderRadius:"50%", padding:2, display:"inline-flex" }}><Avatar user={user} size={size} t={t} /></span>
+      </span>
+      {open && <StoryViewer groups={[{ user, items: mine }]} startGroup={0} me={me} actions={actions} onClose={() => setOpen(false)} onDelete={onDelete || (() => {})} t={t} />}
+    </>
   );
 }
 
@@ -3786,6 +3837,14 @@ export default function App() {
   const [lastGroup, setLastGroup] = useState({});
   const [groupId, setGroupId] = useState(null);
   const [groupMsgs, setGroupMsgs] = useState([]);
+  // la conversation ouverte est marquée « lue » (à l'ouverture, à chaque nouveau message, et à la fermeture)
+  useEffect(()=>{
+    if (!me0) return;
+    const key = page==="dm" && dmPartner ? "u"+dmPartner.id : page==="group" && groupId ? "g"+groupId : null;
+    if (!key) return;
+    markConvRead(me0.id, key);
+    return ()=>markConvRead(me0.id, key);
+  },[page, dmPartner?.id, groupId, dmMessages.length, groupMsgs.length, me0?.id]);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const groupIdRef = useRef(null);
@@ -4131,7 +4190,7 @@ export default function App() {
           {/* AMIS : dans le profil */}
           {page==="friends"&&(
             <div {...swipeBack(()=>setPage("home"))} style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <MyProfilePage currentUser={me} startTab="friends" onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser} actions={postActions}
+              <MyProfilePage currentUser={me} startTab="friends" onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser} actions={postActions} stories={stories} onDeleteStory={handleDeleteStory}
                 friendsView={<FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onOpenDM={openDM} embedded t={t} />} t={t} />
             </div>
           )}
@@ -4139,7 +4198,7 @@ export default function App() {
           {/* MY PROFILE */}
           {page==="profile"&&(
             <div {...swipeBack(()=>setPage("home"))} style={{paddingBottom:BOTTOM_NAV_H+16}}>
-              <MyProfilePage currentUser={me} onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser} actions={postActions}
+              <MyProfilePage currentUser={me} onUpdate={updateCurrentUser} onBack={()=>setPage("home")} onGoSettings={()=>setPage("settings")} posts={posts} onDeletePost={handleDeletePost} onOpenProfile={setProfileUser} actions={postActions} stories={stories} onDeleteStory={handleDeleteStory}
                 friendsView={<FriendsPage currentUser={me} allUsers={allUsers} onOpenProfile={setProfileUser} onAcceptFriend={acceptFriendReq} onOpenDM={openDM} embedded t={t} />} t={t} />
             </div>
           )}
@@ -4224,6 +4283,7 @@ export default function App() {
         {profileUser&&(
           <ProfileModal
             user={profileUser}
+            stories={stories.filter(x=>x.user_id===profileUser.id)} storyActions={postActions}
             currentUser={currentUser}
             onClose={()=>setProfileUser(null)}
             onAddFriend={()=>{ sendFriendReq(profileUser.id); setProfileUser(null); }}
