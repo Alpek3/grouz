@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import * as api from "./api";
 import * as billing from "./billing";
 import * as push from "./push";
+import { registerPlugin } from "@capacitor/core";
 import { gifsEnabled, gifProvider, searchGifs } from "./gifs";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -82,11 +83,11 @@ function AdBanner({ index=0, onAction, t }) {
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:12,background:t.bg3,border:`1px solid ${t.border}`,position:"relative"}}>
       <span style={{fontSize:20,width:30,textAlign:"center"}}>{ad.icon}</span>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:t.text3,letterSpacing:"0.1em"}}>PUB</div>
-        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:t.text,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ad.title}</div>
-        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:t.text3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ad.text}</div>
+        <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:9,color:t.text3,letterSpacing:"0.1em"}}>PUB</div>
+        <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,color:t.text,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ad.title}</div>
+        <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ad.text}</div>
       </div>
-      <button onClick={()=>onAction(ad.action)} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${t.accent}`,background:"transparent",color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:11,cursor:"pointer",flexShrink:0}}>{ad.cta}</button>
+      <button onClick={()=>onAction(ad.action)} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${t.accent}`,background:"transparent",color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,cursor:"pointer",flexShrink:0}}>{ad.cta}</button>
       <button onClick={()=>setClosed(true)} aria-label="Fermer la publicité" style={{background:"none",border:"none",color:t.text3,fontSize:16,cursor:"pointer",padding:"0 2px",flexShrink:0}}>✕</button>
     </div>
   );
@@ -110,7 +111,7 @@ function AvatarCore({ user, size=36 }) {
   if (user.avatar) return <img src={user.avatar} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0}} alt="" />;
   const color = user.avatarColor || AVATAR_COLORS[user.id?.charCodeAt(1)%AVATAR_COLORS.length] || "#E8008A";
   return (
-    <div style={{width:size,height:size,borderRadius:"50%",background:color,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Mono',monospace",fontSize:size*0.34,color:"#fff",fontWeight:700,flexShrink:0,letterSpacing:"-0.5px"}}>
+    <div style={{width:size,height:size,borderRadius:"50%",background:color,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:size*0.34,color:"#fff",fontWeight:700,flexShrink:0,letterSpacing:"-0.5px"}}>
       {(user.pseudo||user.name||"?").slice(0,2).toUpperCase()}
     </div>
   );
@@ -118,10 +119,10 @@ function AvatarCore({ user, size=36 }) {
 
 // ─── INPUT FIELD ─────────────────────────────────────────────────────────────
 function Field({label,value,onChange,type="text",placeholder,t,half=false,options}) {
-  const base = {width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Mono',monospace",outline:"none",boxSizing:"border-box"};
+  const base = {width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",boxSizing:"border-box"};
   return (
     <div style={{flex:half?"0 0 calc(50% - 6px)":"1 1 100%"}}>
-      <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>{label}</label>
+      <label style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>{label}</label>
       {options ? (
         <select value={value} onChange={e=>onChange(e.target.value)} style={{...base,cursor:"pointer"}}>
           {options.map(o=><option key={o} value={o}>{o}</option>)}
@@ -136,7 +137,7 @@ function Field({label,value,onChange,type="text",placeholder,t,half=false,option
 // ─── BUTTON ───────────────────────────────────────────────────────────────────
 function Btn({children,onClick,accent=false,small=false,disabled=false,t,style:s={}}) {
   return (
-    <button onClick={disabled?undefined:onClick} style={{padding:small?"7px 14px":"12px 20px",borderRadius:10,background:disabled?t.bg3:accent?t.gradient:t.bg3,color:disabled?t.text3:accent?"#fff":t.text2,border:`1px solid ${disabled?t.border:accent?"transparent":t.border}`,fontFamily:"'DM Mono',monospace",fontSize:small?11:13,fontWeight:700,cursor:disabled?"not-allowed":"pointer",letterSpacing:"0.04em",transition:"all 0.15s",boxShadow:accent&&!disabled?`0 4px 16px rgba(232,0,138,0.35)`:"none",...s}}>
+    <button onClick={disabled?undefined:onClick} style={{padding:small?"7px 14px":"12px 20px",borderRadius:10,background:disabled?t.bg3:accent?t.gradient:t.bg3,color:disabled?t.text3:accent?"#fff":t.text2,border:`1px solid ${disabled?t.border:accent?"transparent":t.border}`,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:small?11:13,fontWeight:700,cursor:disabled?"not-allowed":"pointer",letterSpacing:"0.04em",transition:"all 0.15s",boxShadow:accent&&!disabled?`0 4px 16px rgba(232,0,138,0.35)`:"none",...s}}>
       {children}
     </button>
   );
@@ -148,7 +149,7 @@ function NotifBell({notifs,theme:t,onOpen}) {
   return (
     <button onClick={onOpen} style={{position:"relative",background:"none",border:"none",cursor:"pointer",padding:"4px 8px",color:t.text2,fontSize:20}}>
       🔔
-      {unread>0&&<span style={{position:"absolute",top:0,right:0,width:16,height:16,borderRadius:"50%",background:t.accent,color:"#fff",fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{unread}</span>}
+      {unread>0&&<span style={{position:"absolute",top:0,right:0,width:16,height:16,borderRadius:"50%",background:t.accent,color:"#fff",fontSize:9,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{unread}</span>}
     </button>
   );
 }
@@ -197,13 +198,13 @@ function AuthScreen({onAuth,t}) {
       {forgot && (
         <div onClick={()=>setForgot(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:380,padding:26}}>
-            <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"0 0 8px"}}>Mot de passe oublié</h2>
-            <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.5,margin:"0 0 16px"}}>Entre ton adresse email, on t'envoie un lien pour choisir un nouveau mot de passe.</p>
+            <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text,margin:"0 0 8px"}}>Mot de passe oublié</h2>
+            <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,lineHeight:1.5,margin:"0 0 16px"}}>Entre ton adresse email, on t'envoie un lien pour choisir un nouveau mot de passe.</p>
             <Field label="Email" value={form.email} onChange={v=>set("email",v)} type="email" placeholder="toi@mail.com" t={t} />
-            {err&&<p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,margin:"12px 0 0"}}>{err}</p>}
-            {info&&<p style={{color:t.green,fontFamily:"'DM Mono',monospace",fontSize:12,margin:"12px 0 0",lineHeight:1.5}}>{info}</p>}
+            {err&&<p style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,margin:"12px 0 0"}}>{err}</p>}
+            {info&&<p style={{color:t.green,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,margin:"12px 0 0",lineHeight:1.5}}>{info}</p>}
             <Btn accent onClick={handleForgot} disabled={busy} t={t} style={{width:"100%",marginTop:16,padding:14}}>ENVOYER LE LIEN</Btn>
-            <button onClick={()=>setForgot(false)} style={{display:"block",margin:"12px auto 0",background:"none",border:"none",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>← Retour</button>
+            <button onClick={()=>setForgot(false)} style={{display:"block",margin:"12px auto 0",background:"none",border:"none",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,cursor:"pointer"}}>← Retour</button>
           </div>
         </div>
       )}
@@ -218,13 +219,13 @@ function AuthScreen({onAuth,t}) {
             <div style={{position:"absolute",inset:-8,borderRadius:"50%",background:t.gradient,opacity:0.45,filter:"blur(16px)"}}/>
             <img src={LOGO_B64} alt="GrouZ" style={{width:120,height:120,borderRadius:"50%",objectFit:"cover",position:"relative",border:"3px solid #D4AF37",boxShadow:"0 0 0 6px rgba(232,0,138,0.3), 0 12px 40px rgba(232,0,138,0.5)",animation:"grouz-glow 3s ease-in-out infinite"}} />
           </div>
-          <h1 style={{fontFamily:"'Fraunces',serif",fontSize:40,fontStyle:"italic",margin:"0 0 6px",background:t.gradient,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",letterSpacing:"-0.5px",lineHeight:1}}>GrouZ</h1>
-          <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,letterSpacing:"0.12em"}}>ORGANISEZ • RENCONTREZ • VIBREZ</p>
+          <h1 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:40,fontStyle:"italic",margin:"0 0 6px",background:t.gradient,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",letterSpacing:"-0.5px",lineHeight:1}}>GrouZ</h1>
+          <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,letterSpacing:"0.12em"}}>ORGANISEZ • RENCONTREZ • VIBREZ</p>
         </div>
 
         <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:24,padding:28,boxShadow:`0 20px 60px rgba(232,0,138,0.12)`}}>
           <div style={{display:"flex",gap:4,background:t.bg3,borderRadius:12,padding:4,marginBottom:24}}>
-            {["login","register"].map(tab_=>(<button key={tab_} onClick={()=>{setTab(tab_);setErr("");}} style={{flex:1,padding:"10px",borderRadius:10,background:tab===tab_?t.accent:"transparent",border:"none",color:tab===tab_?"#fff":t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer",fontWeight:700,letterSpacing:"0.05em",transition:"all 0.2s"}}>{tab_==="login"?"CONNEXION":"INSCRIPTION"}</button>))}
+            {["login","register"].map(tab_=>(<button key={tab_} onClick={()=>{setTab(tab_);setErr("");}} style={{flex:1,padding:"10px",borderRadius:10,background:tab===tab_?t.accent:"transparent",border:"none",color:tab===tab_?"#fff":t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,cursor:"pointer",fontWeight:700,letterSpacing:"0.05em",transition:"all 0.2s"}}>{tab_==="login"?"CONNEXION":"INSCRIPTION"}</button>))}
           </div>
           <div style={{display:"flex",flexWrap:"wrap",gap:12}}>
             {tab==="register"&&<>
@@ -236,16 +237,16 @@ function AuthScreen({onAuth,t}) {
             </>}
             <Field label="Email" value={form.email} onChange={v=>set("email",v)} type="email" placeholder="toi@mail.com" t={t} />
             <Field label="Mot de passe" value={form.password} onChange={v=>set("password",v)} type="password" placeholder="••••••••" t={t} />
-            {tab==="login" && <button onClick={()=>{ setForgot(true); setErr(""); setInfo(""); }} style={{width:"100%",background:"none",border:"none",color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:11,cursor:"pointer",padding:0,textAlign:"left"}}>Mot de passe oublié ?</button>}
+            {tab==="login" && <button onClick={()=>{ setForgot(true); setErr(""); setInfo(""); }} style={{width:"100%",background:"none",border:"none",color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,cursor:"pointer",padding:0,textAlign:"left"}}>Mot de passe oublié ?</button>}
             {tab==="register" && (
               <label style={{display:"flex",gap:10,alignItems:"flex-start",width:"100%",cursor:"pointer"}}>
                 <input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)} style={{width:18,height:18,marginTop:1,accentColor:"#E8008A",flexShrink:0}} />
-                <span style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:12,lineHeight:1.5}}>J'ai 15 ans ou plus et j'accepte les <a href={api.PUBLIC_URL+"/conditions.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>conditions d'utilisation</a> et la <a href={api.PUBLIC_URL+"/confidentialite.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>politique de confidentialité</a>.</span>
+                <span style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,lineHeight:1.5}}>J'ai 15 ans ou plus et j'accepte les <a href={api.PUBLIC_URL+"/conditions.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>conditions d'utilisation</a> et la <a href={api.PUBLIC_URL+"/confidentialite.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>politique de confidentialité</a>.</span>
               </label>
             )}
           </div>
-          {err&&<p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,marginTop:12,padding:"8px 12px",background:t.accentBg,borderRadius:8,border:`1px solid ${t.accent}44`}}>{err}</p>}
-          <button onClick={tab==="login"?handleLogin:handleRegister} disabled={busy} style={{marginTop:20,width:"100%",padding:"14px",borderRadius:14,background:t.gradient,color:"#fff",border:"none",fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",boxShadow:`0 4px 20px rgba(232,0,138,0.4)`,transition:"all 0.2s"}}>
+          {err&&<p style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,marginTop:12,padding:"8px 12px",background:t.accentBg,borderRadius:8,border:`1px solid ${t.accent}44`}}>{err}</p>}
+          <button onClick={tab==="login"?handleLogin:handleRegister} disabled={busy} style={{marginTop:20,width:"100%",padding:"14px",borderRadius:14,background:t.gradient,color:"#fff",border:"none",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",boxShadow:`0 4px 20px rgba(232,0,138,0.4)`,transition:"all 0.2s"}}>
             {tab==="login"?"SE CONNECTER →":"CRÉER MON COMPTE →"}
           </button>
         </div>
@@ -270,14 +271,14 @@ function PasswordForm({ onDone, onCancel, t }) {
   return (
     <div style={{position:"fixed",inset:0,background:t.bg,zIndex:330,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:380,padding:26}}>
-        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"0 0 14px"}}>Nouveau mot de passe</h2>
+        <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text,margin:"0 0 14px"}}>Nouveau mot de passe</h2>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <Field label="Nouveau mot de passe" value={pw} onChange={setPw} type="password" placeholder="••••••••" t={t} />
           <Field label="Confirmer" value={pw2} onChange={setPw2} type="password" placeholder="••••••••" t={t} />
         </div>
-        {err && <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,margin:"12px 0 0"}}>{err}</p>}
+        {err && <p style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,margin:"12px 0 0"}}>{err}</p>}
         <Btn accent onClick={submit} disabled={busy} t={t} style={{width:"100%",marginTop:16,padding:14}}>ENREGISTRER</Btn>
-        {onCancel && <button onClick={onCancel} style={{display:"block",margin:"12px auto 0",background:"none",border:"none",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>Annuler</button>}
+        {onCancel && <button onClick={onCancel} style={{display:"block",margin:"12px auto 0",background:"none",border:"none",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,cursor:"pointer"}}>Annuler</button>}
       </div>
     </div>
   );
@@ -292,12 +293,12 @@ function ReportModal({ user, onSend, onClose, t }) {
   return (
     <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:400,maxHeight:"90%",overflowY:"auto",padding:24}}>
-        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:21,color:t.text,margin:"0 0 4px"}}>Signaler {user.name}</h2>
-        <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:12,margin:"0 0 14px",lineHeight:1.5}}>Ton signalement est confidentiel : la personne ne saura pas que c'est toi.</p>
+        <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:21,color:t.text,margin:"0 0 4px"}}>Signaler {user.name}</h2>
+        <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,margin:"0 0 14px",lineHeight:1.5}}>Ton signalement est confidentiel : la personne ne saura pas que c'est toi.</p>
         {REPORT_REASONS.map(r=>(
-          <button key={r} onClick={()=>setReason(r)} style={{display:"block",width:"100%",textAlign:"left",padding:"11px 14px",marginBottom:6,borderRadius:12,background:reason===r?t.accentBg:t.bg3,border:`1px solid ${reason===r?t.accent:t.border}`,color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:13,cursor:"pointer"}}>{r}</button>
+          <button key={r} onClick={()=>setReason(r)} style={{display:"block",width:"100%",textAlign:"left",padding:"11px 14px",marginBottom:6,borderRadius:12,background:reason===r?t.accentBg:t.bg3,border:`1px solid ${reason===r?t.accent:t.border}`,color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,cursor:"pointer"}}>{r}</button>
         ))}
-        <textarea value={details} onChange={e=>setDetails(e.target.value)} rows={3} placeholder="Précisions (optionnel)…" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
+        <textarea value={details} onChange={e=>setDetails(e.target.value)} rows={3} placeholder="Précisions (optionnel)…" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
         <div style={{display:"flex",gap:10,marginTop:14}}>
           <Btn onClick={onClose} t={t} style={{flex:1}}>Annuler</Btn>
           <Btn accent disabled={!reason||busy} onClick={async()=>{ setBusy(true); await onSend(reason, details); setBusy(false); }} t={t} style={{flex:2}}>Envoyer le signalement</Btn>
@@ -312,16 +313,16 @@ function BlockedListModal({ users, onUnblock, onClose, t }) {
     <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:400,maxHeight:"80%",overflowY:"auto",padding:24}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <h2 style={{fontFamily:"'Fraunces',serif",fontSize:21,color:t.text,margin:0}}>Utilisateurs bloqués</h2>
+          <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:21,color:t.text,margin:0}}>Utilisateurs bloqués</h2>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:18,cursor:"pointer"}}>✕</button>
         </div>
-        {users.length===0 && <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:13,textAlign:"center",padding:"20px 0"}}>Tu n'as bloqué personne.</p>}
+        {users.length===0 && <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,textAlign:"center",padding:"20px 0"}}>Tu n'as bloqué personne.</p>}
         {users.map(u=>(
           <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderTop:`1px solid ${t.border}`}}>
             <Avatar user={u} size={40} t={t} />
             <div style={{flex:1,minWidth:0}}>
-              <p style={{margin:0,color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:14}}>{u.name}</p>
-              <p style={{margin:0,color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10}}>@{u.pseudo}</p>
+              <p style={{margin:0,color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontWeight:600,fontSize:14}}>{u.name}</p>
+              <p style={{margin:0,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10}}>@{u.pseudo}</p>
             </div>
             <Btn small t={t} onClick={()=>onUnblock(u)}>Débloquer</Btn>
           </div>
@@ -336,8 +337,8 @@ function DeleteAccountModal({ onConfirm, onClose, t }) {
   return (
     <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.accent}`,borderRadius:20,width:"100%",maxWidth:380,padding:24}}>
-        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:21,color:t.text,margin:"0 0 8px"}}>Supprimer mon compte</h2>
-        <p style={{color:t.text2,fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.55,margin:"0 0 14px"}}>Cette action est <b>définitive</b> : ton profil, tes sorties, tes messages, tes photos et tes vocaux seront supprimés, et tes amis ne te verront plus.</p>
+        <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:21,color:t.text,margin:"0 0 8px"}}>Supprimer mon compte</h2>
+        <p style={{color:t.text2,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,lineHeight:1.55,margin:"0 0 14px"}}>Cette action est <b>définitive</b> : ton profil, tes sorties, tes messages, tes photos et tes vocaux seront supprimés, et tes amis ne te verront plus.</p>
         <Field label="Tape SUPPRIMER pour confirmer" value={txt} onChange={setTxt} placeholder="SUPPRIMER" t={t} />
         <div style={{display:"flex",gap:10,marginTop:16}}>
           <Btn onClick={onClose} t={t} style={{flex:1}}>Annuler</Btn>
@@ -356,43 +357,43 @@ function ProfileModal({user, currentUser, onClose, onAddFriend, onOpenDM, onRepo
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose} {...swipeDown(onClose)}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:380,padding:28,position:"relative"}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:20}}>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em"}}>PROFIL</span>
+          <span style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.1em"}}>PROFIL</span>
           <div style={{display:"flex",gap:6,alignItems:"center"}}>
             {!isMe && <button onClick={()=>setMenu(m=>!m)} aria-label="Plus d'options" style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer",lineHeight:1,padding:"0 6px"}}>⋯</button>}
             <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:18,cursor:"pointer"}}>✕</button>
           </div>
           {menu && !isMe && (
             <div style={{position:"absolute",top:52,right:22,zIndex:5,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:12,overflow:"hidden",boxShadow:"0 10px 30px rgba(0,0,0,0.45)"}}>
-              <button onClick={()=>{ setMenu(false); onReport(); }} style={{display:"block",width:"100%",textAlign:"left",padding:"12px 18px",background:"none",border:"none",color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,cursor:"pointer"}}>🚩 Signaler</button>
-              <button onClick={()=>{ setMenu(false); onBlock(); }} style={{display:"block",width:"100%",textAlign:"left",padding:"12px 18px",background:"none",border:"none",borderTop:`1px solid ${t.border}`,color:t.accent,fontFamily:"'DM Sans',sans-serif",fontSize:14,cursor:"pointer"}}>🚫 Bloquer</button>
+              <button onClick={()=>{ setMenu(false); onReport(); }} style={{display:"block",width:"100%",textAlign:"left",padding:"12px 18px",background:"none",border:"none",color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,cursor:"pointer"}}>🚩 Signaler</button>
+              <button onClick={()=>{ setMenu(false); onBlock(); }} style={{display:"block",width:"100%",textAlign:"left",padding:"12px 18px",background:"none",border:"none",borderTop:`1px solid ${t.border}`,color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,cursor:"pointer"}}>🚫 Bloquer</button>
             </div>
           )}
         </div>
         <div style={{textAlign:"center",marginBottom:20}}>
           <Avatar user={user} size={72} t={t} />
-          <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"10px 0 4px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{user.name}{user.is_premium&&<PremiumBadge size={20}/>}</h2>
-          <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:13,margin:"0 0 8px"}}>@{user.pseudo}{isAvailableTonight(user)&&<span style={{marginLeft:8,color:"#2DBE60",fontSize:11}}>🟢 Dispo</span>}</p>
-          {user.bio&&<p style={{color:t.text2,fontSize:14,lineHeight:1.5,fontFamily:"'DM Sans',sans-serif"}}>{user.bio}</p>}
+          <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text,margin:"10px 0 4px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{user.name}{user.is_premium&&<PremiumBadge size={20}/>}</h2>
+          <p style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,margin:"0 0 8px"}}>@{user.pseudo}{isAvailableTonight(user)&&<span style={{marginLeft:8,color:"#2DBE60",fontSize:11}}>🟢 Dispo</span>}</p>
+          {user.bio&&<p style={{color:t.text2,fontSize:14,lineHeight:1.5,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>{user.bio}</p>}
           <SocialLinks user={user} t={t} />
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
           {[["Âge",user.age+" ans"],["Genre",user.gender]].map(([l,v])=>(
             <div key={l} style={{background:t.bg3,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
-              <p style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:t.text,margin:"0 0 2px",fontWeight:700}}>{v}</p>
-              <p style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:t.text3,margin:0,letterSpacing:"0.06em"}}>{l.toUpperCase()}</p>
+              <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:18,color:t.text,margin:"0 0 2px",fontWeight:700}}>{v}</p>
+              <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,color:t.text3,margin:0,letterSpacing:"0.06em"}}>{l.toUpperCase()}</p>
             </div>
           ))}
         </div>
         {userActs.length>0&&(
           <div style={{marginBottom:16}}>
-            <button onClick={()=>setShowActs(v=>!v)} style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1px solid ${t.border}`,background:t.bg3,color:t.text,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <button onClick={()=>setShowActs(v=>!v)} style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1px solid ${t.border}`,background:t.bg3,color:t.text,cursor:"pointer",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span>🗓 {userActs.length} sortie{userActs.length>1?"s":""} à venir</span><span style={{color:t.text3}}>{showActs?"▲":"▼"}</span>
             </button>
             {showActs&&<div style={{marginTop:8,maxHeight:200,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
               {userActs.map(a=>{ const left=a.maxPeople-(a.accepted?.length||0); return (
                 <div key={a.id} onClick={()=>onOpenActivity(a)} style={{cursor:"pointer",background:t.bg2,border:`1px solid ${t.border}`,borderRadius:12,padding:"10px 12px"}}>
-                  <div style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:600}}>{CAT_ICONS[a.category]} {a.title}</div>
-                  <div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,marginTop:3}}>{new Date(a.date).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})} · {a.time} · {left>0?`${left} place${left>1?"s":""} libre${left>1?"s":""}`:"complet"}</div>
+                  <div style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,fontWeight:600}}>{CAT_ICONS[a.category]} {a.title}</div>
+                  <div style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,marginTop:3}}>{new Date(a.date).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})} · {a.time} · {left>0?`${left} place${left>1?"s":""} libre${left>1?"s":""}`:"complet"}</div>
                 </div>); })}
             </div>}
           </div>
@@ -452,7 +453,7 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, f
   return (
     <div style={{padding:"20px 24px",maxWidth:600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:0,display:"flex",alignItems:"center",gap:10}}>
+        <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:26,color:t.text,margin:0,display:"flex",alignItems:"center",gap:10}}>
           {mode==="edit" && <button onClick={()=>setMode("view")} aria-label="Retour" style={{background:"none",border:"none",color:t.text2,cursor:"pointer",padding:0,display:"flex"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>}
           {mode==="edit" ? "Modifier le profil" : "@"+currentUser.pseudo}
         </h2>
@@ -465,15 +466,15 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, f
         <div>
           <div style={{textAlign:"center",marginBottom:18}}>
             <div style={{display:"inline-block"}}><Avatar user={currentUser} size={96} t={t} /></div>
-            <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"10px 0 4px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{currentUser.name}{currentUser.is_premium&&<PremiumBadge size={20}/>}</h2>
-            <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,margin:"0 0 8px"}}>{currentUser.age} ans · {currentUser.gender}</p>
-            {currentUser.bio ? <p style={{color:t.text2,fontSize:14,lineHeight:1.5,fontFamily:"'DM Sans',sans-serif",margin:"0 auto",maxWidth:420}}>{currentUser.bio}</p>
-              : <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif",margin:0}}>Ajoute une bio pour te présenter 👋</p>}
+            <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text,margin:"10px 0 4px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{currentUser.name}{currentUser.is_premium&&<PremiumBadge size={20}/>}</h2>
+            <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,margin:"0 0 8px"}}>{currentUser.age} ans · {currentUser.gender}</p>
+            {currentUser.bio ? <p style={{color:t.text2,fontSize:14,lineHeight:1.5,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",margin:"0 auto",maxWidth:420}}>{currentUser.bio}</p>
+              : <p style={{color:t.text3,fontSize:13,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",margin:0}}>Ajoute une bio pour te présenter 👋</p>}
             <SocialLinks user={currentUser} t={t} />
           </div>
           <div style={{display:"flex",justifyContent:"center",gap:34,marginBottom:18}}>
             {[[myPosts.length,"Souvenirs","posts"],[currentUser.friends?.length||0,"Amis","friends"]].map(([n,l,tb])=>(
-              <div key={l} onClick={()=>setTab(tb)} role="button" style={{textAlign:"center",cursor:"pointer",outline:tab===tb?"none":"none",borderBottom:`2px solid ${tab===tb?t.accent:"transparent"}`,paddingBottom:3}}><div style={{fontFamily:"'DM Mono',monospace",fontSize:20,fontWeight:700,color:t.text}}>{n}</div><div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:t.text3,letterSpacing:"0.06em"}}>{l.toUpperCase()}</div></div>
+              <div key={l} onClick={()=>setTab(tb)} role="button" style={{textAlign:"center",cursor:"pointer",outline:tab===tb?"none":"none",borderBottom:`2px solid ${tab===tb?t.accent:"transparent"}`,paddingBottom:3}}><div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:20,fontWeight:700,color:t.text}}>{n}</div><div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,color:t.text3,letterSpacing:"0.06em"}}>{l.toUpperCase()}</div></div>
             ))}
           </div>
           <div style={{display:"flex",gap:10,marginBottom:22}}>
@@ -482,12 +483,12 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, f
           </div>
           <div style={{display:"flex",borderBottom:`1px solid ${t.border}`,marginBottom:16}}>
             {[["posts","▦ Souvenirs"],["friends",`👥 Amis${currentUser.friendReqs?.length?` (${currentUser.friendReqs.length})`:""}`]].map(([id,l])=>(
-              <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px",background:"none",border:"none",borderBottom:`2px solid ${tab===id?t.accent:"transparent"}`,color:tab===id?t.accent:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer"}}>{l}</button>
+              <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px",background:"none",border:"none",borderBottom:`2px solid ${tab===id?t.accent:"transparent"}`,color:tab===id?t.accent:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,cursor:"pointer"}}>{l}</button>
             ))}
           </div>
           {tab==="friends" ? friendsView : (
             myPosts.length===0
-              ? <p style={{textAlign:"center",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,padding:"26px 0"}}>Pas encore de souvenir. Partage tes sorties dans l'onglet Souvenirs !</p>
+              ? <p style={{textAlign:"center",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,padding:"26px 0"}}>Pas encore de souvenir. Partage tes sorties dans l'onglet Souvenirs !</p>
               : <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
                   {myPosts.map(p=>(
                     <div key={p.id} onClick={()=>setViewId(p.id)} style={{position:"relative",aspectRatio:"1",background:t.bg3,borderRadius:10,overflow:"hidden",cursor:"pointer"}}>
@@ -506,7 +507,7 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, f
           <div style={{position:"absolute",bottom:0,right:0,width:28,height:28,borderRadius:"50%",background:t.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#fff"}}>📷</div>
         </div>
         <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{display:"none"}} />
-        <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,marginTop:8}}>Cliquer pour changer</p>
+        <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,marginTop:8}}>Cliquer pour changer</p>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:12}}>
         <Field label="Nom complet" value={form.name} onChange={v=>set("name",v)} t={t} />
@@ -514,16 +515,16 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, f
         <Field label="Âge" value={""+form.age} onChange={v=>set("age",v)} type="number" t={t} half />
         <Field label="Genre" value={form.gender} onChange={v=>set("gender",v)} t={t} options={["Homme","Femme","Non-binaire","Préfère ne pas dire"]} />
         <div style={{flex:"1 1 100%"}}>
-          <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Bio</label>
-          <textarea value={form.bio} onChange={e=>set("bio",e.target.value)} rows={3} placeholder="Parle-nous de toi..." style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
+          <label style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Bio</label>
+          <textarea value={form.bio} onChange={e=>set("bio",e.target.value)} rows={3} placeholder="Parle-nous de toi..." style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
         </div>
         <div style={{flex:"1 1 100%"}}>
-          <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase",display:"flex",alignItems:"center",gap:6}}><InstagramIcon size={14}/> Instagram</label>
-          <input value={form.instagram} onChange={e=>set("instagram",e.target.value)} placeholder="@tonpseudo ou lien du profil" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}} />
+          <label style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.08em",textTransform:"uppercase",display:"flex",alignItems:"center",gap:6}}><InstagramIcon size={14}/> Instagram</label>
+          <input value={form.instagram} onChange={e=>set("instagram",e.target.value)} placeholder="@tonpseudo ou lien du profil" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",boxSizing:"border-box"}} />
         </div>
         <div style={{flex:"1 1 100%"}}>
-          <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase",display:"flex",alignItems:"center",gap:6}}><TikTokIcon size={14}/> TikTok</label>
-          <input value={form.tiktok} onChange={e=>set("tiktok",e.target.value)} placeholder="@tonpseudo ou lien du profil" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}} />
+          <label style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.08em",textTransform:"uppercase",display:"flex",alignItems:"center",gap:6}}><TikTokIcon size={14}/> TikTok</label>
+          <input value={form.tiktok} onChange={e=>set("tiktok",e.target.value)} placeholder="@tonpseudo ou lien du profil" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",boxSizing:"border-box"}} />
         </div>
       </div>
       <Btn accent onClick={save} t={t} style={{marginTop:20,width:"100%",padding:"14px"}}>
@@ -548,7 +549,7 @@ function SettingsPage({onOpenPremium, currentUser, darkMode, onToggleDark, onLog
       onMouseEnter={e=>{if(onClick)e.currentTarget.style.borderColor=t.accent}}
       onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border}}>
       <span style={{fontSize:20}}>{icon}</span>
-      <span style={{flex:1,fontFamily:"'DM Sans',sans-serif",color:t.text,fontSize:14}}>{label}</span>
+      <span style={{flex:1,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:t.text,fontSize:14}}>{label}</span>
       {right}
     </div>
   );
@@ -565,17 +566,17 @@ function SettingsPage({onOpenPremium, currentUser, darkMode, onToggleDark, onLog
         <button onClick={onBack} style={{background:"none",border:"none",color:t.text2,cursor:"pointer",padding:4,display:"flex",alignItems:"center"}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:0}}>Paramètres</h2>
+        <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:26,color:t.text,margin:0}}>Paramètres</h2>
       </div>
 
-      <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em",marginBottom:10}}>APPARENCE</p>
+      <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.1em",marginBottom:10}}>APPARENCE</p>
       <Row icon={darkMode?"🌙":"☀️"} label={darkMode?"Mode sombre activé":"Mode clair activé"} right={<Toggle on={darkMode} onToggle={onToggleDark}/>} />
 
-      <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"20px 0 10px"}}>INVITER DES CONTACTS</p>
+      <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"20px 0 10px"}}>INVITER DES CONTACTS</p>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:16,marginBottom:8}}>
-        <p style={{color:t.text2,fontFamily:"'DM Sans',sans-serif",fontSize:14,marginBottom:12}}>Partagez ce lien pour inviter vos amis à rejoindre GrouZ !</p>
+        <p style={{color:t.text2,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,marginBottom:12}}>Partagez ce lien pour inviter vos amis à rejoindre GrouZ !</p>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <code style={{flex:1,background:t.bg3,border:`1px solid ${t.border}`,borderRadius:8,padding:"9px 12px",color:t.text,fontSize:12,fontFamily:"'DM Mono',monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{inviteLink}</code>
+          <code style={{flex:1,background:t.bg3,border:`1px solid ${t.border}`,borderRadius:8,padding:"9px 12px",color:t.text,fontSize:12,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{inviteLink}</code>
           <Btn onClick={copyLink} accent={copied} t={t} small>{copied?"✓ Copié !":"Copier"}</Btn>
         </div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:12}}>
@@ -587,19 +588,19 @@ function SettingsPage({onOpenPremium, currentUser, darkMode, onToggleDark, onLog
         </div>
       </div>
 
-      <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"20px 0 10px"}}>PREMIUM</p>
+      <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"20px 0 10px"}}>PREMIUM</p>
       <Row icon="⭐" label={currentUser?.is_premium?"GrouZ Premium — actif · Qui a vu mon profil":"Découvrir GrouZ Premium"} onClick={onOpenPremium} right={<span style={{color:t.text3}}>›</span>} />
 
-      <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"20px 0 10px"}}>COMPTE</p>
+      <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"20px 0 10px"}}>COMPTE</p>
       <Row icon="🔒" label="Changer le mot de passe" onClick={onChangePassword} right={<span style={{color:t.text3}}>›</span>} />
       <Row icon="🚫" label={`Utilisateurs bloqués${blockedCount?` (${blockedCount})`:""}`} onClick={onOpenBlocked} right={<span style={{color:t.text3}}>›</span>} />
       <Row icon="🛡" label="Politique de confidentialité" onClick={()=>window.open(api.PUBLIC_URL+"/confidentialite.html","_blank")} right={<span style={{color:t.text3}}>›</span>} />
       <Row icon="📄" label="Conditions d'utilisation" onClick={()=>window.open(api.PUBLIC_URL+"/conditions.html","_blank")} right={<span style={{color:t.text3}}>›</span>} />
       <div style={{marginTop:8}}>
         <Row icon="🗑" label="Supprimer mon compte" onClick={onDeleteAccount} right={<span style={{color:t.accent}}>›</span>} />
-        <Row icon="🚪" label="Se déconnecter" onClick={onLogout} right={<span style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12}}>→</span>} />
+        <Row icon="🚪" label="Se déconnecter" onClick={onLogout} right={<span style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12}}>→</span>} />
       </div>
-      <p style={{textAlign:"center",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,marginTop:24}}>GrouZ v2.0.0 — Fait avec ♥</p>
+      <p style={{textAlign:"center",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,marginTop:24}}>GrouZ v2.0.0 — Fait avec ♥</p>
     </div>
   );
 }
@@ -612,29 +613,29 @@ function FriendsPage({currentUser, allUsers, onOpenProfile, onAcceptFriend, onBa
   const reqs = allUsers.filter(u=>currentUser.friendReqs?.includes(u.id));
   return (
     <div style={{padding:embedded?"0":"20px 24px",maxWidth:600,margin:"0 auto"}}>
-      {!embedded&&<h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,marginBottom:24}}>Amis</h2>}
+      {!embedded&&<h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:26,color:t.text,marginBottom:24}}>Amis</h2>}
       {reqs.length>0&&<>
-        <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.accent,letterSpacing:"0.1em",marginBottom:10}}>🔔 DEMANDES D'AMITIÉ ({reqs.length})</p>
+        <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.accent,letterSpacing:"0.1em",marginBottom:10}}>🔔 DEMANDES D'AMITIÉ ({reqs.length})</p>
         {reqs.map(u=>(
           <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 16px",marginBottom:8}}>
             <div onClick={()=>onOpenProfile(u)} style={{cursor:"pointer"}}><Avatar user={u} size={44} t={t} /></div>
             <div onClick={()=>onOpenProfile(u)} style={{flex:1,cursor:"pointer"}}>
-              <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0}}>{u.name}</p>
-              <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>@{u.pseudo} · {u.age} ans</p>
+              <p style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontWeight:600,margin:0}}>{u.name}</p>
+              <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,margin:0}}>@{u.pseudo} · {u.age} ans</p>
             </div>
             <Btn onClick={()=>onAcceptFriend(u.id)} accent t={t} small>Accepter</Btn>
           </div>
         ))}
         <div style={{borderTop:`1px solid ${t.border}`,margin:"20px 0"}}/>
       </>}
-      <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em",marginBottom:10}}>MES AMIS ({friends.length})</p>
-      {friends.length===0&&<p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:14,textAlign:"center",padding:"32px 0"}}>Vous n'avez pas encore d'amis.<br/>Cliquez sur un profil pour en ajouter !</p>}
+      <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.1em",marginBottom:10}}>MES AMIS ({friends.length})</p>
+      {friends.length===0&&<p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,textAlign:"center",padding:"32px 0"}}>Vous n'avez pas encore d'amis.<br/>Cliquez sur un profil pour en ajouter !</p>}
       {friends.map(u=>(
         <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 16px",marginBottom:8}}>
           <div onClick={()=>onOpenProfile(u)} style={{cursor:"pointer"}}><Avatar user={u} size={44} t={t} /></div>
           <div style={{flex:1,cursor:"pointer"}} onClick={()=>onOpenProfile(u)}>
-            <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0}}>{u.name}</p>
-            <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>@{u.pseudo} · {u.age} ans · {u.gender}{isAvailableTonight(u)&&<span style={{color:"#2DBE60"}}> · 🟢 Dispo</span>}</p>
+            <p style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontWeight:600,margin:0}}>{u.name}</p>
+            <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,margin:0}}>@{u.pseudo} · {u.age} ans · {u.gender}{isAvailableTonight(u)&&<span style={{color:"#2DBE60"}}> · 🟢 Dispo</span>}</p>
           </div>
           <Btn onClick={()=>onOpenDM(u)} accent t={t} small>💬</Btn>
         </div>
@@ -756,12 +757,12 @@ function VoiceMessageBubble({ msg, isMe, t }) {
       <div style={{ flex:1 }}>
         <Waveform isMe={isMe} playing={playing} color={t.accent} />
         <div style={{ display:"flex", justifyContent:"space-between", marginTop:3 }}>
-          <span style={{ fontSize:10, color: isMe?"rgba(255,255,255,0.7)":t.text3, fontFamily:"'DM Mono',monospace" }}>
+          <span style={{ fontSize:10, color: isMe?"rgba(255,255,255,0.7)":t.text3, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>
             {err ? "⚠ Lecture impossible" : `${fmt(Math.round((msg.duration||0) * (playing ? progress : 1)))} / ${fmt(msg.duration||0)}`}
           </span>
         </div>
       </div>
-      <span style={{ fontSize:11, color: isMe?"rgba(255,255,255,0.6)":t.text3, fontFamily:"'DM Mono',monospace" }}>🎙</span>
+      <span style={{ fontSize:11, color: isMe?"rgba(255,255,255,0.6)":t.text3, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>🎙</span>
     </div>
   );
 }
@@ -851,14 +852,14 @@ function ChatInputBar({ onSend, onVoiceSend, onStatus, onPickFile, onGif, onPoll
       {replyTo && (
         <div style={{ position: "absolute", left: 0, right: 0, bottom: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", background: t.bg2, borderTop: `1px solid ${t.border}`, borderLeft: `3px solid ${t.accent}` }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: t.accent, fontFamily: "'DM Mono',monospace" }}>Réponse à {replyLabel}</div>
-            <div style={{ fontSize: 13, color: t.text2, fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{replyTo.poll_id ? "📊 Sondage" : replyTo.type === "voice" ? "🎤 Message vocal" : replyTo.type && replyTo.type !== "text" ? "📷 Média" : replyTo.text}</div>
+            <div style={{ fontSize: 11, color: t.accent, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>Réponse à {replyLabel}</div>
+            <div style={{ fontSize: 13, color: t.text2, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{replyTo.poll_id ? "📊 Sondage" : replyTo.type === "voice" ? "🎤 Message vocal" : replyTo.type && replyTo.type !== "text" ? "📷 Média" : replyTo.text}</div>
           </div>
           <button onClick={onCancelReply} aria-label="Annuler la réponse" style={{ background: "none", border: "none", color: t.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
         </div>
       )}
       {hint && (
-        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: "calc(100% + 8px)", background: t.bg3, border: `1px solid ${t.border}`, color: t.text2, fontFamily: "'DM Mono',monospace", fontSize: 11, padding: "7px 12px", borderRadius: 10, whiteSpace: "nowrap", zIndex: 5 }}>
+        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: "calc(100% + 8px)", background: t.bg3, border: `1px solid ${t.border}`, color: t.text2, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 11, padding: "7px 12px", borderRadius: 10, whiteSpace: "nowrap", zIndex: 5 }}>
           Maintiens le micro pour enregistrer
         </div>
       )}
@@ -871,9 +872,9 @@ function ChatInputBar({ onSend, onVoiceSend, onStatus, onPickFile, onGif, onPoll
 
       {menuOpen && (
         <div style={{ position: "absolute", left: padH, bottom: "calc(100% + 8px)", zIndex: 8, background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 14, overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.4)" }}>
-          <button onClick={() => fileRef.current?.click()} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14, cursor: "pointer" }}>📷 Photo ou vidéo</button>
-          {onGif && <button onClick={() => { setMenuOpen(false); onGif(); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14, cursor: "pointer" }}>🎞 GIF</button>}
-          {onPoll && <button onClick={() => { setMenuOpen(false); onPoll(); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14, cursor: "pointer" }}>📊 Sondage</button>}
+          <button onClick={() => fileRef.current?.click()} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", color: t.text, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 14, cursor: "pointer" }}>📷 Photo ou vidéo</button>
+          {onGif && <button onClick={() => { setMenuOpen(false); onGif(); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 14, cursor: "pointer" }}>🎞 GIF</button>}
+          {onPoll && <button onClick={() => { setMenuOpen(false); onPoll(); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 14, cursor: "pointer" }}>📊 Sondage</button>}
         </div>
       )}
       {onPickFile && <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: "none" }}
@@ -884,14 +885,14 @@ function ChatInputBar({ onSend, onVoiceSend, onStatus, onPickFile, onGif, onPoll
 
       {mode === "idle" && (
         <input value={msg} onChange={e => { const v = e.target.value; setMsg(v); if (onStatus) { if (v.trim()) { const now = Date.now(); if (now - lastTypingRef.current > 2500) { lastTypingRef.current = now; onStatus("typing"); } } else { lastTypingRef.current = 0; onStatus("idle"); } } }} onKeyDown={e => e.key === "Enter" && send()} placeholder={placeholder}
-          style={{ flex: 1, minWidth: 0, padding: "11px 16px", borderRadius: 12, background: t.input, border: `1px solid ${t.border}`, color: t.text, fontSize: 14, fontFamily: "'DM Mono',monospace", outline: "none" }} />
+          style={{ flex: 1, minWidth: 0, padding: "11px 16px", borderRadius: 12, background: t.input, border: `1px solid ${t.border}`, color: t.text, fontSize: 14, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", outline: "none" }} />
       )}
 
       {holding && (
         <div style={strip}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#E8008A", animation: "pulse 1s ease-in-out infinite", flexShrink: 0 }} />
-          <span style={{ color: t.accent, fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 700 }}>{fmt(voice.seconds)}</span>
-          <span style={{ marginLeft: "auto", color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 11, opacity: cancelOpacity, whiteSpace: "nowrap" }}>◀ Glisse pour annuler</span>
+          <span style={{ color: t.accent, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 13, fontWeight: 700 }}>{fmt(voice.seconds)}</span>
+          <span style={{ marginLeft: "auto", color: t.text3, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 11, opacity: cancelOpacity, whiteSpace: "nowrap" }}>◀ Glisse pour annuler</span>
         </div>
       )}
 
@@ -900,8 +901,8 @@ function ChatInputBar({ onSend, onVoiceSend, onStatus, onPickFile, onGif, onPoll
           <button onClick={lockedCancel} aria-label="Annuler" style={{ width: 44, height: 44, borderRadius: "50%", background: t.bg3, border: `1px solid ${t.border}`, cursor: "pointer", fontSize: 18, flexShrink: 0 }}>🗑</button>
           <div style={strip}>
             <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#E8008A", animation: "pulse 1s ease-in-out infinite", flexShrink: 0 }} />
-            <span style={{ color: t.accent, fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 700 }}>{fmt(voice.seconds)}</span>
-            <span style={{ marginLeft: "auto", color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 11 }}>Enregistrement…</span>
+            <span style={{ color: t.accent, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 13, fontWeight: 700 }}>{fmt(voice.seconds)}</span>
+            <span style={{ marginLeft: "auto", color: t.text3, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 11 }}>Enregistrement…</span>
           </div>
         </>
       )}
@@ -945,8 +946,8 @@ function MediaBubble({ msg, isMe, t, onOpen }) {
   const [err, setErr] = useState(false);
   useEffect(() => { if (!url && msg.media_path) api.mediaUrl(msg.media_path).then(setUrl).catch(() => setErr(true)); }, [msg.media_path]);
   const box = { maxWidth: 240, minWidth: 120, borderRadius: 16, overflow: "hidden", border: `1px solid ${isMe ? t.accent : t.border}`, background: t.bg3 };
-  if (err) return <div style={{ ...box, padding: 12, fontSize: 12, color: t.text3, fontFamily: "'DM Mono',monospace" }}>⚠ Média indisponible</div>;
-  if (!url) return <div style={{ ...box, height: 140, display: "flex", alignItems: "center", justifyContent: "center", color: t.text3, fontSize: 12, fontFamily: "'DM Mono',monospace" }}>Chargement…</div>;
+  if (err) return <div style={{ ...box, padding: 12, fontSize: 12, color: t.text3, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>⚠ Média indisponible</div>;
+  if (!url) return <div style={{ ...box, height: 140, display: "flex", alignItems: "center", justifyContent: "center", color: t.text3, fontSize: 12, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>Chargement…</div>;
   if (msg.type === "video") return <div style={box}><video src={url} controls playsInline preload="metadata" onError={() => setErr(true)} style={{ display: "block", width: "100%", maxHeight: 320 }} /></div>;
   return (
     <div style={{ ...box, cursor: "pointer" }} onClick={() => onOpen({ kind: msg.type, url })}>
@@ -1000,13 +1001,13 @@ function GifPicker({ userId, onPick, onClose, t }) {
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, margin: "0 auto", height: "68%", background: t.bg2, borderTop: `1px solid ${t.border}`, borderRadius: "20px 20px 0 0", display: "flex", flexDirection: "column", padding: "14px 14px calc(10px + env(safe-area-inset-bottom, 0px))" }}>
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un GIF…" autoFocus
-            style={{ flex: 1, padding: "11px 14px", borderRadius: 12, background: t.input, border: `1px solid ${t.border}`, color: t.text, fontSize: 14, fontFamily: "'DM Mono',monospace", outline: "none" }} />
+            style={{ flex: 1, padding: "11px 14px", borderRadius: 12, background: t.input, border: `1px solid ${t.border}`, color: t.text, fontSize: 14, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", outline: "none" }} />
           <button onClick={onClose} style={{ width: 42, height: 42, borderRadius: "50%", background: t.bg3, border: `1px solid ${t.border}`, color: t.text3, cursor: "pointer", fontSize: 16 }}>✕</button>
         </div>
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {loading && <p style={{ textAlign: "center", color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 12, padding: 20 }}>Chargement…</p>}
-          {!loading && err && <p style={{ textAlign: "center", color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 12, padding: 20 }}>{err}</p>}
-          {!loading && !err && items.length === 0 && <p style={{ textAlign: "center", color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 12, padding: 20 }}>Aucun résultat.</p>}
+          {loading && <p style={{ textAlign: "center", color: t.text3, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 12, padding: 20 }}>Chargement…</p>}
+          {!loading && err && <p style={{ textAlign: "center", color: t.text3, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 12, padding: 20 }}>{err}</p>}
+          {!loading && !err && items.length === 0 && <p style={{ textAlign: "center", color: t.text3, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 12, padding: 20 }}>Aucun résultat.</p>}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             {items.map(g => (
               <button key={g.id} onClick={() => onPick(g.url)} style={{ padding: 0, border: "none", background: t.bg3, borderRadius: 10, overflow: "hidden", cursor: "pointer", minHeight: 70 }}>
@@ -1015,7 +1016,7 @@ function GifPicker({ userId, onPick, onClose, t }) {
             ))}
           </div>
         </div>
-        <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 9, color: t.text3, fontFamily: "'DM Mono',monospace" }}>Propulsé par {gifProvider}</p>
+        <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 9, color: t.text3, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>Propulsé par {gifProvider}</p>
       </div>
     </div>
   );
@@ -1089,8 +1090,8 @@ function ReplyQuote({ msg, all, resolveUser, isMe, t }) {
   const label = !o ? "Message supprimé" : o.poll_id ? "📊 Sondage" : o.type === "voice" ? "🎤 Message vocal" : o.type === "image" ? "📷 Photo" : o.type === "video" ? "🎬 Vidéo" : o.type === "gif" ? "GIF" : (o.text || "");
   return (
     <div style={{ maxWidth: "100%", margin: "0 0 -6px", padding: "6px 12px 10px", borderRadius: 14, background: t.bg3, border: `1px solid ${t.border}`, borderLeft: `3px solid ${t.accent}`, opacity: 0.85 }}>
-      {who && <div style={{ fontSize: 10, color: t.accent, fontFamily: "'DM Mono',monospace" }}>↩ {who}</div>}
-      <div style={{ fontSize: 12, color: t.text2, fontFamily: "'DM Sans',sans-serif", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{label}</div>
+      {who && <div style={{ fontSize: 10, color: t.accent, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>↩ {who}</div>}
+      <div style={{ fontSize: 12, color: t.text2, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{label}</div>
     </div>
   );
 }
@@ -1104,8 +1105,8 @@ function PinnedBanner({ messages, resolveUser, onUnpin, t }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", background: t.accentBg, borderBottom: `1px solid ${t.border}` }}>
       <span onClick={go} style={{ cursor: "pointer" }}>📌</span>
-      <div onClick={go} style={{ cursor: "pointer", flex: 1, minWidth: 0, fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        <b style={{ color: t.accent, fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{resolveUser(p.senderId || p.sender?.id || p.sender_id)?.pseudo} </b>{label}
+      <div onClick={go} style={{ cursor: "pointer", flex: 1, minWidth: 0, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 13, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <b style={{ color: t.accent, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 11 }}>{resolveUser(p.senderId || p.sender?.id || p.sender_id)?.pseudo} </b>{label}
       </div>
       <button onClick={() => onUnpin(p)} aria-label="Désépingler" style={{ background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 16 }}>✕</button>
     </div>
@@ -1126,17 +1127,17 @@ function PollBubble({ pollId, meId, isMe, t }) {
   };
   return (
     <div style={{ width: 250, maxWidth: "100%", background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 16, padding: 14 }}>
-      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: t.accent, marginBottom: 4 }}>📊 SONDAGE</div>
-      <div style={{ fontFamily: "'Fraunces',serif", fontSize: 15, color: t.text, marginBottom: 10 }}>{poll.question}</div>
+      <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 10, color: t.accent, marginBottom: 4 }}>📊 SONDAGE</div>
+      <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 15, color: t.text, marginBottom: 10 }}>{poll.question}</div>
       {poll.options.map((o, i) => {
         const n = poll.votes.filter(v => v.option_idx === i).length; const pct = total ? Math.round(n * 100 / total) : 0;
         return (
-          <button key={i} onClick={() => vote(i)} style={{ position: "relative", display: "block", width: "100%", textAlign: "left", marginBottom: 6, padding: "9px 12px", borderRadius: 10, overflow: "hidden", cursor: "pointer", background: t.bg3, border: `1.5px solid ${mine === i ? t.accent : t.border}`, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 13 }}>
+          <button key={i} onClick={() => vote(i)} style={{ position: "relative", display: "block", width: "100%", textAlign: "left", marginBottom: 6, padding: "9px 12px", borderRadius: 10, overflow: "hidden", cursor: "pointer", background: t.bg3, border: `1.5px solid ${mine === i ? t.accent : t.border}`, color: t.text, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 13 }}>
             <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${pct}%`, background: t.accentBg, transition: "width .3s" }} />
-            <span style={{ position: "relative", display: "flex", justifyContent: "space-between", gap: 8 }}><span>{mine === i ? "✓ " : ""}{o}</span><span style={{ color: t.text3, fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{n}</span></span>
+            <span style={{ position: "relative", display: "flex", justifyContent: "space-between", gap: 8 }}><span>{mine === i ? "✓ " : ""}{o}</span><span style={{ color: t.text3, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 11 }}>{n}</span></span>
           </button>);
       })}
-      <div style={{ fontSize: 10, color: t.text3, fontFamily: "'DM Mono',monospace" }}>{total} vote{total > 1 ? "s" : ""} · touche pour voter ou changer</div>
+      <div style={{ fontSize: 10, color: t.text3, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>{total} vote{total > 1 ? "s" : ""} · touche pour voter ou changer</div>
     </div>
   );
 }
@@ -1145,14 +1146,14 @@ function PollCreateModal({ onCreate, onClose, t }) {
   const [q, setQ] = useState(""); const [opts, setOpts] = useState(["", ""]); const [busy, setBusy] = useState(false);
   const clean = opts.map(o => o.trim()).filter(Boolean);
   const ok = q.trim() && clean.length >= 2;
-  const inp = { width: "100%", boxSizing: "border-box", padding: "11px 14px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.bg3, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14, marginBottom: 8 };
+  const inp = { width: "100%", boxSizing: "border-box", padding: "11px 14px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.bg3, color: t.text, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 14, marginBottom: 8 };
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 360, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: t.bg2, borderRadius: "22px 22px 0 0", padding: "18px 18px calc(18px + env(safe-area-inset-bottom, 0px))" }}>
-        <h3 style={{ margin: "0 0 12px", fontFamily: "'Fraunces',serif", color: t.text }}>📊 Nouveau sondage</h3>
+        <h3 style={{ margin: "0 0 12px", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", color: t.text }}>📊 Nouveau sondage</h3>
         <input value={q} maxLength={200} onChange={e => setQ(e.target.value)} placeholder="Ta question (ex : on mange où ?)" style={inp} />
         {opts.map((o, i) => <input key={i} value={o} maxLength={60} onChange={e => setOpts(p => p.map((x, j) => j === i ? e.target.value : x))} placeholder={`Option ${i + 1}`} style={inp} />)}
-        {opts.length < 6 && <button onClick={() => setOpts(p => [...p, ""])} style={{ background: "none", border: "none", color: t.accent, cursor: "pointer", fontFamily: "'DM Mono',monospace", fontSize: 12, marginBottom: 10 }}>＋ Ajouter une option</button>}
+        {opts.length < 6 && <button onClick={() => setOpts(p => [...p, ""])} style={{ background: "none", border: "none", color: t.accent, cursor: "pointer", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 12, marginBottom: 10 }}>＋ Ajouter une option</button>}
         <Btn accent disabled={!ok || busy} onClick={async () => { setBusy(true); try { await onCreate(q.trim(), clean); onClose(); } finally { setBusy(false); } }} t={t} style={{ width: "100%" }}>Publier le sondage</Btn>
       </div>
     </div>
@@ -1161,7 +1162,7 @@ function PollCreateModal({ onCreate, onClose, t }) {
 
 function MessageSheet({ msg, isMe, canModerate, myEmoji, onReact, onUnsend, onReply, onPin, onClose, t }) {
   const [more, setMore] = useState(false);
-  const act = { display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 6px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 15, cursor: "pointer", textAlign: "left" };
+  const act = { display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 6px", background: "none", border: "none", borderTop: `1px solid ${t.border}`, color: t.text, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 15, cursor: "pointer", textAlign: "left" };
   const pick = (e) => { onReact(msg, e); onClose(); };
   const emojiBtn = (e) => (
     <button key={e} onClick={() => pick(e)} style={{ fontSize: 26, width: 46, height: 46, borderRadius: "50%", border: "none", cursor: "pointer", background: myEmoji === e ? t.accentBg : "transparent", outline: myEmoji === e ? `2px solid ${t.accent}` : "none" }}>{e}</button>
@@ -1189,11 +1190,11 @@ function ReactionList({ reactions, myId, resolveUser, onRemove, onClose, t }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 350, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, maxHeight: "60vh", overflowY: "auto", background: t.bg2, borderRadius: "22px 22px 0 0", padding: "16px 18px calc(16px + env(safe-area-inset-bottom, 0px))", border: `1px solid ${t.border}` }}>
-        <h3 style={{ margin: "0 0 10px", fontFamily: "'Fraunces',serif", color: t.text, fontSize: 18 }}>Réactions</h3>
+        <h3 style={{ margin: "0 0 10px", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", color: t.text, fontSize: 18 }}>Réactions</h3>
         {reactions.map(r => { const u = resolveUser(r.user_id); const mine = r.user_id === myId; return (
           <div key={r.user_id} onClick={mine ? () => { onRemove(); onClose(); } : undefined} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", cursor: mine ? "pointer" : "default" }}>
             {u && <Avatar user={u} size={38} t={t} />}
-            <div style={{ flex: 1, color: t.text, fontFamily: "'DM Sans',sans-serif", fontSize: 14 }}>{mine ? "Toi" : (u?.name || "Membre")}{mine && <div style={{ color: t.text3, fontSize: 11, fontFamily: "'DM Mono',monospace" }}>Touche pour retirer</div>}</div>
+            <div style={{ flex: 1, color: t.text, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 14 }}>{mine ? "Toi" : (u?.name || "Membre")}{mine && <div style={{ color: t.text3, fontSize: 11, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>Touche pour retirer</div>}</div>
             <span style={{ fontSize: 24 }}>{r.emoji}</span>
           </div>); })}
       </div>
@@ -1225,7 +1226,7 @@ function MsgWrap({ msg, isMe, canModerate, reactions = [], myId, onReact, onUnse
         {hover && <button onClick={() => setSheet(true)} aria-label="Réagir" style={{ border: `1px solid ${t.border}`, background: t.bg2, color: t.text3, borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 15, flexShrink: 0 }}>☺</button>}
       </div>
       {top.length > 0 && (
-        <button onClick={() => setList(true)} style={{ marginTop: -7, marginLeft: 8, marginRight: 8, display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 7px", borderRadius: 12, cursor: "pointer", background: t.bg2, border: `1.5px solid ${mine ? t.accent : t.border}`, color: t.text2, fontSize: 13, fontFamily: "'DM Mono',monospace", lineHeight: 1.4, position: "relative" }}>
+        <button onClick={() => setList(true)} style={{ marginTop: -7, marginLeft: 8, marginRight: 8, display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 7px", borderRadius: 12, cursor: "pointer", background: t.bg2, border: `1.5px solid ${mine ? t.accent : t.border}`, color: t.text2, fontSize: 13, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", lineHeight: 1.4, position: "relative" }}>
           {top.map(([e]) => <span key={e}>{e}</span>)}{reactions.length > 1 && <span style={{ fontSize: 11 }}>{reactions.length}</span>}
         </button>
       )}
@@ -1274,10 +1275,10 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
         </button>
         <div onClick={group?onOpenInfo:onOpenProfile} style={{cursor:"pointer",display:"flex"}}>{group ? <GroupAvatar group={group} size={40} t={t}/> : <Avatar user={otherUser} size={36} t={t} />}</div>
         <div onClick={group?onOpenInfo:onOpenProfile} style={{minWidth:0,cursor:"pointer"}}>
-          <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0,fontSize:15}}>{group ? group.name : otherUser.name}</p>
-          {group ? <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>{group.memberUsers.length} membres · infos</p> : statusText
-            ? <p style={{color:t.accent,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic",fontSize:11,margin:0}}>{statusText}</p>
-            : <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:0}}>@{otherUser.pseudo}</p>}
+          <p style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontWeight:600,margin:0,fontSize:15}}>{group ? group.name : otherUser.name}</p>
+          {group ? <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,margin:0}}>{group.memberUsers.length} membres · infos</p> : statusText
+            ? <p style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontStyle:"italic",fontSize:11,margin:0}}>{statusText}</p>
+            : <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,margin:0}}>@{otherUser.pseudo}</p>}
         </div>
         {onCall && <div style={{marginLeft:"auto",display:"flex",gap:4}}>
           <button onClick={()=>onCall(false)} aria-label="Appel audio" style={{background:"none",border:"none",color:t.accent,cursor:"pointer",padding:8,display:"flex"}}>
@@ -1290,7 +1291,7 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
       </div>
       <PinnedBanner messages={messages} resolveUser={resolveUser} onUnpin={onPin} t={t} />
       <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
-        {messages.length===0&&<p style={{color:t.text3,textAlign:"center",fontFamily:"'DM Mono',monospace",fontSize:12,padding:"40px 0"}}>Commencez la conversation !</p>}
+        {messages.length===0&&<p style={{color:t.text3,textAlign:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,padding:"40px 0"}}>Commencez la conversation !</p>}
         {messages.map((m,i)=>{
           const isMe = m.senderId===currentUser.id;
           const isMedia = m.type==="image" || m.type==="video" || m.type==="gif";
@@ -1299,7 +1300,7 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
             <div key={m.id||i} id={"msg-"+m.id} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:8,marginBottom:14,alignItems:"flex-end",borderRadius:14}}>
               {!isMe&&<div onClick={group?()=>onOpenProfile(sender):undefined} style={{cursor:group?"pointer":"default",display:"flex"}}><Avatar user={sender} size={28} t={t} /></div>}
               <div style={{maxWidth:"72%",display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start"}}>
-                {group && !isMe && <span style={{fontSize:11,color:t.accent,fontFamily:"'DM Mono',monospace",margin:"0 0 3px 4px"}}>{sender?.pseudo}</span>}
+                {group && !isMe && <span style={{fontSize:11,color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",margin:"0 0 3px 4px"}}>{sender?.pseudo}</span>}
                 <ReplyQuote msg={m} all={messages} resolveUser={resolveUser} isMe={isMe} t={t} />
                 <MsgWrap msg={m} isMe={isMe} myId={currentUser.id} reactions={reactions.map[m.id]||[]} onReact={reactions.react} onUnsend={onUnsend} onReply={setReplyTo} onPin={onPin} resolveUser={resolveUser} t={t}>
                 {m.poll_id ? (
@@ -1309,17 +1310,17 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
                 ) : isMedia ? (
                   <MediaBubble msg={m} isMe={isMe} t={t} onOpen={setViewer} />
                 ) : (
-                  <div style={{background:isMe?t.accent:t.bg3,borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",color:isMe?"#fff":t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,border:isMe?"none":`1px solid ${t.border}`}}>
+                  <div style={{background:isMe?t.accent:t.bg3,borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",color:isMe?"#fff":t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",lineHeight:1.5,border:isMe?"none":`1px solid ${t.border}`}}>
                     {renderText(m.text,isMe,t)}
                   </div>
                 )}
                 </MsgWrap>
-                <p style={{fontSize:10,color:t.text3,fontFamily:"'DM Mono',monospace",margin:"3px 0 0"}}>{m.time}</p>
+                <p style={{fontSize:10,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",margin:"3px 0 0"}}>{m.time}</p>
               </div>
             </div>
           );
         })}
-        {statusText && <p style={{fontStyle:"italic",fontSize:11,color:t.text3,fontFamily:"'DM Sans',sans-serif",margin:"0 0 6px 36px"}}>{group ? statusName : otherUser.name.split(" ")[0]} {statusText}</p>}
+        {statusText && <p style={{fontStyle:"italic",fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",margin:"0 0 6px 36px"}}>{group ? statusName : otherUser.name.split(" ")[0]} {statusText}</p>}
         <div ref={bottomRef}/>
       </div>
       <ChatInputBar onSend={onSend} replyTo={replyTo} replyLabel={replyTo?(resolveUser(replyTo.senderId)?.pseudo||""):""} onCancelReply={()=>setReplyTo(null)} onPoll={group&&onCreatePoll?()=>setPollOpen(true):null} onVoiceSend={onVoiceSend} onStatus={onStatus} onPickFile={pickFile}
@@ -1340,16 +1341,16 @@ function NotifPanel({notifs, onMarkRead, onOpen, onClose, t}) {
     <div style={{position:"fixed",inset:0,zIndex:150}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(56px + env(safe-area-inset-top, 0px))",right:16,width:320,maxWidth:"calc(100% - 32px)",maxHeight:400,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:16,overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
         <div style={{padding:"14px 16px",borderBottom:`1px solid ${t.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:t.text,fontWeight:700}}>NOTIFICATIONS</span>
-          <button onClick={onMarkRead} style={{background:"none",border:"none",color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:11,cursor:"pointer"}}>Tout lu</button>
+          <span style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,color:t.text,fontWeight:700}}>NOTIFICATIONS</span>
+          <button onClick={onMarkRead} style={{background:"none",border:"none",color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,cursor:"pointer"}}>Tout lu</button>
         </div>
         <div style={{overflowY:"auto",maxHeight:340}}>
-          {notifs.length===0&&<p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,padding:"24px",textAlign:"center"}}>Aucune notification</p>}
+          {notifs.length===0&&<p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,padding:"24px",textAlign:"center"}}>Aucune notification</p>}
           {notifs.map((n,i)=>(
             <div key={n.id||i} onClick={()=>onOpen&&onOpen(n)} style={{padding:"12px 16px",borderBottom:`1px solid ${t.border}`,background:n.read?"transparent":t.accentBg,cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
               <div style={{flex:1,minWidth:0}}>
-                <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:13,margin:"0 0 3px",lineHeight:1.4}}>{n.text}</p>
-                <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,margin:0}}>{n.time}</p>
+                <p style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,margin:"0 0 3px",lineHeight:1.4}}>{n.text}</p>
+                <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,margin:0}}>{n.time}</p>
               </div>
               <span style={{color:t.text3,fontSize:18,flexShrink:0}}>›</span>
             </div>
@@ -1400,52 +1401,52 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
     <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
       <div style={{padding:"20px 24px 0",overflowY:"auto",flex:isMember?undefined:1}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <button onClick={onBack} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:13,padding:0}}>← Retour</button>
+          <button onClick={onBack} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,padding:0}}>← Retour</button>
           <div style={{display:"flex",gap:8}}>
-            {onToggleFav&&<button onClick={onToggleFav} aria-label="Favori" style={{background:t.bg2,border:`1px solid ${isFav?"#D4AF37":t.border}`,color:isFav?"#D4AF37":t.text3,borderRadius:20,padding:"6px 12px",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:12}}>{isFav?"★ Favori":"☆ Favori"}</button>}
-            <button onClick={shareLink} style={{background:t.bg2,border:`1px solid ${t.border}`,color:t.text2,borderRadius:20,padding:"6px 12px",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:12}}>{copied?"✓ Lien copié":"🔗 Partager"}</button>
+            {onToggleFav&&<button onClick={onToggleFav} aria-label="Favori" style={{background:t.bg2,border:`1px solid ${isFav?"#D4AF37":t.border}`,color:isFav?"#D4AF37":t.text3,borderRadius:20,padding:"6px 12px",cursor:"pointer",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12}}>{isFav?"★ Favori":"☆ Favori"}</button>}
+            <button onClick={shareLink} style={{background:t.bg2,border:`1px solid ${t.border}`,color:t.text2,borderRadius:20,padding:"6px 12px",cursor:"pointer",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12}}>{copied?"✓ Lien copié":"🔗 Partager"}</button>
           </div>
         </div>
         <div style={{background:t.bg2,borderRadius:16,border:`1px solid ${t.border}`,padding:20,marginBottom:16}}>
           {activity.photo_url&&<img src={activity.photo_url} alt="" style={{width:"100%",maxHeight:240,objectFit:"cover",borderRadius:14,marginBottom:14,display:"block"}}/>}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
             <div>
-              <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:t.accent,letterSpacing:"0.1em"}}>{CAT_ICONS[activity.category]} {activity.category?.toUpperCase()}</span>
-              <h2 style={{margin:"6px 0 10px",fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,lineHeight:1.2}}>{activity.title}</h2>
+              <span style={{fontSize:11,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:t.accent,letterSpacing:"0.1em"}}>{CAT_ICONS[activity.category]} {activity.category?.toUpperCase()}</span>
+              <h2 style={{margin:"6px 0 10px",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text,lineHeight:1.2}}>{activity.title}</h2>
             </div>
             {!isMember&&!isPending&&!full&&<Btn accent onClick={()=>onJoin(activity.id)} t={t}>S'inscrire</Btn>}
             {!isMember&&!isPending&&full&&<Btn accent={!onWait} onClick={toggleWait} t={t}>{onWait?"✓ En liste d'attente (quitter)":"⏳ Liste d'attente"}</Btn>}
-            {isPending&&<span style={{padding:"10px 16px",borderRadius:10,background:t.bg3,color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12}}>⏳ En attente</span>}
+            {isPending&&<span style={{padding:"10px 16px",borderRadius:10,background:t.bg3,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12}}>⏳ En attente</span>}
           </div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:14,fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace",marginBottom:12}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:14,fontSize:12,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",marginBottom:12}}>
             <span>📅 {formatDate(activity.date)} à {activity.time}</span>
             <span>📍 {activity.location}</span>
             <span>👥 {activity.accepted?.length}/{activity.maxPeople}</span>
           </div>
-          <p style={{margin:"0 0 12px",fontSize:14,color:t.text2,lineHeight:1.6,fontFamily:"'DM Sans',sans-serif"}}>{activity.description}</p>
+          <p style={{margin:"0 0 12px",fontSize:14,color:t.text2,lineHeight:1.6,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>{activity.description}</p>
           <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>onOpenProfile(activity.creator)}>
             <Avatar user={activity.creator} size={28} t={t} />
-            <span style={{fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace"}}>Par <span style={{color:t.text}}>{activity.creator?.name}</span></span>{activity.creator?.is_premium&&<PremiumBadge size={14}/>}
+            <span style={{fontSize:12,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>Par <span style={{color:t.text}}>{activity.creator?.name}</span></span>{activity.creator?.is_premium&&<PremiumBadge size={14}/>}
           </div>
           {isCreator && onDelete && (
             <button onClick={()=>{ if (window.confirm(`Supprimer la sortie "${activity.title}" ?\n\nLes participants seront prévenus et le groupe de discussion sera supprimé. Cette action est définitive.`)) onDelete(activity.id); }}
-              style={{marginTop:14,width:"100%",padding:"10px",borderRadius:10,background:"transparent",border:`1px solid ${t.accent}66`,color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>
+              style={{marginTop:14,width:"100%",padding:"10px",borderRadius:10,background:"transparent",border:`1px solid ${t.accent}66`,color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,cursor:"pointer"}}>
               🗑 Supprimer cette sortie
             </button>
           )}
         </div>
         {isCreator&&activity.pending?.length>0&&(
           <div style={{background:t.bg2,borderRadius:14,border:`1px solid ${t.accent}44`,padding:16,marginBottom:16}}>
-            <p style={{margin:"0 0 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:t.accent}}>🔔 DEMANDES ({activity.pending.length})</p>
+            <p style={{margin:"0 0 12px",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.accent}}>🔔 DEMANDES ({activity.pending.length})</p>
             {activity.pending.map(u=>(
               <div key={u.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderTop:`1px solid ${t.border}`}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>onOpenProfile(u)}>
                   <Avatar user={u} size={32} t={t} />
-                  <span style={{color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>{u.name}</span>
+                  <span style={{color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>{u.name}</span>
                 </div>
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>onAccept(activity.id,u.id)} style={{padding:"6px 14px",borderRadius:8,background:t.greenBg,border:`1px solid ${t.green}44`,color:t.green,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>✓</button>
-                  <button onClick={()=>onReject(activity.id,u.id)} style={{padding:"6px 14px",borderRadius:8,background:t.accentBg,border:`1px solid ${t.accent}44`,color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>✕</button>
+                  <button onClick={()=>onAccept(activity.id,u.id)} style={{padding:"6px 14px",borderRadius:8,background:t.greenBg,border:`1px solid ${t.green}44`,color:t.green,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,cursor:"pointer"}}>✓</button>
+                  <button onClick={()=>onReject(activity.id,u.id)} style={{padding:"6px 14px",borderRadius:8,background:t.accentBg,border:`1px solid ${t.accent}44`,color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,cursor:"pointer"}}>✕</button>
                 </div>
               </div>
             ))}
@@ -1464,14 +1465,14 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
           <PinnedBanner messages={activity.messages||[]} resolveUser={resolveUser} onUnpin={(m)=>onPin(activity.id,m)} t={t} />
           <div style={{flex:1,overflowY:"auto",padding:"0 24px",minHeight:0}}>
             <div style={{borderTop:`1px solid ${t.border}`,paddingTop:16,marginBottom:8}}>
-              <p style={{margin:"0 0 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em"}}>💬 GROUPE</p>
+              <p style={{margin:"0 0 12px",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.1em"}}>💬 GROUPE</p>
               {activity.messages?.map(m=>{
                 const isMe=m.sender?.id===currentUser.id;
                 return (
                   <div key={m.id} id={"msg-"+m.id} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:10,marginBottom:16,alignItems:"flex-end",borderRadius:14}}>
                     {!isMe&&<div onClick={()=>onOpenProfile(m.sender)} style={{cursor:"pointer"}}><Avatar user={m.sender} size={30} t={t}/></div>}
                     <div style={{maxWidth:"72%"}}>
-                      {!isMe&&<p style={{margin:"0 0 3px",fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace"}}>{m.sender?.name}</p>}
+                      {!isMe&&<p style={{margin:"0 0 3px",fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>{m.sender?.name}</p>}
                       <ReplyQuote msg={{...m,senderId:m.sender?.id}} all={activity.messages} resolveUser={resolveUser} isMe={isMe} t={t} />
                       <MsgWrap msg={m} isMe={isMe} canModerate={isCreator} myId={currentUser.id} reactions={reactions.map[m.id]||[]} onReact={reactions.react} onUnsend={(mm)=>onUnsend(activity.id,mm)} onReply={setReplyTo} onPin={(mm)=>onPin(activity.id,mm)} resolveUser={resolveUser} t={t}>
                       {m.poll_id ? (
@@ -1481,10 +1482,10 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
                       ) : (m.type==="image"||m.type==="video"||m.type==="gif") ? (
                         <MediaBubble msg={m} isMe={isMe} t={t} onOpen={setViewer} />
                       ) : (
-                        <div style={{background:isMe?t.accent:t.bg3,borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",color:isMe?"#fff":t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",lineHeight:1.5,border:isMe?"none":`1px solid ${t.border}`}}>{renderText(m.text,isMe,t)}</div>
+                        <div style={{background:isMe?t.accent:t.bg3,borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",color:isMe?"#fff":t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",lineHeight:1.5,border:isMe?"none":`1px solid ${t.border}`}}>{renderText(m.text,isMe,t)}</div>
                       )}
                       </MsgWrap>
-                      <p style={{margin:"3px 0 0",fontSize:10,color:t.text3,fontFamily:"'DM Mono',monospace",textAlign:isMe?"right":"left"}}>{m.time}</p>
+                      <p style={{margin:"3px 0 0",fontSize:10,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",textAlign:isMe?"right":"left"}}>{m.time}</p>
                     </div>
                   </div>
                 );
@@ -1510,7 +1511,7 @@ function ActivityDetail({activity,currentUser,onBack,onAccept,onReject,onSendMes
       ):(
         <div style={{padding:"12px 24px 28px",textAlign:"center"}}>
           <div style={{background:t.bg2,border:`1px dashed ${t.border}`,borderRadius:14,padding:20}}>
-            <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,margin:0}}>{isPending?"⏳ Votre demande est en cours d'examen.":"🔒 Inscrivez-vous pour rejoindre le groupe."}</p>
+            <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,margin:0}}>{isPending?"⏳ Votre demande est en cours d'examen.":"🔒 Inscrivez-vous pour rejoindre le groupe."}</p>
           </div>
         </div>
       )}
@@ -1552,11 +1553,11 @@ function PlaceInput({ value, onText, onPick, onOffline, hasCoords, t }) {
 
   return (
     <div style={{position:"relative"}}>
-      <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Lieu</label>
+      <label style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Lieu</label>
       <input value={value} onChange={e=>{ setPicked(false); onText(e.target.value); }} onFocus={()=>results.length&&setOpen(true)}
         placeholder="Tape une ville, un code postal ou une adresse…"
-        style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${hasCoords?"#AAEE00":t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Mono',monospace",outline:"none",boxSizing:"border-box"}} />
-      <p style={{margin:"6px 2px 0",fontSize:11,fontFamily:"'DM Mono',monospace",color:hasCoords?"#AAEE00":t.text3}}>
+        style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${hasCoords?"#AAEE00":t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",boxSizing:"border-box"}} />
+      <p style={{margin:"6px 2px 0",fontSize:11,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:hasCoords?"#AAEE00":t.text3}}>
         {hasCoords ? "📍 Position confirmée sur la carte" : loading ? "Recherche…" : "Choisis une proposition pour placer le pin au bon endroit"}
       </p>
       {open && results.length>0 && (
@@ -1565,8 +1566,8 @@ function PlaceInput({ value, onText, onPick, onOffline, hasCoords, t }) {
             const p=f.properties;
             return (
               <button key={i} onClick={()=>choose(f)} style={{display:"block",width:"100%",textAlign:"left",padding:"10px 14px",background:"transparent",border:"none",borderBottom:i<results.length-1?`1px solid ${t.border}`:"none",cursor:"pointer"}}>
-                <span style={{display:"block",color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>📍 {p.type==="municipality"?p.city:p.name}</span>
-                <span style={{display:"block",color:t.text3,fontSize:11,fontFamily:"'DM Mono',monospace",marginTop:2}}>{p.postcode} {p.type==="municipality"?"":p.city} · {p.context}</span>
+                <span style={{display:"block",color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>📍 {p.type==="municipality"?p.city:p.name}</span>
+                <span style={{display:"block",color:t.text3,fontSize:11,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",marginTop:2}}>{p.postcode} {p.type==="municipality"?"":p.city} · {p.context}</span>
               </button>
             );
           })}
@@ -1593,35 +1594,35 @@ function PremiumModal({currentUser,onClose,onOpenProfile,onRefresh,t}) {
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:210,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose} {...swipeDown(onClose)}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid #D4AF3788`,borderRadius:20,width:"100%",maxWidth:460,maxHeight:"88vh",overflowY:"auto",padding:28}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:24,color:t.text,display:"flex",alignItems:"center",gap:10}}><PremiumBadge size={24}/> GrouZ Premium</h2>
+          <h2 style={{margin:0,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:24,color:t.text,display:"flex",alignItems:"center",gap:10}}><PremiumBadge size={24}/> GrouZ Premium</h2>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
-          {perks.map(p=><div key={p} style={{background:t.bg3,borderRadius:10,padding:"10px 14px",fontFamily:"'DM Sans',sans-serif",fontSize:14,color:t.text}}>{p}</div>)}
+          {perks.map(p=><div key={p} style={{background:t.bg3,borderRadius:10,padding:"10px 14px",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,color:t.text}}>{p}</div>)}
         </div>
-        {!prem && !native && <div style={{textAlign:"center",padding:"14px",borderRadius:12,border:"1px dashed #D4AF37",color:"#D4AF37",fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.5}}>L'abonnement se souscrit depuis l'application GrouZ (Android / iPhone). Ton compte est le même partout.</div>}
+        {!prem && !native && <div style={{textAlign:"center",padding:"14px",borderRadius:12,border:"1px dashed #D4AF37",color:"#D4AF37",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,lineHeight:1.5}}>L'abonnement se souscrit depuis l'application GrouZ (Android / iPhone). Ton compte est le même partout.</div>}
         {!prem && native && (
           <div>
-            <button disabled={busy||!pkg} onClick={buy} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#F5D76E,#D4AF37 55%,#A67C00)",color:"#241a00",fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:14,cursor:"pointer",opacity:busy||!pkg?0.6:1}}>
+            <button disabled={busy||!pkg} onClick={buy} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#F5D76E,#D4AF37 55%,#A67C00)",color:"#241a00",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",opacity:busy||!pkg?0.6:1}}>
               {busy?"…":pkg?`S'abonner — ${pkg.price} / mois`:"Chargement de l'offre…"}
             </button>
-            <button disabled={busy} onClick={restore} style={{width:"100%",marginTop:8,padding:"10px",background:"none",border:"none",color:t.text2,fontFamily:"'DM Sans',sans-serif",fontSize:13,cursor:"pointer",textDecoration:"underline"}}>Restaurer mes achats</button>
-            <p style={{fontSize:11,color:t.text3,lineHeight:1.5,fontFamily:"'DM Sans',sans-serif",margin:"8px 0 0"}}>Abonnement mensuel à renouvellement automatique, facturé via ton compte {window.Capacitor?.getPlatform?.()==="ios"?"Apple":"Google Play"}. Résiliable à tout moment dans les réglages de ton compte du store, au moins 24 h avant la fin de la période. <a href={api.PUBLIC_URL+"/conditions.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>Conditions</a> · <a href={api.PUBLIC_URL+"/confidentialite.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>Confidentialité</a></p>
+            <button disabled={busy} onClick={restore} style={{width:"100%",marginTop:8,padding:"10px",background:"none",border:"none",color:t.text2,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,cursor:"pointer",textDecoration:"underline"}}>Restaurer mes achats</button>
+            <p style={{fontSize:11,color:t.text3,lineHeight:1.5,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",margin:"8px 0 0"}}>Abonnement mensuel à renouvellement automatique, facturé via ton compte {window.Capacitor?.getPlatform?.()==="ios"?"Apple":"Google Play"}. Résiliable à tout moment dans les réglages de ton compte du store, au moins 24 h avant la fin de la période. <a href={api.PUBLIC_URL+"/conditions.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>Conditions</a> · <a href={api.PUBLIC_URL+"/confidentialite.html"} target="_blank" rel="noreferrer" style={{color:t.accent}}>Confidentialité</a></p>
           </div>
         )}
         {err && !prem && <p style={{color:t.accent,fontSize:13}}>{err}</p>}
-        {prem && native && <a href={billing.manageSubscriptionUrl()} target="_blank" rel="noreferrer" style={{display:"block",textAlign:"center",color:t.text2,fontSize:13,margin:"0 0 14px",fontFamily:"'DM Sans',sans-serif"}}>Gérer mon abonnement</a>}
+        {prem && native && <a href={billing.manageSubscriptionUrl()} target="_blank" rel="noreferrer" style={{display:"block",textAlign:"center",color:t.text2,fontSize:13,margin:"0 0 14px",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>Gérer mon abonnement</a>}
         {prem && (
           <>
-            <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"4px 0 10px"}}>QUI A VU MON PROFIL</p>
+            <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.1em",margin:"4px 0 10px"}}>QUI A VU MON PROFIL</p>
             {err && <p style={{color:t.accent,fontSize:13}}>{err}</p>}
             {viewers===null && !err && <p style={{color:t.text3,fontSize:13}}>Chargement…</p>}
-            {viewers && viewers.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Personne n'a encore consulté ton profil.</p>}
+            {viewers && viewers.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>Personne n'a encore consulté ton profil.</p>}
             {viewers && viewers.map(v=>{ const u={...v,avatar:v.avatar_url,avatarColor:colorFor(v.id)}; return (
               <div key={v.id} onClick={()=>onOpenProfile(u)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 4px",cursor:"pointer",borderBottom:`1px solid ${t.border}`}}>
                 <Avatar user={u} size={40} t={t}/>
-                <div style={{flex:1}}><div style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14}}>{v.name}</div><div style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12}}>@{v.pseudo}</div></div>
-                <span style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>{new Date(v.viewed_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}</span>
+                <div style={{flex:1}}><div style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14}}>{v.name}</div><div style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12}}>@{v.pseudo}</div></div>
+                <span style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11}}>{new Date(v.viewed_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}</span>
               </div>);})}
           </>
         )}
@@ -1644,15 +1645,15 @@ function CreateModal({onClose,onSave,currentUser,usedToday,t}) {
     <div {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"calc(12px + env(safe-area-inset-top, 0px)) 12px calc(12px + env(safe-area-inset-bottom, 0px))",overflow:"hidden",touchAction:"pan-y"}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:560,maxHeight:"100%",overflowY:"auto",overflowX:"hidden",overscrollBehavior:"contain",padding:"22px 18px",boxSizing:"border-box"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-          <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:24,color:t.text}}>Nouvelle sortie</h2>
+          <h2 style={{margin:0,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:24,color:t.text}}>Nouvelle sortie</h2>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          {blocked && <div style={{padding:"12px 14px",borderRadius:12,background:"#E8008A18",border:"1px solid #E8008A66",color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.5}}>
+          {blocked && <div style={{padding:"12px 14px",borderRadius:12,background:"#E8008A18",border:"1px solid #E8008A66",color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,lineHeight:1.5}}>
             {prem?`Tu as atteint la limite de ${limit} sorties créées aujourd'hui.`:"Tu as déjà créé ta sortie du jour (1 par jour en version gratuite)."} Supprime-en une pour en recréer, ou repasse demain.{!prem&&" Avec GrouZ Premium, crée jusqu'à 5 sorties par jour ★"}
           </div>}
           <div>
-            <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Photo de la sortie {prem?"":"(Premium ★)"}</label>
+            <label style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Photo de la sortie {prem?"":"(Premium ★)"}</label>
             <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{ setPhoto(e.target.files?.[0]||null); e.target.value=""; }} />
             {photoPrev ? (
               <div style={{position:"relative",marginTop:8}}>
@@ -1661,17 +1662,17 @@ function CreateModal({onClose,onSave,currentUser,usedToday,t}) {
               </div>
             ) : (
               <button onClick={()=>prem?photoRef.current?.click():alert("Ajouter une photo à ta sortie est réservé aux membres GrouZ Premium ★")}
-                style={{marginTop:8,width:"100%",padding:"14px",borderRadius:12,border:`1px dashed ${prem?t.accent:"#D4AF37"}`,background:"transparent",color:prem?t.accent:"#D4AF37",fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>
+                style={{marginTop:8,width:"100%",padding:"14px",borderRadius:12,border:`1px dashed ${prem?t.accent:"#D4AF37"}`,background:"transparent",color:prem?t.accent:"#D4AF37",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,cursor:"pointer"}}>
                 {prem?"📸 Ajouter une photo":"🔒 Photo — réservé Premium ★"}
               </button>
             )}
           </div>
           <Field label="Titre" value={form.title} onChange={v=>set("title",v)} placeholder="Ex: Pique-nique au Parc Monceau" t={t} />
           <div>
-            <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Catégorie</label>
+            <label style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Catégorie</label>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>
               {CATEGORIES.filter(c=>c!=="Tous").map(c=>(
-                <button key={c} onClick={()=>set("category",c)} style={{padding:"5px 12px",borderRadius:20,border:`1px solid`,borderColor:form.category===c?t.accent:t.border,background:form.category===c?t.accentBg:"transparent",color:form.category===c?t.accent:t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>
+                <button key={c} onClick={()=>set("category",c)} style={{padding:"5px 12px",borderRadius:20,border:`1px solid`,borderColor:form.category===c?t.accent:t.border,background:form.category===c?t.accentBg:"transparent",color:form.category===c?t.accent:t.text3,cursor:"pointer",fontSize:12,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>
                   {CAT_ICONS[c]} {c}
                 </button>
               ))}
@@ -1683,12 +1684,12 @@ function CreateModal({onClose,onSave,currentUser,usedToday,t}) {
             onPick={(label,lat,lng)=>setForm(f=>({...f,location:label,lat,lng}))}
             onOffline={off=>setForm(f=>f.noGeo===off?f:{...f,noGeo:off})} />
           <div>
-            <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Max participants : <span style={{color:t.accent}}>{form.maxPeople}</span></label>
+            <label style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Max participants : <span style={{color:t.accent}}>{form.maxPeople}</span></label>
             <input type="range" min={2} max={20} value={form.maxPeople} onChange={e=>set("maxPeople",+e.target.value)} style={{width:"100%",accentColor:t.accent,marginTop:8}} />
           </div>
           <div>
-            <label style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>Description</label>
-            <textarea value={form.description} onChange={e=>set("description",e.target.value)} rows={3} placeholder="Décris l'activité…" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
+            <label style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Description</label>
+            <textarea value={form.description} onChange={e=>set("description",e.target.value)} rows={3} placeholder="Décris l'activité…" style={{width:"100%",marginTop:6,padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
           </div>
           <Btn accent={valid} disabled={!valid} onClick={()=>valid&&onSave(form,photo)} t={t} style={{padding:"14px",width:"100%"}}>CRÉER LA SORTIE →</Btn>
         </div>
@@ -1713,26 +1714,26 @@ function ActivityCard({activity,currentUser,onClick,km,t}) {
       <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:t.gradient,borderRadius:"18px 0 0 18px"}}/>
       {isMember&&<div style={{position:"absolute",top:14,right:14,width:9,height:9,borderRadius:"50%",background:"#AAEE00",boxShadow:`0 0 10px #AAEE00`}}/>}
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-        <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:"#E8008A",letterSpacing:"0.08em",fontWeight:700}}>{CAT_ICONS[activity.category]} {activity.category?.toUpperCase()}</span>
-        {spotsLeft<=2&&spotsLeft>0&&<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#D4AF37",background:"#D4AF3722",padding:"2px 8px",borderRadius:6,border:"1px solid #D4AF3744"}}>🔥 {spotsLeft} place{spotsLeft>1?"s":""}</span>}
-        {spotsLeft===0&&<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#E8008A",background:"#E8008A18",padding:"2px 8px",borderRadius:6}}>COMPLET</span>}
+        <span style={{fontSize:11,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:"#E8008A",letterSpacing:"0.08em",fontWeight:700}}>{CAT_ICONS[activity.category]} {activity.category?.toUpperCase()}</span>
+        {spotsLeft<=2&&spotsLeft>0&&<span style={{fontSize:10,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:"#D4AF37",background:"#D4AF3722",padding:"2px 8px",borderRadius:6,border:"1px solid #D4AF3744"}}>🔥 {spotsLeft} place{spotsLeft>1?"s":""}</span>}
+        {spotsLeft===0&&<span style={{fontSize:10,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:"#E8008A",background:"#E8008A18",padding:"2px 8px",borderRadius:6}}>COMPLET</span>}
       </div>
       {activity.photo_url&&<img src={activity.photo_url} alt="" loading="lazy" style={{width:"calc(100% + 40px)",margin:"-20px -20px 14px",height:140,objectFit:"cover",display:"block"}}/>}
-      <h3 style={{margin:"0 0 8px",fontFamily:"'Fraunces',serif",fontSize:17,color:t.text,lineHeight:1.3}}>{activity.title}</h3>
-      <div style={{fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace",marginBottom:14,display:"flex",flexDirection:"column",gap:3}}>
+      <h3 style={{margin:"0 0 8px",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:17,color:t.text,lineHeight:1.3}}>{activity.title}</h3>
+      <div style={{fontSize:12,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",marginBottom:14,display:"flex",flexDirection:"column",gap:3}}>
         <span>📅 {formatDate(activity.date)} · {activity.time}</span>
         <span>📍 {activity.location}{km!=null && <span style={{color:"#E8008A",fontWeight:700}}> · à {fmtKm(km)}</span>}</span>
       </div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <div style={{display:"flex"}}>{activity.accepted?.slice(0,4).map((u,i)=><div key={u.id} style={{marginLeft:i===0?0:-8}}><Avatar user={u} size={26} t={t}/></div>)}</div>
-          <span style={{fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace"}}>{activity.accepted?.length}/{activity.maxPeople}</span>
+          <span style={{fontSize:12,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>{activity.accepted?.length}/{activity.maxPeople}</span>
         </div>
-        {isPending&&<span style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:"#7B00C8",background:"#7B00C818",padding:"4px 10px",borderRadius:8}}>⏳ En attente</span>}
-        {isMember&&!isPending&&<span style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:"#AAEE00",fontWeight:700}}>● Inscrit</span>}
+        {isPending&&<span style={{fontSize:11,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:"#7B00C8",background:"#7B00C818",padding:"4px 10px",borderRadius:8}}>⏳ En attente</span>}
+        {isMember&&!isPending&&<span style={{fontSize:11,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:"#AAEE00",fontWeight:700}}>● Inscrit</span>}
       </div>
       {activity.creator?.id===currentUser.id&&(activity.pending?.length||0)>0&&(
-        <div style={{marginTop:10,padding:"7px 12px",background:"#E8008A18",borderRadius:8,fontSize:12,color:"#E8008A",fontFamily:"'DM Mono',monospace",border:"1px solid #E8008A33"}}>🔔 {activity.pending.length} demande{activity.pending.length>1?"s":""}</div>
+        <div style={{marginTop:10,padding:"7px 12px",background:"#E8008A18",borderRadius:8,fontSize:12,color:"#E8008A",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",border:"1px solid #E8008A33"}}>🔔 {activity.pending.length} demande{activity.pending.length>1?"s":""}</div>
       )}
     </div>
   );
@@ -1889,7 +1890,7 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
                 <div style="width:38px;height:38px;border-radius:50% 50% 50% 0;background:${pinColor};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:16px;transform:rotate(-45deg);box-shadow:0 3px 14px ${pinColor}88;">
                   <span style="transform:rotate(45deg);line-height:1">${icon}</span>
                 </div>
-                ${spotsLeft===0?`<div style="position:absolute;top:-6px;right:-6px;background:#E8008A;color:#fff;font-size:8px;font-family:DM Mono,monospace;padding:1px 4px;border-radius:6px;font-weight:700;white-space:nowrap">COMPLET</div>`:""}
+                ${spotsLeft===0?`<div style="position:absolute;top:-6px;right:-6px;background:#E8008A;color:#fff;font-size:8px;font-family:-apple-system,system-ui,sans-serif;padding:1px 4px;border-radius:6px;font-weight:700;white-space:nowrap">COMPLET</div>`:""}
               </div>`,
             iconSize: [38, 48], iconAnchor: [19, 48],
           });
@@ -1904,7 +1905,7 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
           const center = [c.latSum / n, c.lngSum / n];
           const bubble = L.divIcon({
             className: "",
-            html: `<div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#E8008A,#7B00C8);border:3px solid #fff;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:DM Mono,monospace;box-shadow:0 4px 18px rgba(232,0,138,0.6);cursor:pointer;line-height:1;">
+            html: `<div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#E8008A,#7B00C8);border:3px solid #fff;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:-apple-system,system-ui,sans-serif;box-shadow:0 4px 18px rgba(232,0,138,0.6);cursor:pointer;line-height:1;">
                      <span style="font-size:17px;font-weight:700">${n}</span><span style="font-size:7px;letter-spacing:0.05em;margin-top:2px">SORTIES</span></div>`,
             iconSize: [50, 50], iconAnchor: [25, 25],
           });
@@ -1945,12 +1946,12 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
     <div style={{ display:"flex", flexDirection:"column", height:"100%", background:t.bg }}>
       {/* Header */}
       <div style={{ padding:"14px 16px 8px", flexShrink:0 }}>
-        <h2 style={{ fontFamily:"'Fraunces',serif", fontSize:22, fontStyle:"italic", margin:"0 0 10px", background:t.gradient, WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>
+        <h2 style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize:22, fontStyle:"italic", margin:"0 0 10px", background:t.gradient, WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>
           Carte des sorties
         </h2>
         <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4 }}>
           {["Tous",...CATEGORIES.filter(c=>c!=="Tous")].map(c=>(
-            <button key={c} onClick={()=>setFilterCat(c)} style={{ padding:"5px 12px", borderRadius:20, border:`1px solid ${filterCat===c?"#E8008A":t.border}`, background:filterCat===c?"#E8008A":"transparent", color:filterCat===c?"#fff":t.text3, cursor:"pointer", fontSize:10, fontFamily:"'DM Mono',monospace", whiteSpace:"nowrap", fontWeight:filterCat===c?700:400, flexShrink:0 }}>
+            <button key={c} onClick={()=>setFilterCat(c)} style={{ padding:"5px 12px", borderRadius:20, border:`1px solid ${filterCat===c?"#E8008A":t.border}`, background:filterCat===c?"#E8008A":"transparent", color:filterCat===c?"#fff":t.text3, cursor:"pointer", fontSize:10, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", whiteSpace:"nowrap", fontWeight:filterCat===c?700:400, flexShrink:0 }}>
               {CAT_ICONS[c]} {c}
             </button>
           ))}
@@ -1963,7 +1964,7 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
           <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", background:t.bg2, zIndex:10 }}>
             <div style={{ textAlign:"center" }}>
               <div style={{ fontSize:32, marginBottom:12 }}>🗺</div>
-              <p style={{ color:t.text3, fontFamily:"'DM Mono',monospace", fontSize:12 }}>Chargement de la carte…</p>
+              <p style={{ color:t.text3, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize:12 }}>Chargement de la carte…</p>
             </div>
           </div>
         )}
@@ -1974,8 +1975,8 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
           <div onClick={()=>onOpenActivity(selected)} style={{ position:"absolute", top:12, left:12, zIndex:1000, maxWidth:"min(250px, calc(100% - 150px))", display:"flex", alignItems:"center", gap:10, background:t.bg+"F2", backdropFilter:"blur(8px)", border:"1px solid #E8008A66", borderRadius:14, padding:"8px 10px", cursor:"pointer", boxShadow:"0 6px 20px rgba(0,0,0,0.35)", animation:"slideUp 0.2s ease" }}>
             <div style={{ width:34, height:34, borderRadius:"50%", background:t.gradient, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>{CAT_ICONS[selected.category]}</div>
             <div style={{ flex:1, minWidth:0 }}>
-              <p style={{ margin:0, fontFamily:"'Fraunces',serif", fontSize:13, color:t.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{selected.title}</p>
-              <p style={{ margin:"2px 0 0", fontSize:9, color:t.text3, fontFamily:"'DM Mono',monospace", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{new Date(selected.date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · {selected.time} · {selected.location}</p>
+              <p style={{ margin:0, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize:13, color:t.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{selected.title}</p>
+              <p style={{ margin:"2px 0 0", fontSize:9, color:t.text3, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{new Date(selected.date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · {selected.time} · {selected.location}</p>
             </div>
             <button onClick={e=>{ e.stopPropagation(); setSelected(null); }} style={{ width:22, height:22, borderRadius:"50%", background:t.bg3, border:`1px solid ${t.border}`, color:t.text3, cursor:"pointer", fontSize:10, flexShrink:0, padding:0 }}>✕</button>
           </div>
@@ -1987,7 +1988,7 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
 
         {/* Counter overlay */}
         <div style={{ position:"absolute", bottom:12, left:12, zIndex:1000, background:t.bg+"EE", backdropFilter:"blur(8px)", borderRadius:10, padding:"6px 12px", border:`1px solid ${t.border}`, pointerEvents:"none" }}>
-          <span style={{ fontSize:10, color:t.text2, fontFamily:"'DM Mono',monospace", fontWeight:700 }}>
+          <span style={{ fontSize:10, color:t.text2, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontWeight:700 }}>
             📍 {userPos ? `${nearCount} près de toi` : `${filtered.length} sortie${filtered.length>1?"s":""}`}
           </span>
         </div>
@@ -1996,11 +1997,11 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
         <div style={{ position:"absolute", top:12, right:12, zIndex:1000, background:t.bg+"EE", backdropFilter:"blur(8px)", borderRadius:10, padding:"8px 12px", border:`1px solid ${t.border}` }}>
           <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
             <div style={{ width:10, height:10, borderRadius:"50%", background:"#E8008A" }}/>
-            <span style={{ fontSize:9, color:t.text2, fontFamily:"'DM Mono',monospace" }}>Sortie dispo</span>
+            <span style={{ fontSize:9, color:t.text2, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>Sortie dispo</span>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
             <div style={{ width:10, height:10, borderRadius:"50%", background:"#AAEE00" }}/>
-            <span style={{ fontSize:9, color:t.text2, fontFamily:"'DM Mono',monospace" }}>Inscrit ✓</span>
+            <span style={{ fontSize:9, color:t.text2, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>Inscrit ✓</span>
           </div>
         </div>
       </div>
@@ -2009,17 +2010,17 @@ function MapPage({ activities, currentUser, onOpenActivity, userPos, onRequestLo
       {clusterList && (
         <div style={{ margin:"10px 12px 0", background:t.bg2, border:`2px solid #E8008A55`, borderRadius:18, padding:"12px 14px", flexShrink:0, maxHeight:"38%", overflowY:"auto", boxShadow:"0 8px 28px rgba(232,0,138,0.18)", animation:"slideUp 0.2s ease" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-            <span style={{ fontSize:11, color:"#E8008A", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>📍 {clusterList.length} SORTIES DANS CETTE ZONE</span>
+            <span style={{ fontSize:11, color:"#E8008A", fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontWeight:700 }}>📍 {clusterList.length} SORTIES DANS CETTE ZONE</span>
             <button onClick={()=>setClusterList(null)} style={{ width:28, height:28, borderRadius:"50%", background:t.bg3, border:`1px solid ${t.border}`, color:t.text3, cursor:"pointer", fontSize:12 }}>✕</button>
           </div>
           {clusterList.map(a=>(
             <div key={a.id} onClick={()=>{ onOpenActivity(a); setClusterList(null); }} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderTop:`1px solid ${t.border}`, cursor:"pointer" }}>
               <span style={{ fontSize:20 }}>{CAT_ICONS[a.category]}</span>
               <div style={{ flex:1, minWidth:0 }}>
-                <p style={{ margin:0, fontFamily:"'Fraunces',serif", fontSize:14, color:t.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{a.title}</p>
-                <p style={{ margin:"2px 0 0", fontSize:10, color:t.text3, fontFamily:"'DM Mono',monospace" }}>{new Date(a.date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · {a.time} · {a.accepted?.length}/{a.maxPeople}</p>
+                <p style={{ margin:0, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize:14, color:t.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{a.title}</p>
+                <p style={{ margin:"2px 0 0", fontSize:10, color:t.text3, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif" }}>{new Date(a.date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · {a.time} · {a.accepted?.length}/{a.maxPeople}</p>
               </div>
-              <span style={{ fontSize:11, color:"#E8008A", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>Voir →</span>
+              <span style={{ fontSize:11, color:"#E8008A", fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontWeight:700 }}>Voir →</span>
             </div>
           ))}
         </div>
@@ -2047,11 +2048,11 @@ function GeoAskModal({ onAllow, onLater, t }) {
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(6px)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,maxWidth:380,width:"100%",padding:28,textAlign:"center"}}>
         <div style={{fontSize:44,marginBottom:10}}>📍</div>
-        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:22,color:t.text,margin:"0 0 10px"}}>Autoriser la localisation ?</h2>
-        <p style={{color:t.text2,fontFamily:"'DM Sans',sans-serif",fontSize:14,lineHeight:1.5,margin:"0 0 10px"}}>GrouZ utilise ta position pour centrer la carte sur toi et te proposer des sorties et des personnes près de chez toi.</p>
-        <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,lineHeight:1.5,margin:"0 0 20px"}}>Ta position exacte n'est jamais montrée : les autres voient seulement ta ville. Tu peux arrêter à tout moment.</p>
+        <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text,margin:"0 0 10px"}}>Autoriser la localisation ?</h2>
+        <p style={{color:t.text2,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,lineHeight:1.5,margin:"0 0 10px"}}>GrouZ utilise ta position pour centrer la carte sur toi et te proposer des sorties et des personnes près de chez toi.</p>
+        <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,lineHeight:1.5,margin:"0 0 20px"}}>Ta position exacte n'est jamais montrée : les autres voient seulement ta ville. Tu peux arrêter à tout moment.</p>
         <Btn accent onClick={onAllow} t={t} style={{width:"100%",padding:14,marginBottom:10}}>AUTORISER</Btn>
-        <button onClick={onLater} style={{background:"none",border:"none",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer",padding:8}}>Plus tard</button>
+        <button onClick={onLater} style={{background:"none",border:"none",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,cursor:"pointer",padding:8}}>Plus tard</button>
       </div>
     </div>
   );
@@ -2059,17 +2060,17 @@ function GeoAskModal({ onAllow, onLater, t }) {
 
 function NearbySheet({ users, loading, radius, onRadius, geoStatus, hasPos, sharing, onToggleShare, onAskLocation, onAdd, onOpenProfile, onClose, t }) {
   const [sent, setSent] = useState({});
-  const msg = (txt) => <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:13,lineHeight:1.5,textAlign:"center",margin:"18px 6px"}}>{txt}</p>;
+  const msg = (txt) => <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,lineHeight:1.5,textAlign:"center",margin:"18px 6px"}}>{txt}</p>;
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:120,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)"}}>
       <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(56px + env(safe-area-inset-top, 0px))",left:12,right:12,margin:"0 auto",maxWidth:460,maxHeight:"calc(100% - 140px)",overflowY:"auto",background:t.bg2,border:`1px solid ${t.border}`,borderRadius:18,padding:"16px 16px 12px",boxShadow:"0 16px 48px rgba(0,0,0,0.5)",animation:"slideUp 0.2s ease"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <h3 style={{fontFamily:"'Fraunces',serif",fontSize:20,color:t.text,margin:0}}>👋 Près de toi</h3>
+          <h3 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:20,color:t.text,margin:0}}>👋 Près de toi</h3>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
         </div>
         <div style={{display:"flex",gap:6,marginBottom:6}}>
           {[25,50,150].map(r=>(
-            <button key={r} onClick={()=>onRadius(r)} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${radius===r?"#E8008A":t.border}`,background:radius===r?"#E8008A":"transparent",color:radius===r?"#fff":t.text3,cursor:"pointer",fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:radius===r?700:400}}>{r===150?"Région":`${r} km`}</button>
+            <button key={r} onClick={()=>onRadius(r)} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${radius===r?"#E8008A":t.border}`,background:radius===r?"#E8008A":"transparent",color:radius===r?"#fff":t.text3,cursor:"pointer",fontSize:11,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontWeight:radius===r?700:400}}>{r===150?"Région":`${r} km`}</button>
           ))}
         </div>
 
@@ -2089,22 +2090,22 @@ function NearbySheet({ users, loading, radius, onRadius, geoStatus, hasPos, shar
           <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderTop:`1px solid ${t.border}`}}>
             <div onClick={()=>onOpenProfile(u)} style={{cursor:"pointer"}}><Avatar user={u} size={46} t={t} /></div>
             <div onClick={()=>onOpenProfile(u)} style={{flex:1,minWidth:0,cursor:"pointer"}}>
-              <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.name}</p>
-              <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,margin:"2px 0 0"}}>@{u.pseudo} · {u.age} ans</p>
-              <p style={{color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:10,margin:"2px 0 0"}}>📍 {u.city||"Près de toi"}</p>
+              <p style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontWeight:600,margin:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.name}</p>
+              <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,margin:"2px 0 0"}}>@{u.pseudo} · {u.age} ans</p>
+              <p style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,margin:"2px 0 0"}}>📍 {u.city||"Près de toi"}</p>
             </div>
             {sent[u.id]
-              ? <span style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace"}}>✓ Envoyée</span>
+              ? <span style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>✓ Envoyée</span>
               : <Btn accent small t={t} onClick={()=>{ setSent(p=>({...p,[u.id]:true})); onAdd(u); }}>Ajouter</Btn>}
           </div>
         ))}
 
         {hasPos && (
-          <button onClick={onToggleShare} style={{display:"block",width:"100%",marginTop:10,padding:"10px",background:"none",border:`1px dashed ${t.border}`,borderRadius:10,color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,cursor:"pointer"}}>
+          <button onClick={onToggleShare} style={{display:"block",width:"100%",marginTop:10,padding:"10px",background:"none",border:`1px dashed ${t.border}`,borderRadius:10,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,cursor:"pointer"}}>
             {sharing ? "Ne plus apparaître dans les suggestions des autres" : "Réactiver le partage de ma zone"}
           </button>
         )}
-        <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:9,textAlign:"center",margin:"10px 0 0",lineHeight:1.5}}>Les autres voient uniquement ta ville, jamais ta position exacte.</p>
+        <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:9,textAlign:"center",margin:"10px 0 0",lineHeight:1.5}}>Les autres voient uniquement ta ville, jamais ta position exacte.</p>
       </div>
     </div>
   );
@@ -2127,13 +2128,13 @@ function FriendPicker({ friends, selected, onToggle, t, maxH=260 }) {
   const list = friends.filter(u => !q || (u.name + " " + u.pseudo).toLowerCase().includes(q.toLowerCase()));
   return (
     <div>
-      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Rechercher un ami…" style={{width:"100%",padding:"10px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:8}} />
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Rechercher un ami…" style={{width:"100%",padding:"10px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",boxSizing:"border-box",marginBottom:8}} />
       <div style={{maxHeight:maxH,overflowY:"auto"}}>
-        {list.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Aucun ami.</p>}
+        {list.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>Aucun ami.</p>}
         {list.map(u=>{ const on = selected.includes(u.id); return (
           <div key={u.id} onClick={()=>onToggle(u.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 4px",cursor:"pointer"}}>
             <Avatar user={u} size={38} t={t}/>
-            <div style={{flex:1,color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14}}>{u.name}<div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>@{u.pseudo}</div></div>
+            <div style={{flex:1,color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14}}>{u.name}<div style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11}}>@{u.pseudo}</div></div>
             <span style={{width:22,height:22,borderRadius:"50%",border:`2px solid ${on?t.accent:t.border}`,background:on?t.accent:"transparent",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>{on?"✓":""}</span>
           </div>); })}
       </div>
@@ -2151,11 +2152,11 @@ function NewGroupModal({ friends, onCreate, onClose, t }) {
     <div {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",padding:24}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:22,color:t.text}}>Nouveau groupe</h2>
+          <h2 style={{margin:0,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text}}>Nouveau groupe</h2>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
         </div>
-        <input value={name} onChange={e=>setName(e.target.value.slice(0,40))} placeholder="Nom du groupe" style={{width:"100%",padding:"12px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:15,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:14}} />
-        <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.08em",margin:"0 0 6px"}}>AJOUTER DES AMIS ({sel.length}) — 2 MINIMUM</p>
+        <input value={name} onChange={e=>setName(e.target.value.slice(0,40))} placeholder="Nom du groupe" style={{width:"100%",padding:"12px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:15,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",boxSizing:"border-box",marginBottom:14}} />
+        <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.08em",margin:"0 0 6px"}}>AJOUTER DES AMIS ({sel.length}) — 2 MINIMUM</p>
         <FriendPicker friends={friends} selected={sel} onToggle={toggle} t={t} />
         <Btn accent disabled={!ok||busy} onClick={async()=>{ setBusy(true); const done = await onCreate(name.trim(), sel); setBusy(false); if (done) onClose(); }} t={t} style={{width:"100%",padding:"14px",marginTop:14}}>{busy?"CRÉATION…":"CRÉER LE GROUPE"}</Btn>
       </div>
@@ -2174,23 +2175,23 @@ function GroupInfoModal({ group, me, friends, onClose, onRename, onAdd, onRemove
     <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:260,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",padding:24}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:22,color:t.text}}>Infos du groupe</h2>
+          <h2 style={{margin:0,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text}}>Infos du groupe</h2>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
         </div>
         <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><GroupAvatar group={group} size={72} t={t}/></div>
         {isAdmin
           ? <div style={{display:"flex",gap:8,marginBottom:16}}>
-              <input value={name} onChange={e=>setName(e.target.value.slice(0,40))} style={{flex:1,padding:"10px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:15,fontFamily:"'DM Sans',sans-serif",outline:"none"}} />
+              <input value={name} onChange={e=>setName(e.target.value.slice(0,40))} style={{flex:1,padding:"10px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:15,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none"}} />
               <Btn small accent disabled={!name.trim()||name.trim()===group.name} onClick={()=>onRename(name.trim())} t={t}>OK</Btn>
             </div>
-          : <h3 style={{textAlign:"center",margin:"0 0 16px",fontFamily:"'Fraunces',serif",color:t.text}}>{group.name}</h3>}
-        <p style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:t.text3,letterSpacing:"0.08em",margin:"0 0 6px"}}>{group.memberUsers.length} MEMBRES</p>
+          : <h3 style={{textAlign:"center",margin:"0 0 16px",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:t.text}}>{group.name}</h3>}
+        <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.08em",margin:"0 0 6px"}}>{group.memberUsers.length} MEMBRES</p>
         {group.memberUsers.map(u=>(
           <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0"}}>
             <div onClick={()=>{ onClose(); onOpenProfile(u); }} style={{cursor:"pointer",display:"flex"}}><Avatar user={u} size={40} t={t}/></div>
-            <div style={{flex:1,color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14}}>{u.name}{u.id===me.id?" (toi)":""}<div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>@{u.pseudo}</div></div>
-            {u.id===group.created_by && <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:t.accent,border:`1px solid ${t.accent}66`,borderRadius:6,padding:"2px 6px"}}>ADMIN</span>}
-            {isAdmin && u.id!==me.id && <button onClick={()=>{ if (window.confirm(`Nommer ${u.name} administrateur ? Tu deviendras simple membre.`)) onTransfer(u); }} style={{background:"none",border:`1px solid ${t.border}`,borderRadius:8,color:t.text2,cursor:"pointer",fontSize:10,fontFamily:"'DM Mono',monospace",padding:"3px 6px"}}>Nommer admin</button>}
+            <div style={{flex:1,color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14}}>{u.name}{u.id===me.id?" (toi)":""}<div style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11}}>@{u.pseudo}</div></div>
+            {u.id===group.created_by && <span style={{fontSize:10,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:t.accent,border:`1px solid ${t.accent}66`,borderRadius:6,padding:"2px 6px"}}>ADMIN</span>}
+            {isAdmin && u.id!==me.id && <button onClick={()=>{ if (window.confirm(`Nommer ${u.name} administrateur ? Tu deviendras simple membre.`)) onTransfer(u); }} style={{background:"none",border:`1px solid ${t.border}`,borderRadius:8,color:t.text2,cursor:"pointer",fontSize:10,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",padding:"3px 6px"}}>Nommer admin</button>}
             {isAdmin && u.id!==me.id && <button onClick={()=>{ if (window.confirm(`Retirer ${u.name} du groupe ?`)) onRemove(u); }} aria-label="Retirer" style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontSize:16}}>✕</button>}
           </div>
         ))}
@@ -2204,9 +2205,9 @@ function GroupInfoModal({ group, me, friends, onClose, onRename, onAdd, onRemove
           </div>
         ) : <Btn onClick={()=>setAdding(true)} disabled={!candidates.length} t={t} style={{width:"100%",marginTop:10}}>{candidates.length?"＋ Ajouter des membres":"Tous tes amis sont déjà dans le groupe"}</Btn>)}
         <button onClick={()=>{ if (window.confirm(isAdmin ? "Quitter ce groupe ? Le plus ancien membre deviendra administrateur." : "Quitter ce groupe ?")) onLeave(); }}
-          style={{marginTop:16,width:"100%",padding:"12px",borderRadius:12,background:"transparent",border:`1px solid ${t.accent}66`,color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer"}}>🚪 Quitter le groupe</button>
+          style={{marginTop:16,width:"100%",padding:"12px",borderRadius:12,background:"transparent",border:`1px solid ${t.accent}66`,color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,cursor:"pointer"}}>🚪 Quitter le groupe</button>
         {isAdmin && <button onClick={()=>{ if (window.confirm("Supprimer ce groupe pour tout le monde ?")) onDelete(); }}
-          style={{marginTop:8,width:"100%",padding:"12px",borderRadius:12,background:"transparent",border:`1px solid ${t.border}`,color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer"}}>🗑 Supprimer le groupe pour tous</button>}
+          style={{marginTop:8,width:"100%",padding:"12px",borderRadius:12,background:"transparent",border:`1px solid ${t.border}`,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,cursor:"pointer"}}>🗑 Supprimer le groupe pour tous</button>}
       </div>
     </div>
   );
@@ -2220,12 +2221,12 @@ function MessagesPage({ friends, last, myId, onOpenDM, onGoFriends, groups=[], l
   return (
     <div style={{padding:"20px 24px",maxWidth:600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"0 0 20px"}}>
-        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:0}}>Messages</h2>
+        <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:26,color:t.text,margin:0}}>Messages</h2>
         {friends.length>=2 && <Btn accent small onClick={onNewGroup} t={t}>＋ Groupe</Btn>}
       </div>
       {items.length===0 && (
         <div style={{textAlign:"center",padding:"40px 12px",background:t.bg2,border:`1px dashed ${t.border}`,borderRadius:16}}>
-          <p style={{color:t.text3,fontFamily:"'DM Sans',sans-serif",fontSize:14,margin:"0 0 14px",lineHeight:1.5}}>Tu pourras discuter ici avec tes amis.<br/>Ajoute-en depuis leur profil pour commencer.</p>
+          <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,margin:"0 0 14px",lineHeight:1.5}}>Tu pourras discuter ici avec tes amis.<br/>Ajoute-en depuis leur profil pour commencer.</p>
           <Btn accent onClick={onGoFriends} t={t}>Voir mes amis</Btn>
         </div>
       )}
@@ -2237,10 +2238,10 @@ function MessagesPage({ friends, last, myId, onOpenDM, onGoFriends, groups=[], l
           <div key={it.key} onClick={()=>it.kind==="group" ? onOpenGroup(it.group) : onOpenDM(it.user)} style={{display:"flex",alignItems:"center",gap:12,background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 16px",marginBottom:8,cursor:"pointer"}}>
             {it.kind==="group" ? <GroupAvatar group={it.group} size={46} t={t}/> : <Avatar user={it.user} size={46} t={t} />}
             <div style={{flex:1,minWidth:0}}>
-              <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontWeight:600,margin:0}}>{it.kind==="group" ? "👥 "+it.group.name : it.user.name}</p>
-              <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,margin:"2px 0 0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{preview}</p>
+              <p style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontWeight:600,margin:0}}>{it.kind==="group" ? "👥 "+it.group.name : it.user.name}</p>
+              <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,margin:"2px 0 0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{preview}</p>
             </div>
-            {m && <span style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10}}>{fmtTime(m.created_at)}</span>}
+            {m && <span style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10}}>{fmtTime(m.created_at)}</span>}
           </div>
         );
       })}
@@ -2308,8 +2309,8 @@ function CropModal({ file, onCancel, onDone, t }) {
   return (
     <div {...swipeDown(onCancel)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,padding:24,width:"100%",maxWidth:360,textAlign:"center"}}>
-        <h3 style={{margin:"0 0 6px",fontFamily:"'Fraunces',serif",color:t.text}}>Cadre ta photo</h3>
-        <p style={{margin:"0 0 14px",fontSize:12,color:t.text3,fontFamily:"'DM Sans',sans-serif"}}>Glisse pour déplacer, utilise le curseur pour zoomer.</p>
+        <h3 style={{margin:"0 0 6px",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:t.text}}>Cadre ta photo</h3>
+        <p style={{margin:"0 0 14px",fontSize:12,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>Glisse pour déplacer, utilise le curseur pour zoomer.</p>
         <div onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
           style={{width:V,height:V,margin:"0 auto",borderRadius:"50%",overflow:"hidden",position:"relative",background:"#000",touchAction:"none",cursor:"grab",border:`3px solid ${t.accent}`,boxSizing:"content-box"}}>
           {img && <img src={img.src} alt="" draggable={false} style={{position:"absolute",userSelect:"none",pointerEvents:"none",maxWidth:"none",
@@ -2353,6 +2354,124 @@ const SendIcon = ({ size=24, color="currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
 );
 
+// ── ÉDITEUR DE STORY (texte, emojis, musique) ──────────────────
+const STAGE = { position:"relative", width:"min(100%, calc(100dvh * 9 / 16))", aspectRatio:"9 / 16", containerType:"inline-size", background:"#000", overflow:"hidden" };
+const STORY_COLORS = ["#FFFFFF","#000000","#FFD60A","#FF375F","#30D158","#0A84FF","#BF5AF2"];
+const STORY_EMOJIS = "😀 😂 🥹 😍 🥰 😎 🤩 😭 😅 🙃 😉 😮 🤯 🥳 😴 🤔 🙌 👏 🙏 💪 👍 👎 👀 ✌️ 🤞 🫶 ❤️ 🧡 💛 💚 💙 💜 🖤 💔 🔥 ✨ 🎉 🎊 🎈 🎵 🎶 🍕 🍔 🍟 🍻 🥂 🍷 ☕ 🍰 🍦 ⚽ 🏀 🎮 🎲 🎬 🎤 🌙 ⭐ ☀️ 🌈 🌊 🌴 🏖️ ⛰️ 🚗 ✈️ 📍 💃 🕺 🎂 💯 ✅ ❗".split(" ");
+
+function StoryOverlays({ overlays }) {
+  return (overlays || []).map(o => (
+    <div key={o.id} style={{ position:"absolute", left:`${o.x*100}%`, top:`${o.y*100}%`, transform:"translate(-50%,-50%)", fontSize:`${o.size}cqw`, lineHeight:1.15, color:o.color || "#fff", background:o.bg ? "rgba(0,0,0,0.55)" : "none", padding:o.kind==="text" && o.bg ? "0.2em 0.5em" : 0, borderRadius:"0.35em", fontWeight:o.kind==="text" ? 700 : 400, whiteSpace:"pre-wrap", textAlign:"center", maxWidth:"92cqw", textShadow:o.kind==="text" && !o.bg ? "0 1px 6px rgba(0,0,0,0.5)" : "none", pointerEvents:"none", wordBreak:"break-word" }}>{o.text}</div>
+  ));
+}
+
+function StoryEditor({ file, onCancel, onPublish, t }) {
+  const [url] = useState(() => URL.createObjectURL(file));
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const isVideo = (file.type || "").startsWith("video");
+  const [items, setItems] = useState([]);
+  const [sel, setSel] = useState(null);
+  const [ed, setEd] = useState(null);            // éditeur de texte : { id?, text, color, bg }
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [music, setMusic] = useState(null);      // { file, title, url }
+  const [busy, setBusy] = useState(false);
+  const stageRef = useRef(null), drag = useRef(null), musicInput = useRef(null), audioRef = useRef(null);
+  const uid = () => Math.random().toString(36).slice(2, 9);
+  const down = (e, o) => { e.stopPropagation(); e.currentTarget.setPointerCapture?.(e.pointerId); drag.current = { id:o.id, moved:false }; setSel(o.id); };
+  const move = (e) => {
+    const d = drag.current, st = stageRef.current; if (!d || !st) return;
+    const r = st.getBoundingClientRect();
+    const x = Math.min(0.98, Math.max(0.02, (e.clientX - r.left) / r.width)), y = Math.min(0.98, Math.max(0.02, (e.clientY - r.top) / r.height));
+    d.moved = true; setItems(a => a.map(o => o.id === d.id ? { ...o, x, y } : o));
+  };
+  const up = () => { drag.current = null; };
+  const addEmoji = (em) => { const id = uid(); setItems(a => [...a, { id, kind:"emoji", text:em, x:0.5, y:0.5, size:18 }]); setSel(id); setEmojiOpen(false); };
+  const saveText = () => {
+    const v = ed.text.trim();
+    if (!v) { if (ed.id) setItems(a => a.filter(o => o.id !== ed.id)); setEd(null); return; }
+    if (ed.id) setItems(a => a.map(o => o.id === ed.id ? { ...o, text:v, color:ed.color, bg:ed.bg } : o));
+    else { const id = uid(); setItems(a => [...a, { id, kind:"text", text:v, x:0.5, y:0.5, size:8, color:ed.color, bg:ed.bg }]); setSel(id); }
+    setEd(null);
+  };
+  const cur = items.find(o => o.id === sel);
+  const resize = (k) => setItems(a => a.map(o => o.id === sel ? { ...o, size: Math.min(40, Math.max(3, o.size * k)) } : o));
+  const pickMusic = (e) => {
+    const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+    if (!(f.type || "").startsWith("audio")) { alert("Choisis un fichier audio (mp3, m4a…)."); return; }
+    if (f.size > 12 * 1024 * 1024) { alert("Fichier trop lourd (12 Mo maximum)."); return; }
+    if (music?.url) URL.revokeObjectURL(music.url);
+    setMusic({ file:f, title:f.name.replace(/\.[^.]+$/, "").slice(0, 40), url:URL.createObjectURL(f) });
+  };
+  useEffect(() => { const a = audioRef.current; if (a && music) a.play().catch(() => {}); }, [music?.url]);
+  const publish = async () => { setBusy(true); try { await onPublish({ overlays:items, musicFile:music?.file || null, musicTitle:music?.title || null }); } finally { setBusy(false); } };
+  const tb = { width:42, height:42, borderRadius:"50%", border:"none", background:"rgba(0,0,0,0.45)", color:"#fff", fontSize:20, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", padding:0, fontWeight:700 };
+  return (
+    <div style={{ position:"fixed", inset:0, background:"#000", zIndex:450, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", touchAction:"none" }}>
+      <div ref={stageRef} onPointerDown={() => setSel(null)} style={STAGE}>
+        {isVideo
+          ? <video src={url} autoPlay loop muted playsInline style={{ width:"100%", height:"100%", objectFit:"contain" }} />
+          : <img src={url} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} />}
+        {items.map(o => (
+          <div key={o.id} onPointerDown={e => down(e, o)} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+            onDoubleClick={() => o.kind === "text" && setEd({ id:o.id, text:o.text, color:o.color, bg:!!o.bg })}
+            style={{ position:"absolute", left:`${o.x*100}%`, top:`${o.y*100}%`, transform:"translate(-50%,-50%)", fontSize:`${o.size}cqw`, lineHeight:1.15, color:o.color || "#fff", background:o.bg ? "rgba(0,0,0,0.55)" : "none", padding:o.kind==="text" && o.bg ? "0.2em 0.5em" : 0, borderRadius:"0.35em", fontWeight:o.kind==="text" ? 700 : 400, whiteSpace:"pre-wrap", textAlign:"center", maxWidth:"92cqw", touchAction:"none", cursor:"grab", textShadow:o.kind==="text" && !o.bg ? "0 1px 6px rgba(0,0,0,0.5)" : "none", outline:sel===o.id ? "2px dashed rgba(255,255,255,0.9)" : "none", outlineOffset:4, wordBreak:"break-word", userSelect:"none" }}>{o.text}</div>
+        ))}
+      </div>
+      {music && <audio ref={audioRef} src={music.url} loop />}
+      <input ref={musicInput} type="file" accept="audio/*" onChange={pickMusic} style={{ display:"none" }} />
+      {/* barre du haut */}
+      <div style={{ position:"absolute", top:0, left:0, right:0, padding:"calc(10px + env(safe-area-inset-top, 0px)) 12px 10px", display:"flex", alignItems:"center", gap:10, background:"linear-gradient(rgba(0,0,0,0.5),transparent)" }}>
+        <button onClick={onCancel} style={tb} aria-label="Annuler">✕</button>
+        <div style={{ flex:1 }} />
+        <button onClick={() => setEd({ text:"", color:"#FFFFFF", bg:false })} style={tb} aria-label="Texte">Aa</button>
+        <button onClick={() => setEmojiOpen(true)} style={tb} aria-label="Emoji">😀</button>
+        <button onClick={() => musicInput.current?.click()} style={tb} aria-label="Musique">🎵</button>
+      </div>
+      {music && (
+        <div style={{ position:"absolute", top:"calc(64px + env(safe-area-inset-top, 0px))", left:"50%", transform:"translateX(-50%)", display:"flex", alignItems:"center", gap:8, background:"rgba(0,0,0,0.55)", color:"#fff", padding:"6px 12px", borderRadius:20, fontSize:13, maxWidth:"80%" }}>
+          <span>🎵</span><span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{music.title}</span>
+          <button onClick={() => { URL.revokeObjectURL(music.url); setMusic(null); }} style={{ background:"none", border:"none", color:"#fff", fontSize:16, cursor:"pointer", padding:0 }} aria-label="Retirer la musique">✕</button>
+        </div>
+      )}
+      {/* barre du bas */}
+      <div style={{ position:"absolute", left:0, right:0, bottom:0, padding:"24px 14px calc(14px + env(safe-area-inset-bottom, 0px))", background:"linear-gradient(transparent,rgba(0,0,0,0.65))" }}>
+        {cur && (
+          <div style={{ display:"flex", justifyContent:"center", gap:10, marginBottom:12 }}>
+            <button onClick={() => resize(0.85)} style={tb} aria-label="Plus petit">A−</button>
+            <button onClick={() => resize(1.18)} style={tb} aria-label="Plus grand">A+</button>
+            {cur.kind === "text" && <button onClick={() => setEd({ id:cur.id, text:cur.text, color:cur.color, bg:!!cur.bg })} style={tb} aria-label="Modifier">✏️</button>}
+            <button onClick={() => { setItems(a => a.filter(o => o.id !== cur.id)); setSel(null); }} style={tb} aria-label="Supprimer">🗑</button>
+          </div>
+        )}
+        <button onClick={publish} disabled={busy} style={{ width:"100%", maxWidth:420, display:"block", margin:"0 auto", padding:"14px", borderRadius:26, border:"none", background:t.gradient || t.accent, color:"#fff", fontSize:16, fontWeight:700, cursor:"pointer", opacity:busy ? 0.6 : 1 }}>{busy ? "Publication…" : "Publier ma story →"}</button>
+      </div>
+      {/* saisie du texte */}
+      {ed && (
+        <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.78)", zIndex:3, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"calc(20px + env(safe-area-inset-top, 0px)) 20px 20px", gap:18 }}>
+          <textarea autoFocus value={ed.text} onChange={e => setEd({ ...ed, text:e.target.value.slice(0, 200) })} placeholder="Écris ici…" rows={3}
+            style={{ width:"100%", maxWidth:420, background:ed.bg ? "rgba(255,255,255,0.12)" : "transparent", border:"none", outline:"none", resize:"none", textAlign:"center", color:ed.color, fontSize:28, fontWeight:700, fontFamily:"inherit", borderRadius:12 }} />
+          <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", justifyContent:"center" }}>
+            {STORY_COLORS.map(c => <button key={c} onClick={() => setEd({ ...ed, color:c })} aria-label={c} style={{ width:30, height:30, borderRadius:"50%", background:c, border:ed.color === c ? "3px solid #fff" : "2px solid rgba(255,255,255,0.4)", cursor:"pointer", padding:0 }} />)}
+            <button onClick={() => setEd({ ...ed, bg:!ed.bg })} style={{ ...tb, width:"auto", padding:"0 14px", borderRadius:20, fontSize:14, background:ed.bg ? "#fff" : "rgba(255,255,255,0.2)", color:ed.bg ? "#000" : "#fff" }}>Fond</button>
+          </div>
+          <div style={{ display:"flex", gap:12 }}>
+            <button onClick={() => setEd(null)} style={{ ...tb, width:"auto", padding:"0 22px", borderRadius:22, fontSize:15, background:"rgba(255,255,255,0.2)" }}>Annuler</button>
+            <button onClick={saveText} style={{ ...tb, width:"auto", padding:"0 26px", borderRadius:22, fontSize:15, background:"#fff", color:"#000" }}>OK</button>
+          </div>
+        </div>
+      )}
+      {/* emojis */}
+      {emojiOpen && (
+        <div onClick={() => setEmojiOpen(false)} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3, display:"flex", alignItems:"flex-end" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width:"100%", maxHeight:"55%", overflowY:"auto", background:t.bg2, borderRadius:"20px 20px 0 0", padding:"14px 14px calc(14px + env(safe-area-inset-bottom, 0px))", display:"grid", gridTemplateColumns:"repeat(8, 1fr)", gap:6, boxSizing:"border-box" }}>
+            {STORY_EMOJIS.map(em => <button key={em} onClick={() => addEmoji(em)} style={{ background:"none", border:"none", fontSize:28, cursor:"pointer", padding:4 }}>{em}</button>)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) {
   const [gi, setGi] = useState(startGroup);
   const [si, setSi] = useState(0);
@@ -2364,7 +2483,7 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
   const [viewers, setViewers] = useState(null);
   const [likedMap, setLikedMap] = useState(() => { const m = {}; groups.forEach(g => g.items.forEach(s => { m[s.id] = !!s.likes?.some(l => l.user_id === me.id); })); return m; });
   const elapsed = useRef(0);
-  const vref = useRef(null);
+  const vref = useRef(null), aref = useRef(null);
   const group = groups[gi]; const story = group?.items[si];
   const next = useCallback(() => {
     if (si + 1 < group.items.length) { setSi(si + 1); setProg(0); }
@@ -2379,7 +2498,7 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
     const id = setInterval(()=>{ const n = Date.now(); elapsed.current += n - last; last = n; const p = elapsed.current / 5000; if (p >= 1) { clearInterval(id); next(); } else setProg(p); }, 50);
     return ()=>clearInterval(id);
   },[story?.id, next, paused]);
-  useEffect(()=>{ const v = vref.current; if (!v) return; if (paused) v.pause(); else v.play?.().catch(()=>{}); },[paused, story?.id]);
+  useEffect(()=>{ const v = vref.current; if (v) { if (paused) v.pause(); else v.play?.().catch(()=>{}); } const a = aref.current; if (a) { if (paused) a.pause(); else a.play?.().catch(()=>{}); } },[paused, story?.id]);
   if (!story) return null;
   const mine = story.user_id === me.id;
   const liked = !!likedMap[story.id];
@@ -2395,17 +2514,21 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
   return (
     <div {...swipeDown(()=>{ if (viewersOpen) { setViewersOpen(false); setPaused(false); } else onClose(); }, ()=>{ if (mine && !viewersOpen) openViewers(); })} style={{position:"fixed",inset:0,background:"#000",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{position:"relative",width:"100%",maxWidth:480,height:"100%",background:"#000"}}>
-        {story.media_type === "video"
-          ? <video ref={vref} key={story.id} src={story.url} autoPlay playsInline onEnded={next} onTimeUpdate={e=>{ const v=e.currentTarget; if (v.duration) setProg(v.currentTime / v.duration); }} style={{width:"100%",height:"100%",objectFit:"contain"}} />
-          : <img key={story.id} src={story.url} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} />}
+        <div style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",...STAGE,width:"min(100%, calc(100dvh * 9 / 16))"}}>
+          {story.media_type === "video"
+            ? <video ref={vref} key={story.id} src={story.url} autoPlay playsInline muted={!!story.music_url} onEnded={next} onTimeUpdate={e=>{ const v=e.currentTarget; if (v.duration) setProg(v.currentTime / v.duration); }} style={{width:"100%",height:"100%",objectFit:"contain"}} />
+            : <img key={story.id} src={story.url} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} />}
+          <StoryOverlays overlays={story.overlays} />
+        </div>
+        {story.music_url && <audio ref={aref} key={"m"+story.id} src={story.music_url} autoPlay loop />}
         <div style={{position:"absolute",top:0,left:0,right:0,padding:"calc(10px + env(safe-area-inset-top, 0px)) 12px 0",background:"linear-gradient(rgba(0,0,0,0.55),transparent)",paddingBottom:24}}>
           <div style={{display:"flex",gap:4,marginBottom:10}}>
             {group.items.map((s,i)=>(<div key={s.id} style={{flex:1,height:3,borderRadius:2,background:"rgba(255,255,255,0.3)",overflow:"hidden"}}><div style={{height:"100%",background:"#fff",width:i<si?"100%":i===si?`${prog*100}%`:"0%"}}/></div>))}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <Avatar user={group.user} size={34} t={t}/>
-            <div style={{flex:1,color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:14}}><b>{group.user.pseudo}</b> <span style={{opacity:0.7,fontSize:12}}>{agoLabel(story.created_at)}</span></div>
-            {mine && <button onClick={()=>{ if (window.confirm("Supprimer cette story ?")) { onDelete(story); onClose(); } }} style={{background:"none",border:"none",color:"#fff",fontSize:18,cursor:"pointer"}} aria-label="Supprimer">🗑</button>}
+            <div style={{flex:1,color:"#fff",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,minWidth:0}}><b>{group.user.pseudo}</b> <span style={{opacity:0.7,fontSize:12}}>{agoLabel(story.created_at)}</span>{story.music_title && <div style={{fontSize:11,opacity:0.85,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>🎵 {story.music_title}</div>}</div>
+            {mine && <button onClick={()=>{ setPaused(true); if (window.confirm("Supprimer cette story ?")) { onDelete(story); onClose(); } else setPaused(false); }} style={{background:"rgba(0,0,0,0.4)",border:"none",color:"#fff",fontSize:13,cursor:"pointer",borderRadius:16,padding:"6px 12px"}} aria-label="Supprimer">🗑 Supprimer</button>}
             <button onClick={onClose} style={{background:"none",border:"none",color:"#fff",fontSize:22,cursor:"pointer"}} aria-label="Fermer">✕</button>
           </div>
         </div>
@@ -2414,29 +2537,29 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
         {viewersOpen && (
           <div style={{position:"absolute",left:0,right:0,bottom:0,maxHeight:"65%",background:t.bg2,borderRadius:"20px 20px 0 0",padding:"16px 16px calc(16px + env(safe-area-inset-bottom, 0px))",overflowY:"auto",zIndex:5}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <h3 style={{margin:0,fontFamily:"'Fraunces',serif",color:t.text,fontSize:18}}>Vu par {viewers ? viewers.length : ""}</h3>
+              <h3 style={{margin:0,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:t.text,fontSize:18}}>Vu par {viewers ? viewers.length : ""}</h3>
               <button onClick={()=>{ setViewersOpen(false); setPaused(false); }} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
             </div>
             {viewers===null && <p style={{color:t.text3,fontSize:13}}>Chargement…</p>}
-            {viewers && viewers.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Personne n'a encore vu ta story.</p>}
+            {viewers && viewers.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>Personne n'a encore vu ta story.</p>}
             {viewers && viewers.map(v=>{ const u = shapeUser(v.viewer); const l = story.likes?.some(x=>x.user_id===v.viewer_id); return (
               <div key={v.viewer_id} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0"}}>
                 <Avatar user={u} size={40} t={t}/>
-                <div style={{flex:1,color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14}}>{u.name}<div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>@{u.pseudo} · {agoLabel(v.viewed_at)}</div></div>
+                <div style={{flex:1,color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14}}>{u.name}<div style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11}}>@{u.pseudo} · {agoLabel(v.viewed_at)}</div></div>
                 {l && <HeartIcon size={20} filled />}
               </div>); })}
           </div>
         )}
         <div style={{position:"absolute",left:0,right:0,bottom:0,padding:"30px 12px calc(14px + env(safe-area-inset-bottom, 0px))",background:"linear-gradient(transparent,rgba(0,0,0,0.65))"}}>
           {mine ? (
-            <button onClick={openViewers} style={{display:"flex",alignItems:"center",gap:14,margin:"0 auto",background:"rgba(0,0,0,0.35)",border:"none",color:"#fff",fontFamily:"'DM Mono',monospace",fontSize:13,padding:"10px 18px",borderRadius:22,cursor:"pointer"}}>
+            <button onClick={openViewers} style={{display:"flex",alignItems:"center",gap:14,margin:"0 auto",background:"rgba(0,0,0,0.35)",border:"none",color:"#fff",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,padding:"10px 18px",borderRadius:22,cursor:"pointer"}}>
               <span>👁 {story.views?.length || 0} vue{(story.views?.length||0)>1?"s":""}</span><span>❤️ {likeCount}</span><span style={{opacity:0.7}}>▲</span>
             </button>
           ) : (
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <input value={text} onChange={e=>setText(e.target.value.slice(0,300))} onFocus={()=>setPaused(true)} onBlur={()=>setPaused(false)} onKeyDown={e=>{ if (e.key==="Enter") reply(); }}
                 placeholder={sent ? "Envoyé ✓" : `Répondre à ${group.user.pseudo}…`}
-                style={{flex:1,padding:"12px 16px",borderRadius:24,border:"1px solid rgba(255,255,255,0.6)",background:"rgba(0,0,0,0.25)",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none"}} />
+                style={{flex:1,padding:"12px 16px",borderRadius:24,border:"1px solid rgba(255,255,255,0.6)",background:"rgba(0,0,0,0.25)",color:"#fff",fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none"}} />
               {text.trim()
                 ? <button onClick={reply} aria-label="Envoyer" style={{background:"none",border:"none",cursor:"pointer",display:"flex",padding:4}}><SendIcon size={26} color="#fff"/></button>
                 : <button onClick={toggleLike} aria-label="J'aime" style={{background:"none",border:"none",cursor:"pointer",display:"flex",padding:4}}><HeartIcon size={28} filled={liked} color="#fff"/></button>}
@@ -2467,12 +2590,12 @@ function StoriesBar({ me, stories, onAddFile, onOpen, t }) {
           <span style={ring(!!mineGroup && unseen(mineGroup))}><span style={{background:t.bg,borderRadius:"50%",padding:2,display:"inline-flex"}}><Avatar user={me} size={54} t={t}/></span></span>
           <span onClick={e=>{ e.stopPropagation(); fileRef.current?.click(); }} style={{position:"absolute",right:0,bottom:0,width:22,height:22,borderRadius:"50%",background:t.accent,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,border:`2px solid ${t.bg}`}}>+</span>
         </div>
-        <div style={{fontSize:11,color:t.text2,fontFamily:"'DM Mono',monospace",marginTop:4}}>Ma story</div>
+        <div style={{fontSize:11,color:t.text2,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",marginTop:4}}>Ma story</div>
       </div>
       {others.map(g=>(
         <div key={g.user.id} onClick={()=>onOpen(groups.indexOf(g), groups)} style={{textAlign:"center",flexShrink:0,width:70,cursor:"pointer"}}>
           <span style={ring(unseen(g))}><span style={{background:t.bg,borderRadius:"50%",padding:2,display:"inline-flex"}}><Avatar user={g.user} size={54} t={t}/></span></span>
-          <div style={{fontSize:11,color:t.text2,fontFamily:"'DM Mono',monospace",marginTop:4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.user.pseudo}</div>
+          <div style={{fontSize:11,color:t.text2,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",marginTop:4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.user.pseudo}</div>
         </div>
       ))}
     </div>
@@ -2492,12 +2615,12 @@ function PostComposer({ me, activities, onClose, onSubmit, t }) {
   const pickFile = e => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const err = checkMedia(f); if (err) { alert(err); return; } setFile(f); };
   const pickAct = id => { setActId(id); const a = activities.find(x=>x.id===id); if (a?.category && CATEGORIES.includes(a.category)) setCat(a.category); };
   const go = async () => { setBusy(true); const ok = await onSubmit({ file, category: cat, caption: caption.trim(), activityId: actId || null }); setBusy(false); if (ok) onClose(); };
-  const lbl = {fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"};
+  const lbl = {fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"};
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",padding:26}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:22,color:t.text}}>Partager un souvenir</h2>
+          <h2 style={{margin:0,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text}}>Partager un souvenir</h2>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
         </div>
         <input ref={fileRef} type="file" accept="image/*,video/*" onChange={pickFile} style={{display:"none"}} />
@@ -2507,21 +2630,21 @@ function PostComposer({ me, activities, onClose, onSubmit, t }) {
             <button onClick={()=>setFile(null)} style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer"}}>✕</button>
           </div>
         ) : (
-          <button onClick={()=>fileRef.current?.click()} style={{width:"100%",padding:"28px 10px",borderRadius:12,border:`1px dashed ${t.accent}`,background:"transparent",color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer",marginBottom:14}}>📷 Choisir une photo ou une vidéo</button>
+          <button onClick={()=>fileRef.current?.click()} style={{width:"100%",padding:"28px 10px",borderRadius:12,border:`1px dashed ${t.accent}`,background:"transparent",color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,cursor:"pointer",marginBottom:14}}>📷 Choisir une photo ou une vidéo</button>
         )}
         <label style={lbl}>Sortie concernée (facultatif)</label>
-        <select value={actId} onChange={e=>pickAct(e.target.value)} style={{width:"100%",margin:"6px 0 14px",padding:"10px 12px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>
+        <select value={actId} onChange={e=>pickAct(e.target.value)} style={{width:"100%",margin:"6px 0 14px",padding:"10px 12px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>
           <option value="">— Aucune —</option>
           {mine.map(a=><option key={a.id} value={a.id}>{a.title}</option>)}
         </select>
         <label style={lbl}>Catégorie</label>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,margin:"8px 0 14px"}}>
           {CATEGORIES.filter(c=>c!=="Tous").map(c=>(
-            <button key={c} onClick={()=>setCat(c)} style={{padding:"5px 12px",borderRadius:20,border:"1px solid",borderColor:cat===c?t.accent:t.border,background:cat===c?t.accentBg:"transparent",color:cat===c?t.accent:t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>{CAT_ICONS[c]} {c}</button>
+            <button key={c} onClick={()=>setCat(c)} style={{padding:"5px 12px",borderRadius:20,border:"1px solid",borderColor:cat===c?t.accent:t.border,background:cat===c?t.accentBg:"transparent",color:cat===c?t.accent:t.text3,cursor:"pointer",fontSize:12,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>{CAT_ICONS[c]} {c}</button>
           ))}
         </div>
         <label style={lbl}>Légende (facultatif)</label>
-        <textarea value={caption} onChange={e=>setCaption(e.target.value.slice(0,300))} rows={2} placeholder="Raconte ce moment…" style={{width:"100%",margin:"6px 0 16px",padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
+        <textarea value={caption} onChange={e=>setCaption(e.target.value.slice(0,300))} rows={2} placeholder="Raconte ce moment…" style={{width:"100%",margin:"6px 0 16px",padding:"10px 14px",borderRadius:10,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
         <Btn accent disabled={!file||busy} onClick={go} t={t} style={{width:"100%",padding:"14px"}}>{busy?"ENVOI…":"PUBLIER"}</Btn>
       </div>
     </div>
@@ -2539,18 +2662,18 @@ function ShareModal({ post, friends, onSend, onClose, t }) {
     <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:520,maxHeight:"70vh",overflowY:"auto",padding:"18px 18px calc(18px + env(safe-area-inset-bottom, 0px))",border:`1px solid ${t.border}`}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <h3 style={{margin:0,fontFamily:"'Fraunces',serif",color:t.text}}>Partager</h3>
+          <h3 style={{margin:0,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:t.text}}>Partager</h3>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
         </div>
-        {friends.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Ajoute des amis pour leur envoyer ce souvenir en message.</p>}
+        {friends.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>Ajoute des amis pour leur envoyer ce souvenir en message.</p>}
         {friends.map(u=>(
           <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0"}}>
             <Avatar user={u} size={40} t={t}/>
-            <div style={{flex:1,color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14}}>{u.name}<div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>@{u.pseudo}</div></div>
+            <div style={{flex:1,color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14}}>{u.name}<div style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11}}>@{u.pseudo}</div></div>
             <Btn small accent={!sentTo[u.id]} disabled={!!sentTo[u.id]} onClick={async()=>{ setSentTo(s=>({...s,[u.id]:1})); await onSend(u, post); }} t={t}>{sentTo[u.id]?"Envoyé ✓":"Envoyer"}</Btn>
           </div>
         ))}
-        <button onClick={nativeShare} style={{marginTop:10,width:"100%",padding:"12px",borderRadius:12,border:`1px solid ${t.border}`,background:"transparent",color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,cursor:"pointer"}}>Autres applications…</button>
+        <button onClick={nativeShare} style={{marginTop:10,width:"100%",padding:"12px",borderRadius:12,border:`1px solid ${t.border}`,background:"transparent",color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,cursor:"pointer"}}>Autres applications…</button>
       </div>
     </div>
   );
@@ -2576,9 +2699,9 @@ function PostViewer({ post, me, onClose, onOpenProfile, onDelete, actions, t }) 
     return (
       <div style={{display:"flex",gap:10,padding:"6px 0",marginLeft:reply?38:0}}>
         <div onClick={()=>{ onClose(); onOpenProfile(c.author); }} style={{cursor:"pointer"}}><Avatar user={c.author} size={reply?24:28} t={t}/></div>
-        <div style={{flex:1,fontFamily:"'DM Sans',sans-serif",fontSize:13,color:t.text,lineHeight:1.4}}>
+        <div style={{flex:1,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,color:t.text,lineHeight:1.4}}>
           <b>{c.author?.pseudo}</b> {c.text}
-          <div style={{display:"flex",gap:12,alignItems:"center",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,marginTop:2}}>
+          <div style={{display:"flex",gap:12,alignItems:"center",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,marginTop:2}}>
             <span>{agoLabel(c.created_at)}</span>
             {c.likes?.length>0 && <span>{c.likes.length} j'aime</span>}
             <button onClick={()=>startReply(c)} style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontFamily:"inherit",fontSize:10,padding:0,fontWeight:700}}>Répondre</button>
@@ -2589,14 +2712,14 @@ function PostViewer({ post, me, onClose, onOpenProfile, onDelete, actions, t }) 
       </div>
     );
   };
-  const ab = {background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:6,color:t.text,padding:4,fontFamily:"'DM Mono',monospace",fontSize:13};
+  const ab = {background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:6,color:t.text,padding:4,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13};
   return (
     <div onClick={onClose} {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:260,display:"flex",alignItems:"center",justifyContent:"center",padding:14}}>
       <div onClick={e=>e.stopPropagation()} style={{background:t.bg2,borderRadius:18,width:"100%",maxWidth:520,maxHeight:"94vh",overflowY:"auto",border:`1px solid ${t.border}`}}>
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px"}}>
           <div onClick={()=>{ onClose(); onOpenProfile(post.author); }} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",flex:1}}>
             <Avatar user={post.author} size={34} t={t}/>
-            <div><div style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:600}}>{post.author?.pseudo}</div><div style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11}}>{agoLabel(post.created_at)}</div></div>
+            <div><div style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,fontWeight:600}}>{post.author?.pseudo}</div><div style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11}}>{agoLabel(post.created_at)}</div></div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:20,cursor:"pointer"}}>✕</button>
         </div>
@@ -2609,26 +2732,26 @@ function PostViewer({ post, me, onClose, onOpenProfile, onDelete, actions, t }) 
             <button style={ab} onClick={()=>setShowC(v=>!v)} aria-label="Commentaires"><CommentIcon color={t.text}/> {post.comments?.length||0}</button>
             <button style={ab} onClick={()=>actions.share(post)} aria-label="Partager"><SendIcon color={t.text}/></button>
           </div>
-          <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:t.accent,letterSpacing:"0.08em"}}>{CAT_ICONS[post.category]} {post.category?.toUpperCase()}{post.activity?.title ? ` · ${post.activity.title}` : ""}</div>
-          {post.caption && <p style={{margin:"8px 0 0",color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,lineHeight:1.5}}>{post.caption}</p>}
+          <div style={{fontSize:11,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",color:t.accent,letterSpacing:"0.08em"}}>{CAT_ICONS[post.category]} {post.category?.toUpperCase()}{post.activity?.title ? ` · ${post.activity.title}` : ""}</div>
+          {post.caption && <p style={{margin:"8px 0 0",color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,lineHeight:1.5}}>{post.caption}</p>}
           {showC && (
             <div style={{marginTop:12,borderTop:`1px solid ${t.border}`,paddingTop:10}}>
               {comments===null && <p style={{color:t.text3,fontSize:13}}>Chargement…</p>}
-              {comments && comments.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Aucun commentaire. Sois le premier !</p>}
+              {comments && comments.length===0 && <p style={{color:t.text3,fontSize:13,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>Aucun commentaire. Sois le premier !</p>}
               {comments && comments.filter(c=>!c.parent_id).map(c=>(
                 <div key={c.id}>
                   <CommentRow c={c} />
                   {comments.filter(r=>r.parent_id===c.id).map(r=><CommentRow key={r.id} c={r} reply />)}
                 </div>
               ))}
-              {replyTo && <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6,fontSize:12,color:t.text3,fontFamily:"'DM Mono',monospace"}}>Réponse à @{replyTo.pseudo}<button onClick={()=>{ setReplyTo(null); setTxt(""); }} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontSize:12}}>Annuler</button></div>}
+              {replyTo && <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6,fontSize:12,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>Réponse à @{replyTo.pseudo}<button onClick={()=>{ setReplyTo(null); setTxt(""); }} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontSize:12}}>Annuler</button></div>}
               <div style={{display:"flex",gap:8,marginTop:8}}>
-                <input value={txt} onChange={e=>setTxt(e.target.value.slice(0,300))} onKeyDown={e=>{ if (e.key==="Enter") sendC(); }} placeholder="Ajouter un commentaire…" style={{flex:1,padding:"10px 14px",borderRadius:20,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none"}} />
+                <input value={txt} onChange={e=>setTxt(e.target.value.slice(0,300))} onKeyDown={e=>{ if (e.key==="Enter") sendC(); }} placeholder="Ajouter un commentaire…" style={{flex:1,padding:"10px 14px",borderRadius:20,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none"}} />
                 <Btn accent small disabled={!txt.trim()} onClick={sendC} t={t}>Publier</Btn>
               </div>
             </div>
           )}
-          {post.user_id === me.id && <button onClick={()=>{ if (window.confirm("Supprimer ce souvenir ?")) { onDelete(post); onClose(); } }} style={{marginTop:12,padding:"8px 12px",borderRadius:10,background:"transparent",border:`1px solid ${t.accent}66`,color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>🗑 Supprimer</button>}
+          {post.user_id === me.id && <button onClick={()=>{ if (window.confirm("Supprimer ce souvenir ?")) { onDelete(post); onClose(); } }} style={{marginTop:12,padding:"8px 12px",borderRadius:10,background:"transparent",border:`1px solid ${t.accent}66`,color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,cursor:"pointer"}}>🗑 Supprimer</button>}
         </div>
       </div>
     </div>
@@ -2652,7 +2775,7 @@ function FeedItem({ p, me, actions, onOpenComments, onOpenProfile, t }) {
   const lastTap = useRef(0);
   const tap = () => { const n = Date.now(); if (n - lastTap.current < 320) { if (!liked) actions.like(p); setBurst(true); setTimeout(() => setBurst(false), 700); lastTap.current = 0; } else lastTap.current = n; };
   const btn = { background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 46, height: 46, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", padding: 0 };
-  const cnt = { color: "#fff", fontSize: 12, fontFamily: "'DM Mono',monospace", textAlign: "center", marginTop: 2, textShadow: "0 1px 3px rgba(0,0,0,0.6)" };
+  const cnt = { color: "#fff", fontSize: 12, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", textAlign: "center", marginTop: 2, textShadow: "0 1px 3px rgba(0,0,0,0.6)" };
   return (
     <div ref={ref} style={{ position: "relative", height: "calc(100dvh - 190px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))", minHeight: 360, marginBottom: 12, borderRadius: 18, overflow: "hidden", background: "#000", scrollSnapAlign: "start", scrollMarginTop: 8 }}>
       <div onClick={tap} style={{ position: "absolute", inset: 0 }}>
@@ -2664,11 +2787,11 @@ function FeedItem({ p, me, actions, onOpenComments, onOpenProfile, t }) {
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "40px 70px 14px 14px", background: "linear-gradient(transparent, rgba(0,0,0,0.75))", pointerEvents: "none" }}>
         <div onClick={() => onOpenProfile(p.author)} style={{ display: "flex", alignItems: "center", gap: 8, pointerEvents: "auto", cursor: "pointer", width: "fit-content" }}>
           <Avatar user={p.author} size={30} t={t} />
-          <span style={{ color: "#fff", fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 14 }}>{p.author?.pseudo}</span>
-          <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{agoLabel(p.created_at)}</span>
+          <span style={{ color: "#fff", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontWeight: 700, fontSize: 14 }}>{p.author?.pseudo}</span>
+          <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 11 }}>{agoLabel(p.created_at)}</span>
         </div>
-        <div style={{ marginTop: 6, color: "#fff", fontFamily: "'DM Mono',monospace", fontSize: 11, letterSpacing: "0.06em", opacity: 0.85 }}>{CAT_ICONS[p.category]} {p.category?.toUpperCase()}{p.activity?.title ? ` · ${p.activity.title}` : ""}</div>
-        {p.caption && <p style={{ margin: "6px 0 0", color: "#fff", fontFamily: "'DM Sans',sans-serif", fontSize: 14, lineHeight: 1.4, textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}>{p.caption}</p>}
+        <div style={{ marginTop: 6, color: "#fff", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 11, letterSpacing: "0.06em", opacity: 0.85 }}>{CAT_ICONS[p.category]} {p.category?.toUpperCase()}{p.activity?.title ? ` · ${p.activity.title}` : ""}</div>
+        {p.caption && <p style={{ margin: "6px 0 0", color: "#fff", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 14, lineHeight: 1.4, textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}>{p.caption}</p>}
       </div>
       <div style={{ position: "absolute", right: 10, bottom: 18, display: "flex", flexDirection: "column", gap: 14, alignItems: "center" }}>
         <div><button style={btn} onClick={() => actions.like(p)} aria-label="J'aime"><HeartIcon size={26} filled={liked} color={liked ? "#FF3B5C" : "#fff"} /></button><div style={cnt}>{p.likes?.length || 0}</div></div>
@@ -2686,6 +2809,7 @@ function GalleryPage({ me, posts, stories, activities, friendIds, actions, focus
   const [composer, setComposer] = useState(false);
   const [viewId, setViewId] = useState(null);
   const [storyView, setStoryView] = useState(null);
+  const [storyDraft, setStoryDraft] = useState(null);
   useEffect(()=>{ if (focusPostId && posts.some(p=>p.id===focusPostId)) { setViewId(focusPostId); onFocusDone?.(); } },[focusPostId, posts]);
   const rootRef = useRef(null);
   useEffect(()=>{
@@ -2712,29 +2836,30 @@ function GalleryPage({ me, posts, stories, activities, friendIds, actions, focus
   return (
     <div ref={rootRef} style={{padding:"20px 12px",maxWidth:680,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:0}}>Souvenirs</h2>
+        <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:26,color:t.text,margin:0}}>Souvenirs</h2>
         <Btn accent small onClick={()=>setComposer(true)} t={t}>＋ Partager</Btn>
       </div>
-      <StoriesBar me={me} stories={stories} onAddFile={async f=>{ const e=checkMedia(f); if(e){ alert(e); return; } await onAddStory(f); }} onOpen={(i,groups)=>setStoryView({ i, groups })} t={t} />
+      <StoriesBar me={me} stories={stories} onAddFile={f=>{ const e=checkMedia(f); if(e){ alert(e); return; } setStoryDraft(f); }} onOpen={(i,groups)=>setStoryView({ i, groups })} t={t} />
       <div style={{display:"flex",borderBottom:`1px solid ${t.border}`,margin:"4px 0 12px"}}>
         {[["all","🌍 Tout le monde"],["friends","👥 Mes amis"]].map(([id,l])=>(
-          <button key={id} onClick={()=>setScope(id)} style={{flex:1,padding:"10px",background:"none",border:"none",borderBottom:`2px solid ${scope===id?t.accent:"transparent"}`,color:scope===id?t.accent:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,cursor:"pointer"}}>{l}</button>
+          <button key={id} onClick={()=>setScope(id)} style={{flex:1,padding:"10px",background:"none",border:"none",borderBottom:`2px solid ${scope===id?t.accent:"transparent"}`,color:scope===id?t.accent:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,cursor:"pointer"}}>{l}</button>
         ))}
       </div>
       <div style={{display:"flex",gap:6,overflowX:"auto",padding:"2px 0 14px"}}>
         {CATEGORIES.map(c=>(
-          <button key={c} onClick={()=>setCat(c)} style={{flexShrink:0,padding:"6px 12px",borderRadius:20,border:"1px solid",borderColor:cat===c?t.accent:t.border,background:cat===c?t.accentBg:"transparent",color:cat===c?t.accent:t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>
+          <button key={c} onClick={()=>setCat(c)} style={{flexShrink:0,padding:"6px 12px",borderRadius:20,border:"1px solid",borderColor:cat===c?t.accent:t.border,background:cat===c?t.accentBg:"transparent",color:cat===c?t.accent:t.text3,cursor:"pointer",fontSize:12,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>
             {CAT_ICONS[c]} {c}{c!=="Tous"&&counts[c]?` (${counts[c]})`:""}
           </button>
         ))}
       </div>
-      {scoped.length === 0 && <div style={{textAlign:"center",padding:"48px 10px",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13}}>{scope==="friends" ? "Tes amis n'ont encore rien partagé." : "Aucun souvenir pour l'instant. Partage les photos et vidéos de tes sorties !"}</div>}
-      {scoped.length > 0 && cat !== "Tous" && !counts[cat] && <div style={{textAlign:"center",padding:"36px 10px",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13}}>Rien dans cette catégorie pour l'instant.</div>}
+      {scoped.length === 0 && <div style={{textAlign:"center",padding:"48px 10px",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13}}>{scope==="friends" ? "Tes amis n'ont encore rien partagé." : "Aucun souvenir pour l'instant. Partage les photos et vidéos de tes sorties !"}</div>}
+      {scoped.length > 0 && cat !== "Tous" && !counts[cat] && <div style={{textAlign:"center",padding:"36px 10px",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13}}>Rien dans cette catégorie pour l'instant.</div>}
       {scoped.filter(p=>cat==="Tous"||p.category===cat).map(p=>(
         <FeedItem key={p.id} p={p} me={me} actions={actions} onOpenComments={q=>setViewId(q.id)} onOpenProfile={onOpenProfile} t={t} />
       ))}
       {composer && <PostComposer me={me} activities={activities} onClose={()=>setComposer(false)} onSubmit={onAddPost} t={t} />}
       {viewPost && <PostViewer post={viewPost} me={me} actions={actions} onClose={()=>setViewId(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} />}
+      {storyDraft && <StoryEditor file={storyDraft} onCancel={()=>setStoryDraft(null)} onPublish={async o=>{ await onAddStory(storyDraft, o); setStoryDraft(null); }} t={t} />}
       {storyView && <StoryViewer groups={storyView.groups} startGroup={storyView.i} me={me} actions={actions} onClose={()=>setStoryView(null)} onDelete={onDeleteStory} t={t} />}
     </div>
   );
@@ -2748,6 +2873,7 @@ const getIceServers = () => {
   return [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
 };
 const RING_TIMEOUT = 45000;
+let _audioSession = null;
 
 // Icônes des appels (style Instagram)
 const PHONE_PATH = "M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z";
@@ -2773,7 +2899,7 @@ function PeerTile({ stream, user, video, mine, mirror, off, hidden, t }) {
     <div style={{ position: "relative", borderRadius: 16, overflow: "hidden", background: "#1B1426", aspectRatio: video ? "3/4" : "1", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
       <video ref={ref} autoPlay playsInline muted={!!mine} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: hasVideo ? 1 : 0, transform: mine && mirror ? "scaleX(-1)" : "none" }} />
       {!hasVideo && user && <Avatar user={user} size={64} t={t} />}
-      <div style={{ position: "absolute", left: 8, bottom: 6, fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>{mine ? "Toi" : user?.pseudo}</div>
+      <div style={{ position: "absolute", left: 8, bottom: 6, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 12, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>{mine ? "Toi" : user?.pseudo}</div>
     </div>
   );
 }
@@ -2797,6 +2923,8 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
   const [remote, setRemote] = useState(null);
   const [local, setLocal] = useState(null);
   const [muted, setMuted] = useState(false);
+  const [speaker, setSpeaker] = useState(false);
+  const applySpeakerRef = useRef(null);
   const [camOff, setCamOff] = useState(false);
   const [secs, setSecs] = useState(0);
   const R = useRef({ pc: null, local: null, callId: null, peerId: null, ice: [], timers: [], senders: {}, ring: null, gpcs: {}, gice: {}, gHad: false });
@@ -2863,7 +2991,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     r.local?.getTracks().forEach(x => x.stop());
     Object.assign(r, { pc: null, local: null, callId: null, peerId: null, ice: [], facing: "user", gpcs: {}, gice: {}, gHad: false });
     setGcall(null); setGStreams({});
-    setCall(null); setMin(false); setSwap(false); setFacing("user"); setRemote(null); setLocal(null); setMuted(false); setCamOff(false); setSecs(0);
+    setCall(null); setMin(false); setSwap(false); setFacing("user"); setRemote(null); setLocal(null); setMuted(false); setCamOff(false); setSecs(0); setSpeaker(false); applySpeakerRef.current?.(false);
   }, []);
 
   const getMedia = async (video) => {
@@ -2939,6 +3067,14 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     r.local = stream; r.facing = used; setFacing(used); setLocal(stream);
   };
   const ignore = () => { stopRing(); setMin(true); };   // met l'appel de côté sans raccrocher
+  const applySpeaker = async (on) => {
+    try {
+      const AS = _audioSession || (_audioSession = registerPlugin("AudioSession"));
+      await AS.overrideOutput({ type: on ? "speaker" : "default" });
+    } catch (e) { console.warn("haut-parleur", e); }
+  };
+  applySpeakerRef.current = applySpeaker;
+  const toggleSpeaker = () => { const n = !speaker; setSpeaker(n); applySpeaker(n); };
   const toggleMute = () => { const tr = R.current.local?.getAudioTracks(); tr?.forEach(x => x.enabled = !x.enabled); setMuted(m => !m); };
   const toggleCam = () => { const tr = R.current.local?.getVideoTracks(); tr?.forEach(x => x.enabled = !x.enabled); setCamOff(v => !v); };
 
@@ -3119,7 +3255,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
       : call.status === "calling" ? "Appel en cours…" : call.status === "connecting" ? "Connexion…" : `${mm}:${ss}`;
     const showVideo = call.video && remote && call.status === "active";
     const rb = (bg) => ({ width: 58, height: 58, borderRadius: "50%", border: "none", background: bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)", padding: 0 });
-    const lbl = (txt) => <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, marginTop: 8, opacity: 0.85, textAlign: "center" }}>{txt}</div>;
+    const lbl = (txt) => <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 12, marginTop: 8, opacity: 0.85, textAlign: "center" }}>{txt}</div>;
     const item = (btn, txt) => <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>{btn}{lbl(txt)}</div>;
     const GLASS = "rgba(255,255,255,0.22)", GLASS_ON = "#fff";
     const bigLocal = swap && call.video && !!local && call.status !== "ringing";
@@ -3128,14 +3264,14 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     const full = (
       <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "#0D0A12", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", color: "#fff", padding: "calc(40px + env(safe-area-inset-top, 0px)) 20px calc(36px + env(safe-area-inset-bottom, 0px))" }}>
         <video ref={rv} autoPlay playsInline onClick={bigLocal ? () => setSwap(false) : undefined} style={{ ...(bigLocal ? pipStyle : bigStyle), opacity: showVideo ? 1 : 0, background: "#000", cursor: bigLocal ? "pointer" : "default" }} />
-        <button onClick={call.status === "ringing" ? ignore : () => setMin(true)} style={{ position: "absolute", left: 14, top: "calc(14px + env(safe-area-inset-top, 0px))", zIndex: 2, display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: "none", background: "rgba(255,255,255,0.2)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", color: "#fff", fontFamily: "'DM Sans',sans-serif", fontSize: 13, cursor: "pointer" }}>
+        <button onClick={call.status === "ringing" ? ignore : () => setMin(true)} style={{ position: "absolute", left: 14, top: "calc(14px + env(safe-area-inset-top, 0px))", zIndex: 2, display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: "none", background: "rgba(255,255,255,0.2)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", color: "#fff", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 13, cursor: "pointer" }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           {call.status === "ringing" ? "Ignorer" : "Réduire"}
         </button>
         <div style={{ position: "relative", textAlign: "center", textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>
           {!showVideo && !bigLocal && <div style={{ display: "inline-block", marginBottom: 16 }}><Avatar user={call.peer} size={120} t={t} /></div>}
-          <div style={{ fontFamily: "'Fraunces',serif", fontSize: 26 }}>{call.peer?.name}</div>
-          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 14, opacity: 0.85, marginTop: 6 }}>{label}</div>
+          <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 26 }}>{call.peer?.name}</div>
+          <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 14, opacity: 0.85, marginTop: 6 }}>{label}</div>
         </div>
         {call.video && local && call.status !== "ringing" && (
           <video ref={lv} autoPlay playsInline muted onClick={() => setSwap(v => !v)} style={{ ...(bigLocal ? bigStyle : pipStyle), background: "#000", transform: facing === "user" ? "scaleX(-1)" : "none", opacity: camOff ? 0.25 : 1, cursor: "pointer" }} />
@@ -3148,6 +3284,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
             {call.video && item(<button onClick={flip} style={rb(GLASS)} aria-label="Retourner la caméra"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.9-3M4 5v4h4M4 13a8 8 0 0014.9 3M20 19v-4h-4"/></svg></button>, "Retourner")}
             {call.video && item(<button onClick={toggleCam} style={rb(camOff ? GLASS_ON : GLASS)} aria-label="Caméra">{camOff ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 16v1a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2h2m5.7 0H14a2 2 0 012 2v3.3l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/></svg> : <CallIcon name="cam" />}</button>, camOff ? "Caméra off" : "Caméra")}
             {item(<button onClick={toggleMute} style={rb(muted ? GLASS_ON : GLASS)} aria-label="Micro">{muted ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9v2a3 3 0 005.1 2.1M15 9.3V5a3 3 0 00-5.9-.8"/><path d="M5 11a7 7 0 0011.3 5.5M19 11a7 7 0 01-.5 2.6M12 18v4M8 22h8"/><line x1="2" y1="2" x2="22" y2="22"/></svg> : <CallIcon name="mic" />}</button>, muted ? "Micro off" : "Micro")}
+            {item(<button onClick={toggleSpeaker} style={rb(speaker ? GLASS_ON : GLASS)} aria-label="Haut-parleur"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={speaker ? "#111" : "#fff"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill={speaker ? "#111" : "none"}/><path d="M15.5 8.5a5 5 0 010 7M19 5a10 10 0 010 14"/></svg></button>, speaker ? "Haut-parleur" : "Écouteur")}
             {item(<button onClick={hangup} style={rb("#FF3B30")} aria-label="Raccrocher"><CallIcon name="hangup" /></button>, "Raccrocher")}
           </>)}
         </div>
@@ -3161,15 +3298,15 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
           <div onClick={() => setMin(false)} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, cursor: "pointer" }}>
             <Avatar user={call.peer} size={40} t={t} />
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{call.peer?.name}</div>
-              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, opacity: 0.8 }}>{label}</div>
+              <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{call.peer?.name}</div>
+              <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 11, opacity: 0.8 }}>{label}</div>
             </div>
           </div>
           {call.status === "ringing" ? (<>
             <button onClick={hangup} style={sb("#FF3B30")} aria-label="Refuser"><CallIcon name="hangup" size={20} /></button>
             <button onClick={() => { setMin(false); accept(); }} style={sb("#34C759")} aria-label="Répondre"><CallIcon name={call.video ? "acceptVideo" : "accept"} size={20} /></button>
           </>) : (<>
-            <button onClick={() => setMin(false)} style={{ ...sb("rgba(255,255,255,0.18)"), width: "auto", padding: "0 14px", borderRadius: 20, fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "#fff" }}>Ouvrir</button>
+            <button onClick={() => setMin(false)} style={{ ...sb("rgba(255,255,255,0.18)"), width: "auto", padding: "0 14px", borderRadius: 20, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 13, color: "#fff" }}>Ouvrir</button>
             <button onClick={hangup} style={sb("#FF3B30")} aria-label="Raccrocher"><CallIcon name="hangup" size={20} /></button>
           </>)}
         </div>
@@ -3184,7 +3321,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     const glabel = gcall.status === "ringing" ? (gcall.video ? "Appel vidéo de groupe…" : "Appel de groupe…")
       : gcall.status === "active" ? `${mm2}:${ss2} · ${peers.length + 1} participant${peers.length ? "s" : ""}` : gcall.status === "calling" ? "Appel en cours…" : "Connexion…";
     const rb2 = (bg) => ({ width: 58, height: 58, borderRadius: "50%", border: "none", background: bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)", padding: 0 });
-    const it2 = (btn, txt) => <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>{btn}<div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, marginTop: 8, opacity: 0.85 }}>{txt}</div></div>;
+    const it2 = (btn, txt) => <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>{btn}<div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 12, marginTop: 8, opacity: 0.85 }}>{txt}</div></div>;
     const GL = "rgba(255,255,255,0.22)", GL_ON = "#fff";
     const members = gcall.group.memberUsers;
     const meUser = members.find(u => u.id === meId) || { id: meId, name: "Moi", pseudo: "moi" };
@@ -3192,19 +3329,19 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     const gfull = (
       <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "#0D0A12", display: "flex", flexDirection: "column", color: "#fff", padding: "calc(14px + env(safe-area-inset-top, 0px)) 12px calc(24px + env(safe-area-inset-bottom, 0px))" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <button onClick={gcall.status === "ringing" ? ignore : () => setMin(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: "none", background: "rgba(255,255,255,0.2)", color: "#fff", fontFamily: "'DM Sans',sans-serif", fontSize: 13, cursor: "pointer" }}>
+          <button onClick={gcall.status === "ringing" ? ignore : () => setMin(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: "none", background: "rgba(255,255,255,0.2)", color: "#fff", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 13, cursor: "pointer" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             {gcall.status === "ringing" ? "Ignorer" : "Réduire"}
           </button>
           <div style={{ flex: 1, textAlign: "center", marginRight: 70 }}>
-            <div style={{ fontFamily: "'Fraunces',serif", fontSize: 18 }}>👥 {gcall.group.name}</div>
-            <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, opacity: 0.8 }}>{glabel}</div>
+            <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 18 }}>👥 {gcall.group.name}</div>
+            <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 12, opacity: 0.8 }}>{glabel}</div>
           </div>
         </div>
         {gcall.status === "ringing" ? (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center" }}>
             <GroupAvatar group={gcall.group} size={120} t={t} />
-            <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 15, opacity: 0.9 }}>{gcall.from?.pseudo ? "@" + gcall.from.pseudo + " t'appelle" : "Appel de groupe"}</div>
+            <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 15, opacity: 0.9 }}>{gcall.from?.pseudo ? "@" + gcall.from.pseudo + " t'appelle" : "Appel de groupe"}</div>
           </div>
         ) : (
           <div style={{ flex: 1, display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 8, alignContent: "center", minHeight: 0 }}>
@@ -3220,6 +3357,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
             {gcall.video && it2(<button onClick={flip} style={rb2(GL)} aria-label="Retourner la caméra"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.9-3M4 5v4h4M4 13a8 8 0 0014.9 3M20 19v-4h-4"/></svg></button>, "Retourner")}
             {gcall.video && it2(<button onClick={toggleCam} style={rb2(camOff ? GL_ON : GL)} aria-label="Caméra">{camOff ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 16v1a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2h2m5.7 0H14a2 2 0 012 2v3.3l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/></svg> : <CallIcon name="cam" />}</button>, camOff ? "Caméra off" : "Caméra")}
             {it2(<button onClick={toggleMute} style={rb2(muted ? GL_ON : GL)} aria-label="Micro">{muted ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9v2a3 3 0 005.1 2.1M15 9.3V5a3 3 0 00-5.9-.8"/><path d="M5 11a7 7 0 0011.3 5.5M19 11a7 7 0 01-.5 2.6M12 18v4M8 22h8"/><line x1="2" y1="2" x2="22" y2="22"/></svg> : <CallIcon name="mic" />}</button>, muted ? "Micro off" : "Micro")}
+            {it2(<button onClick={toggleSpeaker} style={rb2(speaker ? GL_ON : GL)} aria-label="Haut-parleur"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={speaker ? "#111" : "#fff"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill={speaker ? "#111" : "none"}/><path d="M15.5 8.5a5 5 0 010 7M19 5a10 10 0 010 14"/></svg></button>, speaker ? "Haut-parleur" : "Écouteur")}
             {it2(<button onClick={hangup} style={rb2("#FF3B30")} aria-label="Raccrocher"><CallIcon name="hangup" /></button>, "Quitter")}
           </>)}
         </div>
@@ -3233,15 +3371,15 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
           <div onClick={() => setMin(false)} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, cursor: "pointer" }}>
             <GroupAvatar group={gcall.group} size={40} t={t} />
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{gcall.group.name}</div>
-              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, opacity: 0.8 }}>{glabel}</div>
+              <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{gcall.group.name}</div>
+              <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 11, opacity: 0.8 }}>{glabel}</div>
             </div>
           </div>
           {gcall.status === "ringing" ? (<>
             <button onClick={hangup} style={sb2("#FF3B30")} aria-label="Refuser"><CallIcon name="hangup" size={20} /></button>
             <button onClick={() => { setMin(false); accept(); }} style={sb2("#34C759")} aria-label="Rejoindre"><CallIcon name={gcall.video ? "acceptVideo" : "accept"} size={20} /></button>
           </>) : (<>
-            <button onClick={() => setMin(false)} style={{ ...sb2("rgba(255,255,255,0.18)"), width: "auto", padding: "0 14px", borderRadius: 20, fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "#fff" }}>Ouvrir</button>
+            <button onClick={() => setMin(false)} style={{ ...sb2("rgba(255,255,255,0.18)"), width: "auto", padding: "0 14px", borderRadius: 20, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif", fontSize: 13, color: "#fff" }}>Ouvrir</button>
             <button onClick={hangup} style={sb2("#FF3B30")} aria-label="Quitter"><CallIcon name="hangup" size={20} /></button>
           </>)}
         </div>
@@ -3375,7 +3513,7 @@ export default function App() {
   const sendPostToFriend = (u, p) => api.sendDM(me0.id, u.id, `📷 Souvenir de @${p.author?.pseudo}${p.caption?" : "+p.caption:""}\n${p.url}`).catch(fail);
   const handleAddPost = async (d) => { try { await api.createPost(me0.id, d); await refreshPosts(); return true; } catch(e) { fail(e); return false; } };
   const handleDeletePost = async (p) => { try { await api.deletePost(p); refreshPosts(); } catch(e) { fail(e); } };
-  const handleAddStory = async (f) => { try { await api.createStory(me0.id, f); await refreshStories(); } catch(e) { fail(e); } };
+  const handleAddStory = async (f, opts) => { try { await api.createStory(me0.id, f, opts); await refreshStories(); } catch(e) { fail(e); } };
   const handleDeleteStory = async (st) => { try { await api.deleteStory(st); refreshStories(); } catch(e) { fail(e); } };
   const friendIds = me0 ? friendships.filter(f=>f.status==="accepted").map(f=>f.requester_id===me0.id?f.addressee_id:f.requester_id) : [];
   const reqIds = me0 ? friendships.filter(f=>f.status==="pending"&&f.addressee_id===me0.id).map(f=>f.requester_id) : [];
@@ -3738,7 +3876,7 @@ export default function App() {
   // ── Écrans d'attente / connexion ───────────────────────────────────────────
   if (recovery && session) return <PasswordForm t={t} onDone={()=>{ setRecovery(false); window.history.replaceState({}, "", window.location.pathname); }} onCancel={()=>setRecovery(false)} />;
   if (loadErr) return (
-    <div style={{minHeight:"100dvh",background:t.bg,color:t.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:24,textAlign:"center",fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{minHeight:"100dvh",background:t.bg,color:t.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:24,textAlign:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>
       <p>Impossible de charger ton profil.<br/><span style={{color:t.text3,fontSize:12}}>{loadErr}</span></p>
       <Btn accent onClick={handleLogout} t={t}>Se déconnecter</Btn>
     </div>
@@ -3767,7 +3905,7 @@ export default function App() {
         <svg width="26" height="26" viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth={active?0:2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
         </svg>
-        {unreadMsgs>0&&<span style={{position:"absolute",top:-4,right:-6,minWidth:16,height:16,borderRadius:8,background:"#E8008A",color:"#fff",fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{unreadMsgs}</span>}
+        {unreadMsgs>0&&<span style={{position:"absolute",top:-4,right:-6,minWidth:16,height:16,borderRadius:8,background:"#E8008A",color:"#fff",fontSize:9,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{unreadMsgs}</span>}
       </div>
     )},
     { id:"create",  icon: () => (
@@ -3797,7 +3935,7 @@ export default function App() {
     { id:"profile", icon: (active) => (
       <div style={{position:"relative",borderRadius:"50%",border:`2px solid ${active?t.accent:"transparent"}`,padding:1}}>
         <Avatar user={me} size={28} t={t} />
-        {friendReqCount>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:16,height:16,borderRadius:8,background:t.accent,color:"#fff",fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{friendReqCount}</span>}
+        {friendReqCount>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:16,height:16,borderRadius:8,background:t.accent,color:"#fff",fontSize:9,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{friendReqCount}</span>}
       </div>
     )},
   ];
@@ -3815,12 +3953,11 @@ export default function App() {
   const BOTTOM_NAV_H = 64;
   const TOP_BAR_H = 56;
 
-  const inputStyle = {flex:1,padding:"11px 16px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"'DM Mono',monospace",outline:"none"};
+  const inputStyle = {flex:1,padding:"11px 16px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none"};
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;1,9..144,400&family=DM+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;600&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
         ::-webkit-scrollbar{width:4px}
         ::-webkit-scrollbar-track{background:transparent}
@@ -3835,12 +3972,12 @@ export default function App() {
         @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
         .grouz-map-dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.7);}
         .grouz-map-dark.leaflet-container{background:#1b1b1f;}
-        .leaflet-container{font-family:'DM Sans',sans-serif!important;}
+        .leaflet-container{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif!important;}
         .leaflet-control-zoom a{background:${t.navBg}!important;color:${t.text}!important;border-color:${t.border}!important;}
         .leaflet-bar{border:1px solid ${t.border}!important;border-radius:10px!important;overflow:hidden;}
       `}</style>
 
-      <div style={{background:t.bg,position:"fixed",inset:0,display:"flex",flexDirection:"column",color:t.text,fontFamily:"'DM Sans',sans-serif",transition:"background 0.2s,color 0.2s",overflow:"hidden"}}>
+      <div style={{background:t.bg,position:"fixed",inset:0,display:"flex",flexDirection:"column",color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",transition:"background 0.2s,color 0.2s",overflow:"hidden"}}>
         {/* Ambient background orbs */}
         <div style={{position:"fixed",inset:0,overflow:"hidden",pointerEvents:"none",zIndex:0}}>
         <div style={{position:"absolute",top:"-15%",left:"-10%",width:280,height:280,borderRadius:"50%",background:"#E8008A",opacity:0.06,filter:"blur(70px)",pointerEvents:"none",zIndex:0}}/>
@@ -3857,7 +3994,7 @@ export default function App() {
                 <div style={{position:"absolute",inset:-2,borderRadius:"50%",background:t.gradient,opacity:0.6,filter:"blur(6px)"}}/>
                 <img src={LOGO_B64} alt="GrouZ" style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",position:"relative",border:`2px solid #D4AF37`}} />
               </div>
-              <span style={{fontFamily:"'Fraunces',serif",fontSize:22,fontStyle:"italic",background:t.gradient,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontWeight:700}}>GrouZ</span>
+              <span style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,fontStyle:"italic",background:t.gradient,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontWeight:700}}>GrouZ</span>
             </button>
             {/* right: notifications */}
             <button onClick={()=>setShowNotifs(v=>!v)} style={{position:"relative",background:"none",border:"none",cursor:"pointer",color:showNotifs?"#E8008A":t.text2,padding:4}}>
@@ -3865,7 +4002,7 @@ export default function App() {
                 <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                 <path d="M13.73 21a2 2 0 01-3.46 0" fill="none" stroke="currentColor" strokeWidth="2"/>
               </svg>
-              {unreadNotifs>0&&<span style={{position:"absolute",top:-2,right:-2,minWidth:16,height:16,borderRadius:8,background:"#E8008A",color:"#fff",fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{unreadNotifs}</span>}
+              {unreadNotifs>0&&<span style={{position:"absolute",top:-2,right:-2,minWidth:16,height:16,borderRadius:8,background:"#E8008A",color:"#fff",fontSize:9,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,padding:"0 3px"}}>{unreadNotifs}</span>}
             </button>
           </div>
         )}
@@ -3877,32 +4014,32 @@ export default function App() {
           {page==="home"&&(
             <div style={{maxWidth:680,margin:"0 auto",padding:"0 14px",paddingBottom:BOTTOM_NAV_H+16}}>
               <div style={{padding:"28px 8px 20px",textAlign:"center"}}>
-                <h1 style={{fontFamily:"'Fraunces',serif",fontSize:"clamp(26px,5vw,44px)",fontStyle:"italic",lineHeight:1.1,marginBottom:8,background:t.gradient,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>Plus jamais seul</h1>
-                <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,letterSpacing:"0.08em"}}>ORGANISEZ • RENCONTREZ • VIBREZ</p>
+                <h1 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:"clamp(26px,5vw,44px)",fontStyle:"italic",lineHeight:1.1,marginBottom:8,background:t.gradient,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>Plus jamais seul</h1>
+                <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,letterSpacing:"0.08em"}}>ORGANISEZ • RENCONTREZ • VIBREZ</p>
               </div>
               <div style={{marginBottom:20}}>
-                <button onClick={toggleAvail} style={{width:"100%",marginBottom:10,padding:"10px 14px",borderRadius:14,border:`1px solid ${availNow?"#2DBE60":t.border}`,background:availNow?"#2DBE6018":t.bg2,color:availNow?"#2DBE60":t.text2,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,textAlign:"left"}}>{availNow?"🟢 Tu es dispo — touche pour annuler":"⚪ Touche pour montrer que tu es dispo"}</button>
+                <button onClick={toggleAvail} style={{width:"100%",marginBottom:10,padding:"10px 14px",borderRadius:14,border:`1px solid ${availNow?"#2DBE60":t.border}`,background:availNow?"#2DBE6018":t.bg2,color:availNow?"#2DBE60":t.text2,cursor:"pointer",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,textAlign:"left"}}>{availNow?"🟢 Tu es dispo — touche pour annuler":"⚪ Touche pour montrer que tu es dispo"}</button>
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Rechercher une sortie ou un lieu…" style={{...inputStyle,width:"100%",marginBottom:10,padding:"12px 16px",borderRadius:14,fontSize:14,flex:"none"}} />
                 <div style={{display:"flex",gap:8,marginBottom:8}}>
-                  <button onClick={()=>setShowFilters(v=>!v)} style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${nbFilters?"#E8008A":t.border}`,background:t.bg2,color:nbFilters?"#E8008A":t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:"-2px",marginRight:6}}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>Filtres{nbFilters?` (${nbFilters})`:""}</button>
-                  {nbFilters>0&&<button onClick={()=>{setFDate("all");setFRadius(0);setFFree(false);setFFav(false);}} style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>Réinitialiser</button>}
+                  <button onClick={()=>setShowFilters(v=>!v)} style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${nbFilters?"#E8008A":t.border}`,background:t.bg2,color:nbFilters?"#E8008A":t.text3,cursor:"pointer",fontSize:12,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:"-2px",marginRight:6}}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>Filtres{nbFilters?` (${nbFilters})`:""}</button>
+                  {nbFilters>0&&<button onClick={()=>{setFDate("all");setFRadius(0);setFFree(false);setFFav(false);}} style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontSize:12,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>Réinitialiser</button>}
                 </div>
-                {showFilters&&(()=>{ const chip=(on,label,fn)=>(<button key={label} onClick={fn} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${on?"#E8008A":t.border}`,background:on?"#E8008A":"transparent",color:on?"#fff":t.text3,cursor:"pointer",fontSize:11,fontFamily:"'DM Mono',monospace"}}>{label}</button>); return (
+                {showFilters&&(()=>{ const chip=(on,label,fn)=>(<button key={label} onClick={fn} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${on?"#E8008A":t.border}`,background:on?"#E8008A":"transparent",color:on?"#fff":t.text3,cursor:"pointer",fontSize:11,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>{label}</button>); return (
                   <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,padding:14,marginBottom:10,display:"flex",flexDirection:"column",gap:10}}>
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",width:64}}>Quand</span>{[["all","Toutes"],["today","Aujourd'hui"],["weekend","Ce week-end"],["week","7 jours"]].map(([k,l])=>chip(fDate===k,l,()=>setFDate(k)))}</div>
-                    {userPos&&<div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",width:64}}>Distance</span>{[[0,"Toutes"],[5,"5 km"],[10,"10 km"],[25,"25 km"],[50,"50 km"]].map(([k,l])=>chip(fRadius===k,l,()=>setFRadius(k)))}</div>}
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:11,color:t.text3,fontFamily:"'DM Mono',monospace",width:64}}>Autres</span>{chip(fFree,"Places libres",()=>setFFree(v=>!v))}{chip(fFav,"★ Favoris",()=>setFFav(v=>!v))}</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",width:64}}>Quand</span>{[["all","Toutes"],["today","Aujourd'hui"],["weekend","Ce week-end"],["week","7 jours"]].map(([k,l])=>chip(fDate===k,l,()=>setFDate(k)))}</div>
+                    {userPos&&<div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",width:64}}>Distance</span>{[[0,"Toutes"],[5,"5 km"],[10,"10 km"],[25,"25 km"],[50,"50 km"]].map(([k,l])=>chip(fRadius===k,l,()=>setFRadius(k)))}</div>}
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:11,color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",width:64}}>Autres</span>{chip(fFree,"Places libres",()=>setFFree(v=>!v))}{chip(fFav,"★ Favoris",()=>setFFav(v=>!v))}</div>
                   </div>); })()}
                 <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
                   {CATEGORIES.map(c=>(
-                    <button key={c} onClick={()=>setFilter(c)} style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${filter===c?"#E8008A":t.border}`,background:filter===c?"#E8008A":t.bg2,color:filter===c?"#fff":t.text3,cursor:"pointer",fontSize:11,fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",transition:"all 0.15s",fontWeight:filter===c?700:400}}>
+                    <button key={c} onClick={()=>setFilter(c)} style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${filter===c?"#E8008A":t.border}`,background:filter===c?"#E8008A":t.bg2,color:filter===c?"#fff":t.text3,cursor:"pointer",fontSize:11,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",whiteSpace:"nowrap",transition:"all 0.15s",fontWeight:filter===c?700:400}}>
                       {CAT_ICONS[c]} {c}
                     </button>
                   ))}
                 </div>
               </div>
               {feed.length===0
-                ? <div style={{textAlign:"center",padding:"56px 0",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:14}}>Aucune sortie. Soyez le premier !</div>
+                ? <div style={{textAlign:"center",padding:"56px 0",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14}}>Aucune sortie. Soyez le premier !</div>
                 : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
                     {feed.map(({a,km},i)=>(
                       <React.Fragment key={a.id}>
@@ -3926,16 +4063,16 @@ export default function App() {
           {page==="notifs"&&(
             <div style={{maxWidth:600,margin:"0 auto",padding:"20px 16px",paddingBottom:BOTTOM_NAV_H+16}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-                <h2 style={{fontFamily:"'Fraunces',serif",fontSize:24,color:t.text}}>Notifications</h2>
-                <button onClick={markNotifsRead} style={{background:"none",border:"none",color:t.accent,fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>Tout marquer lu</button>
+                <h2 style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:24,color:t.text}}>Notifications</h2>
+                <button onClick={markNotifsRead} style={{background:"none",border:"none",color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12,cursor:"pointer"}}>Tout marquer lu</button>
               </div>
-              {notifs.length===0&&<p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13,textAlign:"center",padding:"48px 0"}}>Aucune notification pour le moment.</p>}
+              {notifs.length===0&&<p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,textAlign:"center",padding:"48px 0"}}>Aucune notification pour le moment.</p>}
               {notifs.map((n,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px",background:n.read?t.bg2:t.accentBg,border:`1px solid ${n.read?t.border:t.accent+"44"}`,borderRadius:14,marginBottom:8}}>
                   <span style={{fontSize:20,marginTop:2}}>{n.text.startsWith("🔔")?"🔔":n.text.startsWith("✅")?"✅":n.text.startsWith("👋")?"👋":"🗺"}</span>
                   <div style={{flex:1}}>
-                    <p style={{color:t.text,fontFamily:"'DM Sans',sans-serif",fontSize:14,margin:"0 0 3px",lineHeight:1.4}}>{n.text}</p>
-                    <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:10,margin:0}}>{n.time}</p>
+                    <p style={{color:t.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,margin:"0 0 3px",lineHeight:1.4}}>{n.text}</p>
+                    <p style={{color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,margin:0}}>{n.time}</p>
                   </div>
                   {!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:t.accent,marginTop:6,flexShrink:0}}/>}
                 </div>
@@ -4029,7 +4166,7 @@ export default function App() {
                 >
                   {icon(active)}
                   {!isCreate&&(
-                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",letterSpacing:"0.04em",color:active?"#E8008A":t.text3,fontWeight:active?700:400,marginTop:1}}>
+                    <span style={{fontSize:9,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",letterSpacing:"0.04em",color:active?"#E8008A":t.text3,fontWeight:active?700:400,marginTop:1}}>
                       {id==="home"?"Accueil":id==="messages"?"Messages":id==="map"?"Carte":id==="gallery"?"Souvenirs":"Profil"}
                     </span>
                   )}

@@ -268,27 +268,32 @@ export const listStories = () =>
   supabase.from("stories").select("*, author:profiles!user_id(*), likes:story_likes(user_id), views:story_views(viewer_id)")
     .gt("created_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString())
     .order("created_at", { ascending: true })
-    .then(ok).then(rows => rows.map(s => ({ ...s, url: pubUrl("stories", s.media_path) })));
+    .then(ok).then(rows => rows.map(s => ({ ...s, url: pubUrl("stories", s.media_path), music_url: s.music_path ? pubUrl("stories", s.music_path) : null })));
 
-export async function createStory(userId, file) {
+export async function createStory(userId, file, opts = {}) {
   const media_type = kindOf(file);
   const media_path = `${userId}/${Date.now()}.${fileExt(file, media_type)}`;
   ok(await supabase.storage.from("stories").upload(media_path, file, { contentType: file.type || undefined }));
+  let music_path = null;
+  if (opts.musicFile) {
+    music_path = `${userId}/${Date.now()}-music.${(opts.musicFile.name.split(".").pop() || "mp3").toLowerCase().slice(0, 5)}`;
+    ok(await supabase.storage.from("stories").upload(music_path, opts.musicFile, { contentType: opts.musicFile.type || undefined }));
+  }
   // ménage : on supprime mes anciennes stories expirées (lignes + fichiers)
   try {
-    const old = ok(await supabase.from("stories").select("id, media_path").eq("user_id", userId)
+    const old = ok(await supabase.from("stories").select("id, media_path, music_path").eq("user_id", userId)
       .lt("created_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString()));
     if (old?.length) {
       await supabase.from("stories").delete().in("id", old.map(o => o.id));
-      await supabase.storage.from("stories").remove(old.map(o => o.media_path));
+      await supabase.storage.from("stories").remove(old.flatMap(o => [o.media_path, o.music_path].filter(Boolean)));
     }
   } catch {}
-  return supabase.from("stories").insert({ user_id: userId, media_path, media_type }).then(ok);
+  return supabase.from("stories").insert({ user_id: userId, media_path, media_type, overlays: opts.overlays?.length ? opts.overlays : null, music_path, music_title: opts.musicTitle || null }).then(ok);
 }
 
 export async function deleteStory(story) {
   ok(await supabase.from("stories").delete().eq("id", story.id));
-  try { await supabase.storage.from("stories").remove([story.media_path]); } catch {}
+  try { await supabase.storage.from("stories").remove([story.media_path, story.music_path].filter(Boolean)); } catch {}
 }
 
 // ── LIKES / COMMENTAIRES ────────────────────────────────────────
