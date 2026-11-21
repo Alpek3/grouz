@@ -2896,7 +2896,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     r.callId = (crypto.randomUUID?.() || String(Date.now())); r.peerId = peer.id;
     setCall({ peer, video, status: "calling", incoming: false, callId: r.callId });
     send(peer.id, { type: "invite", callId: r.callId, video });
-    api.supabase.rpc("notify_call", { p_to: peer.id, p_video: !!video }).then(()=>{},()=>{});   // notification push si son app est fermée
+    api.supabase.rpc("notify_call", { p_to: peer.id, p_video: !!video, p_call: String(r.callId) }).then(()=>{},()=>{});   // notification push si son app est fermée
     startRing("out");
     r.timers.push(setTimeout(() => { if (callRef.current?.status === "calling") { send(peer.id, { type: "cancel", callId: r.callId }); alert("Pas de réponse."); cleanup(); } }, RING_TIMEOUT));
   };
@@ -3018,7 +3018,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     const gc = { callId: (crypto.randomUUID?.() || String(Date.now())), group, video, status: "calling", incoming: false };
     setGcall(gc);
     gSend(gc, { type: "ginvite", groupId: group.id, video });
-    api.supabase.rpc("notify_group_call", { p_group: group.id, p_video: !!video }).then(()=>{},()=>{});
+    api.supabase.rpc("notify_group_call", { p_group: group.id, p_video: !!video, p_call: String(gc.callId) }).then(()=>{},()=>{});
     startRing("out");
     r.timers.push(setTimeout(() => {
       if (gcallRef.current && Object.keys(R.current.gpcs).length === 0) { gSend(gc, { type: "gcancel" }); alert("Personne n'a rejoint l'appel."); cleanup(); }
@@ -3078,6 +3078,13 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     if (p.type === "answer" && r.pc) { await r.pc.setRemoteDescription(p.sdp); await flushIce(); return; }
     if (p.type === "ice") { if (r.pc?.remoteDescription) { try { await r.pc.addIceCandidate(p.candidate); } catch {} } else r.ice.push(p.candidate); }
   };
+
+  // ── appel ouvert en touchant la notification (l'app était fermée) : on affiche l'écran Répondre / Raccrocher
+  useEffect(() => {
+    const h = (e) => { const d = e.detail; if (d?.type) handleRef.current({ ...d, from: d.from, callId: d.callId, video: !!d.video, groupId: d.groupId }); };
+    window.addEventListener("grouz:incoming-call", h);
+    return () => window.removeEventListener("grouz:incoming-call", h);
+  }, []);
 
   // ── boîte de réception de signalisation
   useEffect(() => {
@@ -3524,6 +3531,16 @@ export default function App() {
       return;
     }
     if (kind==="activity_cancelled") return;
+    if (kind==="call") {
+      (async()=>{
+        let row = n.meta ? n : null;
+        if (!row && n.id) { const { data } = await api.supabase.from("notifications").select("*").eq("id", n.id).maybeSingle(); row = data; }
+        if (!row?.meta) return;
+        if (Date.now() - new Date(row.created_at).getTime() > 40000) { alert("📞 Appel manqué."); return; }
+        window.dispatchEvent(new CustomEvent("grouz:incoming-call", { detail: row.meta }));
+      })();
+      return;
+    }
     if (kind==="friend_request" || kind==="friend_accepted") { refreshFriends(); setPage("friends"); return; }
     let actId = n.ref_id;
     if (!actId) {
