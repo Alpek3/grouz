@@ -2876,6 +2876,8 @@ function FeedItem({ p, me, actions, onOpenComments, onOpenProfile, t }) {
 function GalleryPage({ me, posts, stories, activities, friendIds, actions, focusPostId, onFocusDone, onOpenProfile, onAddPost, onDeletePost, onAddStory, onDeleteStory, t }) {
   const [scope, setScope] = useState("all");   // "friends" | "all"
   const [cat, setCat] = useState("Tous");
+  const [sort, setSortState] = useState(() => { try { return localStorage.getItem("grouz_souvenirs_sort") === "popular" ? "popular" : "recent"; } catch { return "recent"; } });
+  const setSort = (v) => { setSortState(v); try { localStorage.setItem("grouz_souvenirs_sort", v); } catch {} };
   const [composer, setComposer] = useState(false);
   const [viewId, setViewId] = useState(null);
   const [storyView, setStoryView] = useState(null);
@@ -2915,6 +2917,11 @@ function GalleryPage({ me, posts, stories, activities, friendIds, actions, focus
           <button key={id} onClick={()=>setScope(id)} style={{flex:1,padding:"10px",background:"none",border:"none",borderBottom:`2px solid ${scope===id?t.accent:"transparent"}`,color:scope===id?t.accent:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13,cursor:"pointer"}}>{l}</button>
         ))}
       </div>
+      <div style={{display:"inline-flex",background:t.input,borderRadius:20,padding:3,margin:"0 0 10px"}}>
+        {[["recent","Récents"],["popular","Populaires"]].map(([id,l])=>(
+          <button key={id} onClick={()=>setSort(id)} style={{padding:"6px 16px",borderRadius:17,border:"none",background:sort===id?t.accent:"transparent",color:sort===id?"#fff":t.text3,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{l}</button>
+        ))}
+      </div>
       <div style={{display:"flex",gap:6,overflowX:"auto",padding:"2px 0 14px"}}>
         {CATEGORIES.map(c=>(
           <button key={c} onClick={()=>setCat(c)} style={{flexShrink:0,padding:"6px 12px",borderRadius:20,border:"1px solid",borderColor:cat===c?t.accent:t.border,background:cat===c?t.accentBg:"transparent",color:cat===c?t.accent:t.text3,cursor:"pointer",fontSize:12,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"}}>
@@ -2924,7 +2931,10 @@ function GalleryPage({ me, posts, stories, activities, friendIds, actions, focus
       </div>
       {scoped.length === 0 && <div style={{textAlign:"center",padding:"48px 10px",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13}}>{scope==="friends" ? "Tes amis n'ont encore rien partagé." : "Aucun souvenir pour l'instant. Partage les photos et vidéos de tes sorties !"}</div>}
       {scoped.length > 0 && cat !== "Tous" && !counts[cat] && <div style={{textAlign:"center",padding:"36px 10px",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:13}}>Rien dans cette catégorie pour l'instant.</div>}
-      {scoped.filter(p=>cat==="Tous"||p.category===cat).map(p=>(
+      {[...scoped].filter(p=>cat==="Tous"||p.category===cat).sort((a,b)=>{
+        if (sort === "popular") { const sa=(a.likes?.length||0)*2+(a.comments?.length||0), sb=(b.likes?.length||0)*2+(b.comments?.length||0); if (sb!==sa) return sb-sa; }
+        return (b.created_at||"").localeCompare(a.created_at||"");
+      }).map(p=>(
         <FeedItem key={p.id} p={p} me={me} actions={actions} onOpenComments={q=>setViewId(q.id)} onOpenProfile={onOpenProfile} t={t} />
       ))}
       {composer && <PostComposer me={me} activities={activities} onClose={()=>setComposer(false)} onSubmit={onAddPost} t={t} />}
