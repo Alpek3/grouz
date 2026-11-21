@@ -2113,6 +2113,7 @@ function NearbySheet({ users, loading, radius, onRadius, geoStatus, hasPos, shar
 
 // ── GROUPES DE DISCUSSION ───────────────────────────────────────
 function GroupAvatar({ group, size=46, t }) {
+  if (group.avatar_url) return <img src={group.avatar_url} alt="" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, display: "block" }} />;
   const m = (group.memberUsers || []).slice(0, 2);
   const s = Math.round(size * 0.66);
   return (
@@ -2143,6 +2144,8 @@ function FriendPicker({ friends, selected, onToggle, t, maxH=260 }) {
 }
 
 function NewGroupModal({ friends, onCreate, onClose, t }) {
+  const [photo, setPhoto] = useState(null), [photoUrl, setPhotoUrl] = useState(null), [cropFile, setCropFile] = useState(null);
+  const photoInput = useRef(null);
   const [name, setName] = useState("");
   const [sel, setSel] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -2155,18 +2158,27 @@ function NewGroupModal({ friends, onCreate, onClose, t }) {
           <h2 style={{margin:0,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text}}>Nouveau groupe</h2>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
         </div>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
+          <input ref={photoInput} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if (f) setCropFile(f); }} />
+          <div onClick={()=>photoInput.current?.click()} style={{width:84,height:84,borderRadius:"50%",background:t.input,border:`2px dashed ${t.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",color:t.text3,fontSize:12,textAlign:"center"}}>
+            {photoUrl ? <img src={photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} /> : <span>📷<br/>Photo</span>}
+          </div>
+        </div>
+        {cropFile && <CropModal file={cropFile} t={t} onCancel={()=>setCropFile(null)} onDone={(f,url)=>{ setPhoto(f); setPhotoUrl(url); setCropFile(null); }} />}
         <input value={name} onChange={e=>setName(e.target.value.slice(0,40))} placeholder="Nom du groupe" style={{width:"100%",padding:"12px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:15,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none",boxSizing:"border-box",marginBottom:14}} />
         <p style={{fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:11,color:t.text3,letterSpacing:"0.08em",margin:"0 0 6px"}}>AJOUTER DES AMIS ({sel.length}) — 2 MINIMUM</p>
         <FriendPicker friends={friends} selected={sel} onToggle={toggle} t={t} />
-        <Btn accent disabled={!ok||busy} onClick={async()=>{ setBusy(true); const done = await onCreate(name.trim(), sel); setBusy(false); if (done) onClose(); }} t={t} style={{width:"100%",padding:"14px",marginTop:14}}>{busy?"CRÉATION…":"CRÉER LE GROUPE"}</Btn>
+        <Btn accent disabled={!ok||busy} onClick={async()=>{ setBusy(true); const done = await onCreate(name.trim(), sel, photo); setBusy(false); if (done) onClose(); }} t={t} style={{width:"100%",padding:"14px",marginTop:14}}>{busy?"CRÉATION…":"CRÉER LE GROUPE"}</Btn>
       </div>
     </div>
   );
 }
 
-function GroupInfoModal({ group, me, friends, onClose, onRename, onAdd, onRemove, onLeave, onDelete, onTransfer, onOpenProfile, t }) {
+function GroupInfoModal({ group, me, friends, onClose, onRename, onChangePhoto, onAdd, onRemove, onLeave, onDelete, onTransfer, onOpenProfile, t }) {
   const isAdmin = group.created_by === me.id;
   const [name, setName] = useState(group.name);
+  const [cropFile, setCropFile] = useState(null), [savingPhoto, setSavingPhoto] = useState(false);
+  const photoInput = useRef(null);
   const [adding, setAdding] = useState(false);
   const [sel, setSel] = useState([]);
   const memberIds = group.memberUsers.map(u=>u.id);
@@ -2178,7 +2190,14 @@ function GroupInfoModal({ group, me, friends, onClose, onRename, onAdd, onRemove
           <h2 style={{margin:0,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:22,color:t.text}}>Infos du groupe</h2>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
         </div>
-        <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><GroupAvatar group={group} size={72} t={t}/></div>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:12,gap:6}}>
+          <div onClick={()=>isAdmin && photoInput.current?.click()} style={{cursor:isAdmin?"pointer":"default",opacity:savingPhoto?0.5:1}}><GroupAvatar group={group} size={84} t={t}/></div>
+          {isAdmin && <>
+            <input ref={photoInput} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if (f) setCropFile(f); }} />
+            <button onClick={()=>photoInput.current?.click()} disabled={savingPhoto} style={{background:"none",border:"none",color:t.accent,fontSize:13,cursor:"pointer"}}>{savingPhoto ? "Envoi…" : group.avatar_url ? "Modifier la photo" : "Ajouter une photo"}</button>
+          </>}
+        </div>
+        {cropFile && <CropModal file={cropFile} t={t} onCancel={()=>setCropFile(null)} onDone={async(f)=>{ setCropFile(null); setSavingPhoto(true); try { await onChangePhoto(f); } finally { setSavingPhoto(false); } }} />}
         {isAdmin
           ? <div style={{display:"flex",gap:8,marginBottom:16}}>
               <input value={name} onChange={e=>setName(e.target.value.slice(0,40))} style={{flex:1,padding:"10px 14px",borderRadius:12,background:t.input,border:`1px solid ${t.border}`,color:t.text,fontSize:15,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",outline:"none"}} />
@@ -2927,7 +2946,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
   const applySpeakerRef = useRef(null);
   const [camOff, setCamOff] = useState(false);
   const [secs, setSecs] = useState(0);
-  const R = useRef({ pc: null, local: null, callId: null, peerId: null, ice: [], timers: [], senders: {}, ring: null, gpcs: {}, gice: {}, gHad: false });
+  const R = useRef({ pc: null, local: null, callId: null, peerId: null, ice: [], timers: [], senders: {}, ring: null, gpcs: {}, gice: {}, gHad: false, ack: false, gAcks: [] });
   const callRef = useRef(null); callRef.current = call;
   const handleRef = useRef(() => {});
 
@@ -2989,7 +3008,7 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     try { r.pc?.close(); } catch {}
     Object.values(r.gpcs).forEach(pc => { try { pc.close(); } catch {} });
     r.local?.getTracks().forEach(x => x.stop());
-    Object.assign(r, { pc: null, local: null, callId: null, peerId: null, ice: [], facing: "user", gpcs: {}, gice: {}, gHad: false });
+    Object.assign(r, { pc: null, local: null, callId: null, peerId: null, ice: [], facing: "user", gpcs: {}, gice: {}, gHad: false, ack: false, gAcks: [] });
     setGcall(null); setGStreams({});
     setCall(null); setMin(false); setSwap(false); setFacing("user"); setRemote(null); setLocal(null); setMuted(false); setCamOff(false); setSecs(0); setSpeaker(false); applySpeakerRef.current?.(false);
   }, []);
@@ -3024,7 +3043,9 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     r.callId = (crypto.randomUUID?.() || String(Date.now())); r.peerId = peer.id;
     setCall({ peer, video, status: "calling", incoming: false, callId: r.callId });
     send(peer.id, { type: "invite", callId: r.callId, video });
-    api.supabase.rpc("notify_call", { p_to: peer.id, p_video: !!video, p_call: String(r.callId) }).then(()=>{},()=>{});   // notification push si son app est fermée
+    // notification push seulement si son app ne répond pas (app fermée / en arrière-plan) : évite une double sonnerie
+    r.ack = false; const cid = r.callId;
+    r.timers.push(setTimeout(() => { if (!R.current.ack && R.current.callId === cid && callRef.current?.status === "calling") api.supabase.rpc("notify_call", { p_to: peer.id, p_video: !!video, p_call: String(cid) }).then(()=>{},()=>{}); }, 2500));
     startRing("out");
     r.timers.push(setTimeout(() => { if (callRef.current?.status === "calling") { send(peer.id, { type: "cancel", callId: r.callId }); alert("Pas de réponse."); cleanup(); } }, RING_TIMEOUT));
   };
@@ -3103,11 +3124,13 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
   };
   const handleGroup = async (p) => {
     const r = R.current; const gc = gcallRef.current;
+    if (p.type === "gringing") { if (gc && p.callId === gc.callId && !r.gAcks.includes(p.from)) r.gAcks.push(p.from); return; }
     if (p.type === "ginvite") {
       if (callRef.current || gc) return;
       const g = findGroup(p.groupId);
       if (!g || !g.memberUsers.some(u => u.id === p.from) || !g.memberUsers.some(u => u.id === meId)) return;
       setGcall({ callId: p.callId, group: g, video: !!p.video, status: "ringing", incoming: true, from: findUser(p.from) });
+      send(p.from, { type: "gringing", callId: p.callId });
       startRing("in");
       r.timers.push(setTimeout(() => { if (gcallRef.current?.status === "ringing") cleanup(); }, RING_TIMEOUT));
       return;
@@ -3154,7 +3177,8 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
     const gc = { callId: (crypto.randomUUID?.() || String(Date.now())), group, video, status: "calling", incoming: false };
     setGcall(gc);
     gSend(gc, { type: "ginvite", groupId: group.id, video });
-    api.supabase.rpc("notify_group_call", { p_group: group.id, p_video: !!video, p_call: String(gc.callId) }).then(()=>{},()=>{});
+    r.gAcks = [];
+    r.timers.push(setTimeout(() => { if (R.current.gAcks && gcallRef.current?.callId === gc.callId && Object.keys(R.current.gpcs).length === 0) api.supabase.rpc("notify_group_call", { p_group: group.id, p_video: !!video, p_call: String(gc.callId), p_skip: R.current.gAcks }).then(()=>{},()=>{}); }, 2500));
     startRing("out");
     r.timers.push(setTimeout(() => {
       if (gcallRef.current && Object.keys(R.current.gpcs).length === 0) { gSend(gc, { type: "gcancel" }); alert("Personne n'a rejoint l'appel."); cleanup(); }
@@ -3186,11 +3210,13 @@ function useCalls(meId, isFriend, findUser, findGroup, t) {
       const peer = findUser(p.from); if (!peer) return;
       r.callId = p.callId; r.peerId = p.from;
       setCall({ peer, video: !!p.video, status: "ringing", incoming: true, callId: p.callId });
+      send(p.from, { type: "ringing", callId: p.callId });
       startRing("in");
       r.timers.push(setTimeout(() => { if (callRef.current?.status === "ringing") cleanup(); }, RING_TIMEOUT));
       return;
     }
     if (!c || p.callId !== r.callId) return;
+    if (p.type === "ringing") { r.ack = true; return; }
     if (p.type === "cancel" || p.type === "hangup" || p.type === "reject" || p.type === "busy") {
       if (p.type === "reject") alert("Appel refusé.");
       if (p.type === "busy") alert("Ton ami est déjà en appel.");
@@ -3778,8 +3804,8 @@ export default function App() {
     setGroupId(g.id); setGroupMsgs([]); loadGroupMsgs(g.id); setPage("group");
     api.markGroupNotifsRead(me0.id, g.id).then(refreshNotifs).catch(()=>{});
   };
-  const createGroup = async (name, ids) => {
-    try { const g = await api.createGroup(me0.id, name, ids); refreshGroups(); setTimeout(()=>{ setGroupId(g.id); setGroupMsgs([]); setPage("group"); }, 400); return true; }
+  const createGroup = async (name, ids, photo) => {
+    try { const g = await api.createGroup(me0.id, name, ids, photo); refreshGroups(); setTimeout(()=>{ setGroupId(g.id); setGroupMsgs([]); setPage("group"); }, 400); return true; }
     catch(e) { fail(e); return false; }
   };
   const sendGroupText = (text, rid) => api.sendGroupMessage(groupId, me0.id, text, rid).then(()=>{ loadGroupMsgs(groupId); refreshGroups(); }).catch(fail);
@@ -4143,6 +4169,7 @@ export default function App() {
         {showNewGroup && <NewGroupModal friends={allUsers.filter(u=>friendIds.includes(u.id))} onCreate={createGroup} onClose={()=>setShowNewGroup(false)} t={t} />}
         {showGroupInfo && group && <GroupInfoModal group={group} me={me0} friends={allUsers.filter(u=>friendIds.includes(u.id))} onClose={()=>setShowGroupInfo(false)} onOpenProfile={u=>setProfileUser(u)}
           onRename={async name=>{ try { await api.renameGroup(group.id, name); refreshGroups(); } catch(e) { fail(e); } }}
+          onChangePhoto={async f=>{ try { await api.setGroupAvatar(me0.id, group.id, f); refreshGroups(); } catch(e) { fail(e); } }}
           onAdd={async ids=>{ try { await api.addGroupMembers(group.id, ids); refreshGroups(); } catch(e) { fail(e); } }}
           onRemove={async u=>{ try { await api.removeGroupMember(group.id, u.id); refreshGroups(); } catch(e) { fail(e); } }}
           onLeave={async()=>{ try { await api.removeGroupMember(group.id, me0.id); setShowGroupInfo(false); setGroupId(null); setPage("messages"); refreshGroups(); } catch(e) { fail(e); } }}

@@ -319,9 +319,17 @@ export const listStoryViews = (storyId) =>
 export const listGroups = () =>
   supabase.from("group_chats").select("*, members:group_members(user_id, role, user:profiles(*))").order("created_at", { ascending: false }).then(ok);
 
-export async function createGroup(me, name, memberIds) {
+export async function setGroupAvatar(me, groupId, file) {
+  const path = `${me}/group-${groupId}-${Date.now()}.jpg`;
+  ok(await supabase.storage.from("avatars").upload(path, file, { contentType: file.type || "image/jpeg" }));
+  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+  ok(await supabase.from("group_chats").update({ avatar_url: data.publicUrl }).eq("id", groupId));
+  return data.publicUrl;
+}
+export async function createGroup(me, name, memberIds, photo) {
   const g = ok(await supabase.from("group_chats").insert({ name, created_by: me }).select().single());
   if (memberIds.length) ok(await supabase.from("group_members").insert(memberIds.map(id => ({ group_id: g.id, user_id: id }))));
+  if (photo) { try { await setGroupAvatar(me, g.id, photo); } catch (e) { console.warn("photo de groupe", e); } }
   return g;
 }
 export const renameGroup = (id, name) => supabase.from("group_chats").update({ name }).eq("id", id).then(ok);
