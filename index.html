@@ -9,12 +9,15 @@
     <meta name="theme-color" content="#0D0A12" />
     <title>GrouZ</title>
     <style>
+      *,*::before,*::after{box-sizing:border-box}
       html,body,#root{margin:0;height:100%;background:#0D0A12}
       html,body{width:100%;max-width:100%;overflow-x:hidden;overscroll-behavior:none;-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation}
       body{position:relative;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
       #root{overflow-x:hidden}
       input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;font-size:16px}
-      img{-webkit-user-drag:none}
+      img{-webkit-user-drag:none;max-width:100%}
+      input,select,textarea{max-width:100%;min-width:0}
+      input[type=date],input[type=time]{min-width:0;width:100%}
     </style>
   </head>
   <body>
