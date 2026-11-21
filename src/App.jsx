@@ -2591,19 +2591,19 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
           <StoryOverlays overlays={story.overlays} />
         </div>
         {story.music_url && <audio ref={aref} key={"m"+story.id} src={story.music_url} autoPlay loop />}
-        <div style={{position:"absolute",top:0,left:0,right:0,padding:"calc(10px + env(safe-area-inset-top, 0px)) 12px 0",background:"linear-gradient(rgba(0,0,0,0.55),transparent)",paddingBottom:24}}>
+        <div style={{position:"absolute",top:0,left:0,right:0,zIndex:6,padding:"calc(10px + env(safe-area-inset-top, 0px)) 12px 0",background:"linear-gradient(rgba(0,0,0,0.55),transparent)",paddingBottom:24}}>
           <div style={{display:"flex",gap:4,marginBottom:10}}>
             {group.items.map((s,i)=>(<div key={s.id} style={{flex:1,height:3,borderRadius:2,background:"rgba(255,255,255,0.3)",overflow:"hidden"}}><div style={{height:"100%",background:"#fff",width:i<si?"100%":i===si?`${prog*100}%`:"0%"}}/></div>))}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <Avatar user={group.user} size={34} t={t}/>
             <div style={{flex:1,color:"#fff",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,minWidth:0}}><b>{group.user.pseudo}</b> <span style={{opacity:0.7,fontSize:12}}>{agoLabel(story.created_at)}</span>{story.music_title && <div style={{fontSize:11,opacity:0.85,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>🎵 {story.music_title}</div>}</div>
-            {mine && <button onClick={()=>{ setPaused(true); if (window.confirm("Supprimer cette story ?")) { onDelete(story); onClose(); } else setPaused(false); }} style={{background:"rgba(0,0,0,0.4)",border:"none",color:"#fff",fontSize:13,cursor:"pointer",borderRadius:16,padding:"6px 12px"}} aria-label="Supprimer">🗑 Supprimer</button>}
+            {mine && <button onClick={()=>{ setPaused(true); if (window.confirm("Supprimer cette story ?")) { onDelete(story); onClose(); } else setPaused(false); }} style={{background:"rgba(0,0,0,0.5)",border:"none",color:"#fff",fontSize:14,cursor:"pointer",borderRadius:18,padding:"10px 16px",flexShrink:0}} aria-label="Supprimer">🗑 Supprimer</button>}
             <button onClick={onClose} style={{background:"none",border:"none",color:"#fff",fontSize:22,cursor:"pointer"}} aria-label="Fermer">✕</button>
           </div>
         </div>
-        <div onClick={prev} style={{position:"absolute",left:0,top:90,bottom:100,width:"33%"}}/>
-        <div onClick={next} style={{position:"absolute",right:0,top:90,bottom:100,width:"67%"}}/>
+        <div onClick={prev} style={{position:"absolute",left:0,top:"calc(120px + env(safe-area-inset-top, 0px))",bottom:100,width:"33%"}}/>
+        <div onClick={next} style={{position:"absolute",right:0,top:"calc(120px + env(safe-area-inset-top, 0px))",bottom:100,width:"67%"}}/>
         {viewersOpen && (
           <div style={{position:"absolute",left:0,right:0,bottom:0,maxHeight:"65%",background:t.bg2,borderRadius:"20px 20px 0 0",padding:"16px 16px calc(16px + env(safe-area-inset-bottom, 0px))",overflowY:"auto",zIndex:5}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
