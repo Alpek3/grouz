@@ -56,6 +56,12 @@ workflows:
           # Notifications push : fichier Firebase (variable secrète GOOGLE_SERVICE_INFO_PLIST_B64, voir PUSH.md)
           python3 - <<'PY'
           import base64, os, re, sys
+          if os.path.exists("firebase/GoogleService-Info.plist"):
+              data = open("firebase/GoogleService-Info.plist", "rb").read()
+              if b"GOOGLE_APP_ID" not in data:
+                  print("ATTENTION : firebase/GoogleService-Info.plist n'est pas valide"); sys.exit(1)
+              open("ios/App/App/GoogleService-Info.plist", "wb").write(data)
+              print("GoogleService-Info.plist copie depuis le depot (%d octets)" % len(data)); sys.exit(0)
           v = os.environ.get("GOOGLE_SERVICE_INFO_PLIST_B64", "")
           v = re.sub(r"\s+", "", v).strip('"').strip("'")
           if not v:
@@ -110,6 +116,12 @@ workflows:
           # Notifications push : fichier Firebase (variable secrète GOOGLE_SERVICES_JSON_B64, voir PUSH.md)
           python3 - <<'PY'
           import base64, os, re, sys
+          if os.path.exists("firebase/google-services.json"):
+              data = open("firebase/google-services.json", "rb").read()
+              if b"project_info" not in data:
+                  print("ATTENTION : firebase/google-services.json n'est pas valide"); sys.exit(1)
+              open("android/app/google-services.json", "wb").write(data)
+              print("google-services.json copie depuis le depot (%d octets)" % len(data)); sys.exit(0)
           v = os.environ.get("GOOGLE_SERVICES_JSON_B64", "")
           v = re.sub(r"\s+", "", v).strip('"').strip("'")
           if not v:
