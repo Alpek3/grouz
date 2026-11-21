@@ -123,25 +123,26 @@ if (fs.existsSync(path.join(root, "ios/App"))) {
   }
 }
 
-// Firebase iOS : déclare GoogleService-Info.plist dans le projet Xcode (sinon le fichier n'est pas embarqué dans l'app)
-{
-  const plistFile = path.join(root, "ios/App/App/GoogleService-Info.plist");
-  if (fs.existsSync(plistFile) && fs.existsSync(pbxPath)) {
-    let pbx = fs.readFileSync(pbxPath, "utf8");
-    if (pbx.includes("GoogleService-Info.plist")) log("Xcode : GoogleService-Info.plist déjà déclaré");
-    else if (pbx.includes("PBXFileSystemSynchronizedRootGroup")) log("Xcode : dossier synchronisé, GoogleService-Info.plist inclus automatiquement");
-    else {
-      const id = () => Array.from({ length: 24 }, () => "0123456789ABCDEF"[Math.floor(Math.random() * 16)]).join("");
-      const ref = id(), bf = id();
-      let ok = true;
-      const rep = (re, fn) => { if (re.test(pbx)) pbx = pbx.replace(re, fn); else ok = false; };
-      rep(/\/\* Begin PBXBuildFile section \*\/\n/, (m) => `${m}\t\t${bf} /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = ${ref} /* GoogleService-Info.plist */; };\n`);
-      rep(/\/\* Begin PBXFileReference section \*\/\n/, (m) => `${m}\t\t${ref} /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };\n`);
-      rep(/(\/\* AppDelegate\.swift \*\/,\n)/, (m) => `${m}\t\t\t\t${ref} /* GoogleService-Info.plist */,\n`);
-      rep(/(isa = PBXResourcesBuildPhase;[\s\S]*?files = \(\n)/, (m) => `${m}\t\t\t\t${bf} /* GoogleService-Info.plist in Resources */,\n`);
-      if (ok) { fs.writeFileSync(pbxPath, pbx); log("Xcode : GoogleService-Info.plist ajouté aux ressources de l'app"); }
-      else console.warn("⚠ Impossible de déclarer GoogleService-Info.plist dans le projet Xcode (structure inattendue)");
-    }
-  } else log("Firebase iOS : pas de GoogleService-Info.plist, notifications iPhone non configurées");
+// Déclare un fichier dans le projet Xcode (sinon il n'est pas embarqué dans l'app)
+function addIosResource(name, fileType, fromRepo) {
+  const dest = path.join(root, "ios/App/App/" + name);
+  if (fromRepo && fs.existsSync(path.join(root, fromRepo)) && !fs.existsSync(dest)) { fs.copyFileSync(path.join(root, fromRepo), dest); log(name + " copié dans le projet iPhone"); }
+  if (!fs.existsSync(dest) || !fs.existsSync(pbxPath)) return false;
+  let pbx = fs.readFileSync(pbxPath, "utf8");
+  if (pbx.includes(name)) { log("Xcode : " + name + " déjà déclaré"); return true; }
+  if (pbx.includes("PBXFileSystemSynchronizedRootGroup")) { log("Xcode : dossier synchronisé, " + name + " inclus automatiquement"); return true; }
+  const id = () => Array.from({ length: 24 }, () => "0123456789ABCDEF"[Math.floor(Math.random() * 16)]).join("");
+  const ref = id(), bf = id();
+  let ok = true;
+  const rep = (re, fn) => { if (re.test(pbx)) pbx = pbx.replace(re, fn); else ok = false; };
+  rep(/\/\* Begin PBXBuildFile section \*\/\n/, (m) => `${m}\t\t${bf} /* ${name} in Resources */ = {isa = PBXBuildFile; fileRef = ${ref} /* ${name} */; };\n`);
+  rep(/\/\* Begin PBXFileReference section \*\/\n/, (m) => `${m}\t\t${ref} /* ${name} */ = {isa = PBXFileReference; lastKnownFileType = ${fileType}; path = "${name}"; sourceTree = "<group>"; };\n`);
+  rep(/(\/\* AppDelegate\.swift \*\/,\n)/, (m) => `${m}\t\t\t\t${ref} /* ${name} */,\n`);
+  rep(/(isa = PBXResourcesBuildPhase;[\s\S]*?files = \(\n)/, (m) => `${m}\t\t\t\t${bf} /* ${name} in Resources */,\n`);
+  if (ok) { fs.writeFileSync(pbxPath, pbx); log("Xcode : " + name + " ajouté aux ressources de l'app"); return true; }
+  console.warn("⚠ Impossible de déclarer " + name + " dans le projet Xcode (structure inattendue)");
+  return false;
 }
+if (!addIosResource("GoogleService-Info.plist", "text.plist.xml")) log("Firebase iOS : pas de GoogleService-Info.plist, notifications iPhone non configurées");
+addIosResource("ring.wav", "audio.wav", "assets/ring.wav");   // sonnerie des notifications d'appel
 console.log("✅ Configuration native terminée");
