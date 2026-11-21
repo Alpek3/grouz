@@ -54,7 +54,19 @@ workflows:
           npx cap add ios
           npx @capacitor/assets generate --ios
           # Notifications push : fichier Firebase (variable secrète GOOGLE_SERVICE_INFO_PLIST_B64, voir PUSH.md)
-          if [ -n "$GOOGLE_SERVICE_INFO_PLIST_B64" ]; then echo "$GOOGLE_SERVICE_INFO_PLIST_B64" | base64 --decode > ios/App/App/GoogleService-Info.plist; fi
+          python3 - <<'PY'
+          import base64, os, re, sys
+          v = os.environ.get("GOOGLE_SERVICE_INFO_PLIST_B64", "")
+          v = re.sub(r"\s+", "", v).strip('"').strip("'")
+          if not v:
+              print("ATTENTION : GOOGLE_SERVICE_INFO_PLIST_B64 est vide, les notifications iPhone ne marcheront pas"); sys.exit(0)
+          v += "=" * (-len(v) % 4)
+          data = base64.b64decode(v)
+          if b"GOOGLE_APP_ID" not in data:
+              print("ATTENTION : ce n'est pas un GoogleService-Info.plist valide"); sys.exit(1)
+          open("ios/App/App/GoogleService-Info.plist", "wb").write(data)
+          print("GoogleService-Info.plist ecrit (%d octets)" % len(data))
+          PY
           node scripts/configure-native.mjs
           npx cap sync ios
       - name: Préparer la signature
@@ -70,7 +82,7 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        submit_to_testflight: false   # le build arrive dans TestFlight pour les testeurs internes ; passe à true pour l'envoi en test externe
 
   # ───────────────────────── Android → fichier .aab ─────────────────────────
   android-release:
@@ -96,7 +108,19 @@ workflows:
           npx cap add android
           npx @capacitor/assets generate --android
           # Notifications push : fichier Firebase (variable secrète GOOGLE_SERVICES_JSON_B64, voir PUSH.md)
-          if [ -n "$GOOGLE_SERVICES_JSON_B64" ]; then echo "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > android/app/google-services.json; fi
+          python3 - <<'PY'
+          import base64, os, re, sys
+          v = os.environ.get("GOOGLE_SERVICES_JSON_B64", "")
+          v = re.sub(r"\s+", "", v).strip('"').strip("'")
+          if not v:
+              print("ATTENTION : GOOGLE_SERVICES_JSON_B64 est vide, les notifications Android ne marcheront pas"); sys.exit(0)
+          v += "=" * (-len(v) % 4)
+          data = base64.b64decode(v)
+          if b"project_info" not in data:
+              print("ATTENTION : ce n'est pas un google-services.json valide"); sys.exit(1)
+          open("android/app/google-services.json", "wb").write(data)
+          print("google-services.json ecrit (%d octets)" % len(data))
+          PY
           node scripts/configure-native.mjs
           npx cap sync android
       - name: Construire l'application (.aab)
