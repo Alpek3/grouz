@@ -600,7 +600,7 @@ function SettingsPage({onOpenPremium, currentUser, darkMode, onToggleDark, onLog
         <Row icon="🗑" label="Supprimer mon compte" onClick={onDeleteAccount} right={<span style={{color:t.accent}}>›</span>} />
         <Row icon="🚪" label="Se déconnecter" onClick={onLogout} right={<span style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12}}>→</span>} />
       </div>
-      <p style={{textAlign:"center",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,marginTop:24}}>GrouZ v2.0.0 — Fait avec ♥</p>
+      <p style={{textAlign:"center",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,marginTop:24}}>GrouZ v2.0.0 · version 21/11-C · Fait avec ♥</p>
     </div>
   );
 }
@@ -2598,7 +2598,7 @@ function StoryViewer({ groups, startGroup, me, onClose, onDelete, actions, t }) 
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <Avatar user={group.user} size={34} t={t}/>
             <div style={{flex:1,color:"#fff",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:14,minWidth:0}}><b>{group.user.pseudo}</b> <span style={{opacity:0.7,fontSize:12}}>{agoLabel(story.created_at)}</span>{story.music_title && <div style={{fontSize:11,opacity:0.85,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>🎵 {story.music_title}</div>}</div>
-            {mine && <button onClick={()=>{ setPaused(true); if (window.confirm("Supprimer cette story ?")) { onDelete(story); onClose(); } else setPaused(false); }} style={{background:"rgba(0,0,0,0.5)",border:"none",color:"#fff",fontSize:14,cursor:"pointer",borderRadius:18,padding:"10px 16px",flexShrink:0}} aria-label="Supprimer">🗑 Supprimer</button>}
+            {mine && <button onClick={()=>{ setPaused(true); if (window.confirm("Supprimer cette story ?")) { onDelete(story); onClose(); } else setPaused(false); }} style={{background:"rgba(0,0,0,0.45)",border:"none",width:40,height:40,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0,flexShrink:0}} aria-label="Supprimer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6"/></svg></button>}
             <button onClick={onClose} style={{background:"none",border:"none",color:"#fff",fontSize:22,cursor:"pointer"}} aria-label="Fermer">✕</button>
           </div>
         </div>
