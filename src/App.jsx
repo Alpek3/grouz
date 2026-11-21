@@ -1268,7 +1268,7 @@ function DMChat({currentUser, otherUser, messages, onSend, onVoiceSend, onSendMe
 
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-      <div style={{padding:"16px 20px",borderBottom:`1px solid ${t.border}`,display:"flex",alignItems:"center",gap:12,background:t.bg2,flexShrink:0}}>
+      <div style={{padding:"calc(16px + env(safe-area-inset-top, 0px)) 20px 16px",borderBottom:`1px solid ${t.border}`,display:"flex",alignItems:"center",gap:12,background:t.bg2,flexShrink:0}}>
         <button onClick={onBack} style={{background:"none",border:"none",color:t.accent,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center"}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
@@ -1641,8 +1641,8 @@ function CreateModal({onClose,onSave,currentUser,usedToday,t}) {
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const valid=!blocked&&form.title&&form.date&&form.time&&form.location&&form.description&&(form.lat!=null||form.noGeo);
   return (
-    <div {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",padding:32}}>
+    <div {...swipeDown(onClose)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(6px)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"calc(12px + env(safe-area-inset-top, 0px)) 12px calc(12px + env(safe-area-inset-bottom, 0px))",overflow:"hidden",touchAction:"pan-y"}}>
+      <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,width:"100%",maxWidth:560,maxHeight:"100%",overflowY:"auto",overflowX:"hidden",overscrollBehavior:"contain",padding:"22px 18px",boxSizing:"border-box"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
           <h2 style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:24,color:t.text}}>Nouvelle sortie</h2>
           <button onClick={onClose} style={{background:"none",border:"none",color:t.text3,fontSize:22,cursor:"pointer"}}>✕</button>
@@ -2635,6 +2635,51 @@ function PostViewer({ post, me, onClose, onOpenProfile, onDelete, actions, t }) 
   );
 }
 
+// ── Souvenirs : défilement plein écran façon TikTok ──
+function FeedItem({ p, me, actions, onOpenComments, onOpenProfile, t }) {
+  const ref = useRef(null), vref = useRef(null);
+  const [muted, setMuted] = useState(true);
+  const liked = !!p.likes?.some(l => l.user_id === me.id);
+  const [burst, setBurst] = useState(false);
+  useEffect(() => {
+    const el = ref.current; if (!el || !("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver(([e]) => {
+      const v = vref.current; if (!v) return;
+      if (e.isIntersecting && e.intersectionRatio > 0.6) { v.play().catch(() => {}); } else { v.pause(); }
+    }, { threshold: [0, 0.6, 1] });
+    io.observe(el); return () => io.disconnect();
+  }, []);
+  const lastTap = useRef(0);
+  const tap = () => { const n = Date.now(); if (n - lastTap.current < 320) { if (!liked) actions.like(p); setBurst(true); setTimeout(() => setBurst(false), 700); lastTap.current = 0; } else lastTap.current = n; };
+  const btn = { background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 46, height: 46, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", padding: 0 };
+  const cnt = { color: "#fff", fontSize: 12, fontFamily: "'DM Mono',monospace", textAlign: "center", marginTop: 2, textShadow: "0 1px 3px rgba(0,0,0,0.6)" };
+  return (
+    <div ref={ref} style={{ position: "relative", height: "calc(100dvh - 190px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))", minHeight: 360, marginBottom: 12, borderRadius: 18, overflow: "hidden", background: "#000", scrollSnapAlign: "start", scrollMarginTop: 8 }}>
+      <div onClick={tap} style={{ position: "absolute", inset: 0 }}>
+        {p.media_type === "video"
+          ? <video ref={vref} src={p.url} loop muted={muted} playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
+          : <img src={p.url} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000", display: "block" }} />}
+        {burst && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", animation: "slideUp .4s ease" }}><HeartIcon size={96} filled color="#fff" /></div>}
+      </div>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "40px 70px 14px 14px", background: "linear-gradient(transparent, rgba(0,0,0,0.75))", pointerEvents: "none" }}>
+        <div onClick={() => onOpenProfile(p.author)} style={{ display: "flex", alignItems: "center", gap: 8, pointerEvents: "auto", cursor: "pointer", width: "fit-content" }}>
+          <Avatar user={p.author} size={30} t={t} />
+          <span style={{ color: "#fff", fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 14 }}>{p.author?.pseudo}</span>
+          <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{agoLabel(p.created_at)}</span>
+        </div>
+        <div style={{ marginTop: 6, color: "#fff", fontFamily: "'DM Mono',monospace", fontSize: 11, letterSpacing: "0.06em", opacity: 0.85 }}>{CAT_ICONS[p.category]} {p.category?.toUpperCase()}{p.activity?.title ? ` · ${p.activity.title}` : ""}</div>
+        {p.caption && <p style={{ margin: "6px 0 0", color: "#fff", fontFamily: "'DM Sans',sans-serif", fontSize: 14, lineHeight: 1.4, textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}>{p.caption}</p>}
+      </div>
+      <div style={{ position: "absolute", right: 10, bottom: 18, display: "flex", flexDirection: "column", gap: 14, alignItems: "center" }}>
+        <div><button style={btn} onClick={() => actions.like(p)} aria-label="J'aime"><HeartIcon size={26} filled={liked} color={liked ? "#FF3B5C" : "#fff"} /></button><div style={cnt}>{p.likes?.length || 0}</div></div>
+        <div><button style={btn} onClick={() => onOpenComments(p)} aria-label="Commentaires"><CommentIcon size={26} color="#fff" /></button><div style={cnt}>{p.comments?.length || 0}</div></div>
+        <button style={btn} onClick={() => actions.share(p)} aria-label="Partager"><SendIcon size={24} color="#fff" /></button>
+        {p.media_type === "video" && <button style={btn} onClick={() => setMuted(m => !m)} aria-label="Son">{muted ? "🔇" : "🔊"}</button>}
+      </div>
+    </div>
+  );
+}
+
 function GalleryPage({ me, posts, stories, activities, friendIds, actions, focusPostId, onFocusDone, onOpenProfile, onAddPost, onDeletePost, onAddStory, onDeleteStory, t }) {
   const [scope, setScope] = useState("all");   // "friends" | "all"
   const [cat, setCat] = useState("Tous");
@@ -2642,6 +2687,14 @@ function GalleryPage({ me, posts, stories, activities, friendIds, actions, focus
   const [viewId, setViewId] = useState(null);
   const [storyView, setStoryView] = useState(null);
   useEffect(()=>{ if (focusPostId && posts.some(p=>p.id===focusPostId)) { setViewId(focusPostId); onFocusDone?.(); } },[focusPostId, posts]);
+  const rootRef = useRef(null);
+  useEffect(()=>{
+    let n = rootRef.current?.parentElement;
+    while (n && !/(auto|scroll)/.test(getComputedStyle(n).overflowY)) n = n.parentElement;
+    if (!n) return;
+    const prev = n.style.scrollSnapType; n.style.scrollSnapType = "y proximity";
+    return ()=>{ n.style.scrollSnapType = prev; };
+  },[]);
   const viewPost = viewId ? posts.find(p=>p.id===viewId) : null;
   const scoped = scope==="friends" ? posts.filter(p=>p.user_id===me.id || friendIds.includes(p.user_id)) : posts;
   const counts = {}; scoped.forEach(p=>{ counts[p.category] = (counts[p.category]||0) + 1; });
@@ -2657,7 +2710,7 @@ function GalleryPage({ me, posts, stories, activities, friendIds, actions, focus
     </div>
   );
   return (
-    <div style={{padding:"20px 16px",maxWidth:680,margin:"0 auto"}}>
+    <div ref={rootRef} style={{padding:"20px 12px",maxWidth:680,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <h2 style={{fontFamily:"'Fraunces',serif",fontSize:26,color:t.text,margin:0}}>Souvenirs</h2>
         <Btn accent small onClick={()=>setComposer(true)} t={t}>＋ Partager</Btn>
@@ -2677,13 +2730,8 @@ function GalleryPage({ me, posts, stories, activities, friendIds, actions, focus
       </div>
       {scoped.length === 0 && <div style={{textAlign:"center",padding:"48px 10px",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13}}>{scope==="friends" ? "Tes amis n'ont encore rien partagé." : "Aucun souvenir pour l'instant. Partage les photos et vidéos de tes sorties !"}</div>}
       {scoped.length > 0 && cat !== "Tous" && !counts[cat] && <div style={{textAlign:"center",padding:"36px 10px",color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:13}}>Rien dans cette catégorie pour l'instant.</div>}
-      {shown.filter(c=>counts[c]).map(c=>(
-        <div key={c} style={{marginBottom:22}}>
-          <div style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:t.accent,letterSpacing:"0.08em",marginBottom:8}}>{CAT_ICONS[c]} {c.toUpperCase()} · {counts[c]}</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
-            {scoped.filter(p=>p.category===c).map(p=><Thumb key={p.id} p={p}/>)}
-          </div>
-        </div>
+      {scoped.filter(p=>cat==="Tous"||p.category===cat).map(p=>(
+        <FeedItem key={p.id} p={p} me={me} actions={actions} onOpenComments={q=>setViewId(q.id)} onOpenProfile={onOpenProfile} t={t} />
       ))}
       {composer && <PostComposer me={me} activities={activities} onClose={()=>setComposer(false)} onSubmit={onAddPost} t={t} />}
       {viewPost && <PostViewer post={viewPost} me={me} actions={actions} onClose={()=>setViewId(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} />}
@@ -3804,7 +3852,7 @@ export default function App() {
         )}
 
         {/* ── SCROLL CONTENT ── */}
-        <div style={{flex:1,overflowY:"auto",position:"relative"}}>
+        <div style={{flex:1,overflowY:"auto",overflowX:"hidden",overscrollBehaviorX:"none",WebkitOverflowScrolling:"touch",position:"relative"}}>
 
           {/* HOME */}
           {page==="home"&&(
@@ -3814,10 +3862,10 @@ export default function App() {
                 <p style={{color:t.text3,fontFamily:"'DM Mono',monospace",fontSize:11,letterSpacing:"0.08em"}}>ORGANISEZ • RENCONTREZ • VIBREZ</p>
               </div>
               <div style={{marginBottom:20}}>
-                <button onClick={toggleAvail} style={{width:"100%",marginBottom:10,padding:"10px 14px",borderRadius:14,border:`1px solid ${availNow?"#2DBE60":t.border}`,background:availNow?"#2DBE6018":t.bg2,color:availNow?"#2DBE60":t.text2,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,textAlign:"left"}}>{availNow?"🟢 Tu es dispo ce soir — tes amis le voient (touche pour annuler)":"⚪ Dispo ce soir ? Préviens tes amis en un geste"}</button>
+                <button onClick={toggleAvail} style={{width:"100%",marginBottom:10,padding:"10px 14px",borderRadius:14,border:`1px solid ${availNow?"#2DBE60":t.border}`,background:availNow?"#2DBE6018":t.bg2,color:availNow?"#2DBE60":t.text2,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,textAlign:"left"}}>{availNow?"🟢 Tu es dispo — touche pour annuler":"⚪ Touche pour montrer que tu es dispo"}</button>
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Rechercher une sortie ou un lieu…" style={{...inputStyle,width:"100%",marginBottom:10,padding:"12px 16px",borderRadius:14,fontSize:14,flex:"none"}} />
                 <div style={{display:"flex",gap:8,marginBottom:8}}>
-                  <button onClick={()=>setShowFilters(v=>!v)} style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${nbFilters?"#E8008A":t.border}`,background:t.bg2,color:nbFilters?"#E8008A":t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>⚙️ Filtres{nbFilters?` (${nbFilters})`:""}</button>
+                  <button onClick={()=>setShowFilters(v=>!v)} style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${nbFilters?"#E8008A":t.border}`,background:t.bg2,color:nbFilters?"#E8008A":t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:"-2px",marginRight:6}}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>Filtres{nbFilters?` (${nbFilters})`:""}</button>
                   {nbFilters>0&&<button onClick={()=>{setFDate("all");setFRadius(0);setFFree(false);setFFav(false);}} style={{background:"none",border:"none",color:t.text3,cursor:"pointer",fontSize:12,fontFamily:"'DM Mono',monospace"}}>Réinitialiser</button>}
                 </div>
                 {showFilters&&(()=>{ const chip=(on,label,fn)=>(<button key={label} onClick={fn} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${on?"#E8008A":t.border}`,background:on?"#E8008A":"transparent",color:on?"#fff":t.text3,cursor:"pointer",fontSize:11,fontFamily:"'DM Mono',monospace"}}>{label}</button>); return (
@@ -3850,7 +3898,7 @@ export default function App() {
 
           {/* DETAIL */}
           {page==="detail"&&selected&&(
-            <div {...swipeBack(()=>setPage(detailBack),true)} style={{display:"flex",flexDirection:"column",height:"100%"}}>
+            <div {...swipeBack(()=>setPage(detailBack),true)} style={{display:"flex",flexDirection:"column",height:"100%",paddingTop:"env(safe-area-inset-top, 0px)",boxSizing:"border-box"}}>
               <ActivityDetail activity={selected} currentUser={currentUser} onBack={()=>setPage(detailBack)} onAccept={handleAccept} onReject={handleReject} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendMedia={handleSendMedia} onSendGif={handleSendGif} onUnsend={handleUnsendAct} onPin={handlePinAct} onCreatePoll={handlePollAct} onJoin={handleJoin} onOpenProfile={setProfileUser} onDelete={handleDeleteActivity} isFav={favs.includes(selected.id)} onToggleFav={()=>toggleFav(selected.id)} t={t} />
             </div>
           )}
