@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import * as api from "./api";
 import * as billing from "./billing";
 import * as push from "./push";
@@ -497,7 +498,7 @@ function MyProfilePage({currentUser, onUpdate, onBack, onGoSettings, startTab, f
                     </div>))}
                 </div>
           )}
-          {viewPost && <PostViewer post={viewPost} me={currentUser} actions={actions} onClose={()=>setViewId(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} />}
+          {viewPost && <Portal><PostViewer post={viewPost} me={currentUser} actions={actions} onClose={()=>setViewId(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} /></Portal>}
         </div>
       ) : (<>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:28}}>
@@ -600,7 +601,7 @@ function SettingsPage({onOpenPremium, currentUser, darkMode, onToggleDark, onLog
         <Row icon="🗑" label="Supprimer mon compte" onClick={onDeleteAccount} right={<span style={{color:t.accent}}>›</span>} />
         <Row icon="🚪" label="Se déconnecter" onClick={onLogout} right={<span style={{color:t.accent,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:12}}>→</span>} />
       </div>
-      <p style={{textAlign:"center",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,marginTop:24}}>GrouZ v2.0.0 · version 21/11-C · Fait avec ♥</p>
+      <p style={{textAlign:"center",color:t.text3,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",fontSize:10,marginTop:24}}>GrouZ v2.0.0 · version 22/11-D · Fait avec ♥</p>
     </div>
   );
 }
@@ -2408,6 +2409,9 @@ const SendIcon = ({ size=24, color="currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
 );
 
+// Affiche un plein écran directement dans <body> : il passe ainsi au-dessus de la barre du haut et de la barre de navigation
+const Portal = ({ children }) => createPortal(children, document.body);
+
 // ── ÉDITEUR DE STORY (texte, emojis, musique) ──────────────────
 const STAGE = { position:"relative", width:"min(100%, calc(100dvh * 9 / 16))", aspectRatio:"9 / 16", containerType:"inline-size", background:"#000", overflow:"hidden" };
 const STORY_COLORS = ["#FFFFFF","#000000","#FFD60A","#FF375F","#30D158","#0A84FF","#BF5AF2"];
@@ -2460,7 +2464,7 @@ function StoryEditor({ file, onCancel, onPublish, t }) {
   const publish = async () => { setBusy(true); try { await onPublish({ overlays:items, musicFile:music?.file || null, musicTitle:music?.title || null }); } finally { setBusy(false); } };
   const tb = { width:42, height:42, borderRadius:"50%", border:"none", background:"rgba(0,0,0,0.45)", color:"#fff", fontSize:20, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", padding:0, fontWeight:700 };
   return (
-    <div style={{ position:"fixed", inset:0, background:"#000", zIndex:450, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", touchAction:"none" }}>
+    <div style={{ position:"fixed", top:0, left:0, width:"100vw", height:"100dvh", background:"#000", zIndex:2000, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", touchAction:"none", fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text',Roboto,Helvetica,Arial,sans-serif" }}>
       <div ref={stageRef} onPointerDown={() => setSel(null)} style={STAGE}>
         {isVideo
           ? <video src={url} autoPlay loop muted playsInline style={{ width:"100%", height:"100%", objectFit:"contain" }} />
@@ -2537,7 +2541,7 @@ function StoryAvatar({ user, size, stories = [], me, actions, onDelete, t }) {
       <span onClick={() => setOpen(true)} style={{ display:"inline-flex", padding:3, borderRadius:"50%", background: unseen ? t.gradient : t.border, cursor:"pointer" }} aria-label="Voir la story">
         <span style={{ background:t.bg, borderRadius:"50%", padding:2, display:"inline-flex" }}><Avatar user={user} size={size} t={t} /></span>
       </span>
-      {open && <StoryViewer groups={[{ user, items: mine }]} startGroup={0} me={me} actions={actions} onClose={() => setOpen(false)} onDelete={onDelete || (() => {})} t={t} />}
+      {open && <Portal><StoryViewer groups={[{ user, items: mine }]} startGroup={0} me={me} actions={actions} onClose={() => setOpen(false)} onDelete={onDelete || (() => {})} t={t} /></Portal>}
     </>
   );
 }
@@ -2937,10 +2941,10 @@ function GalleryPage({ me, posts, stories, activities, friendIds, actions, focus
       }).map(p=>(
         <FeedItem key={p.id} p={p} me={me} actions={actions} onOpenComments={q=>setViewId(q.id)} onOpenProfile={onOpenProfile} t={t} />
       ))}
-      {composer && <PostComposer me={me} activities={activities} onClose={()=>setComposer(false)} onSubmit={onAddPost} t={t} />}
-      {viewPost && <PostViewer post={viewPost} me={me} actions={actions} onClose={()=>setViewId(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} />}
-      {storyDraft && <StoryEditor file={storyDraft} onCancel={()=>setStoryDraft(null)} onPublish={async o=>{ await onAddStory(storyDraft, o); setStoryDraft(null); }} t={t} />}
-      {storyView && <StoryViewer groups={storyView.groups} startGroup={storyView.i} me={me} actions={actions} onClose={()=>setStoryView(null)} onDelete={onDeleteStory} t={t} />}
+      {composer && <Portal><PostComposer me={me} activities={activities} onClose={()=>setComposer(false)} onSubmit={onAddPost} t={t} /></Portal>}
+      {viewPost && <Portal><PostViewer post={viewPost} me={me} actions={actions} onClose={()=>setViewId(null)} onOpenProfile={onOpenProfile} onDelete={onDeletePost} t={t} /></Portal>}
+      {storyDraft && <Portal><StoryEditor file={storyDraft} onCancel={()=>setStoryDraft(null)} onPublish={async o=>{ await onAddStory(storyDraft, o); setStoryDraft(null); }} t={t} /></Portal>}
+      {storyView && <Portal><StoryViewer groups={storyView.groups} startGroup={storyView.i} me={me} actions={actions} onClose={()=>setStoryView(null)} onDelete={onDeleteStory} t={t} /></Portal>}
     </div>
   );
 }
